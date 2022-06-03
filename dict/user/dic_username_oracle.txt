@@ -1,0 +1,8 @@
+sys
+system
+admin
+test
+web
+orcl
+oracle
+root
