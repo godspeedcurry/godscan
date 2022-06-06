@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
+	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/fatih/color v1.12.0
 	github.com/gobuffalo/envy v1.9.0 // indirect
 	github.com/gobuffalo/logger v1.0.4 // indirect
