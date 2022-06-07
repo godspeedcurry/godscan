@@ -20,7 +20,7 @@ func init() {
 func main() {
 	flag.Parse()
 	utils.PrintFinger(Url)
-
+	// utils.GetListFromYunsee(1)
 	// var web_username = dict.Get_web_username()
 	// var device_username = dict.Get_device_password("topsec")
 	// color.Cyan("Prints text in cyan.")

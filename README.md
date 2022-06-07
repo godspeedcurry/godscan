@@ -18,6 +18,9 @@
 * 图标哈希
 * 版本识别
 * 爬虫 递归访问
-
+* finger.txt来源
+  * Ehole https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json
+  * https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf
+  * 
 ## 新增弱口令
 - [x] 在fscan的基础上新增从若干个报告中获取到的弱口令
