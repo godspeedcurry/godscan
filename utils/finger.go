@@ -18,17 +18,17 @@ import (
 	"github.com/scylladb/termtables"
 )
 
-type Pair struct {
-	Key   string
-	Value int
-}
+func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, string, string, error) {
+	req, _ := http.NewRequest(Method, Url, nil)
 
-func HttpGetServerHeader(Url string, NeedTitle bool) (string, string, error) {
-	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.61 Safari/537.36")
+	if Method == http.MethodPost {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
 	resp, err := Client.Do(req)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -37,55 +37,60 @@ func HttpGetServerHeader(Url string, NeedTitle bool) (string, string, error) {
 		log.Fatal(err)
 	}
 	ServerValue := resp.Header["Server"]
+	Status := resp.Status
 	if len(ServerValue) != 0 {
-		return ServerValue[0], title, nil
+		return ServerValue[0], Status, title, nil
 	}
-	return "", "", nil
+	return "", "", "", nil
 }
 
 func FindKeyWord(data string) {
 	fi, err := os.Open("utils/finger.txt")
-	m := make(map[string]int)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
 		return
 	}
 	defer fi.Close()
 
+	m := make(map[string]int)
 	br := bufio.NewReader(fi)
 	for {
-		a, _, c := br.ReadLine()
-		if c == io.EOF {
+		line, _, err := br.ReadLine()
+		if err == io.EOF {
 			break
 		}
-		x := string(a)
+		x := string(line)
 		if strings.Contains(data, x) {
 			cnt := strings.Count(data, x)
 			m[x] = cnt
 		}
 	}
-	y := mysort(m)
+	mSorted := mysort(m)
 	table := termtables.CreateTable()
 	table.AddHeaders("Key1", "Value1", "Key2", "Value2", "Key3", "Value3", "Key4", "Value4", "Key5", "Value5")
 	tmpList := []string{}
 	cnt := 0
-	for _, tmp := range y {
+	maxColumn := 10
+	for _, tmp := range mSorted {
 		tmpList = append(tmpList, tmp.Key)
 		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
 		cnt++
-		if cnt%5 == 0 {
-			table.AddRow(StringListToInterfaceList(tmpList[:10])...)
+		if cnt%(maxColumn/2) == 0 {
+			table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
 			tmpList = []string{}
 		}
 	}
 	if cnt%5 != 0 {
-		for i := 0; i <= 5-cnt%5; i++ {
-			tmpList = append(tmpList, "None")
-			tmpList = append(tmpList, "None")
-		}
-		table.AddRow(StringListToInterfaceList(tmpList[:10])...)
+		tmpList = append(tmpList, make([]string, maxColumn)...)
+		table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
 	}
 	color.Cyan("%s\n", table.Render())
+}
+
+func IsVuePath(Path string) bool {
+	reg := regexp.MustCompile(`app\.[0-9a-z]+\.js`)
+	res := reg.FindAllString(Path, -1)
+	return len(res) > 0
 }
 
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
@@ -99,20 +104,47 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	fmt.Printf("======Depth %d, target %s =====\n", depth, Url)
 	s1.Add(Url)
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/102.0.5005.61 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
 	resp, err := Client.Do(req)
 	if err != nil {
+		fmt.Println(err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
 	FindKeyWord(doc.Text())
-	//正则提取注释
-	reg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 
-	result := reg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	if len(result) > 0 {
-		fmt.Println(result)
+	//正则提取注释
+	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
+
+	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	if len(AnnotationResult) > 0 {
+		fmt.Println("[*] 注释部分")
+		fmt.Println(AnnotationResult)
+	}
+
+	//正则提取版本
+	VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
+
+	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	if len(VersionResult) > 0 {
+		fmt.Println("[*] 版本识别")
+		res, _ := removeDuplicateElement(VersionResult)
+		fmt.Println(strings.Join(res.([]string), "\n"))
+	}
+
+	// 如果是vue.js app.xxxxxxxx.js
+	if IsVuePath(Url) {
+		fmt.Println("[*] Api Path")
+		ApiReg := regexp.MustCompile(`path:"(?P<path>.*?)"`)
+		ApiResult := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+
+		if len(ApiResult) > 0 {
+			for _, tmp := range ApiResult {
+				fmt.Println(RootPath + tmp[1])
+			}
+		}
+
 	}
 
 	// a标签
@@ -124,8 +156,8 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		}
 	})
 	// script 标签
-	doc.Find("script").Each(func(i int, a *goquery.Selection) {
-		src, _ := a.Attr("src")
+	doc.Find("script").Each(func(i int, script *goquery.Selection) {
+		src, _ := script.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
 		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
 			Spider(RootPath, normalizeUrl, depth-1, s1)
@@ -134,13 +166,13 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	return "", nil
 }
 
-func DisplayHeader(Url string) {
-	ServerHeader, Title, err := HttpGetServerHeader(Url, true)
+func DisplayHeader(Url string, Method string) {
+	ServerHeader, Status, Title, err := HttpGetServerHeader(Url, true, Method)
 	if err != nil {
 		color.HiRed("Error: %s\n", err)
 	} else {
-		color.Cyan("Server: %s\n", ServerHeader)
-		color.Cyan("Title: %s\n", Title)
+		color.Cyan("Url: %s\tMethod: %s\n", Url, Method)
+		color.Cyan("Server: %s\tStatus: %s\tTitle: %s\n", ServerHeader, Status, Title)
 	}
 }
 
@@ -148,16 +180,24 @@ func PrintFinger(Url string) {
 	InitHttp()
 	color.HiRed("Your URL: %s\n", Url)
 	Host, _ := url.Parse(Url)
-
+	RootPath := Host.Scheme + "://" + Host.Hostname()
+	if Host.Port() != "" {
+		RootPath = RootPath + ":" + Host.Port()
+	}
 	// 首页
-	FirstUrl := Host.Scheme + "://" + Host.Hostname()
-	DisplayHeader(FirstUrl)
+	FirstUrl := RootPath
+	DisplayHeader(FirstUrl, http.MethodGet)
 
 	// 构造404
-	SecondUrl := Host.Scheme + "://" + Host.Hostname() + "/xxxxxx"
-	DisplayHeader(SecondUrl)
+	SecondUrl := RootPath + "/xxxxxx"
+	DisplayHeader(SecondUrl, http.MethodGet)
+
+	// 构造POST
+	ThirdUrl := RootPath
+	DisplayHeader(ThirdUrl, http.MethodPost)
 
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
-	Spider(Host.Scheme+"://"+Host.Hostname(), Url, 10, s1)
+	// fmt.Print(s1)
+	Spider(RootPath, Url, 10, s1)
 }
