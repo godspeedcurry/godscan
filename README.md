@@ -18,6 +18,7 @@ v1.7.2
 v2.1.1
 版本 5.x
 ```
+- [x] 对注释里的内容匹配到关键字并高亮
 - [x] 识别接口 从js里提取
 - [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
 - [x] finger.txt来源
@@ -52,3 +53,6 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags
 
 
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
+
+
+![image](https://github.com/godspeedcurry/godscan/blob/master/images/img.png)

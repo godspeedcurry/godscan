@@ -1,9 +1,8 @@
 package main
 
 import (
-	"main/utils"
-	// "github.com/gobuffalo/packr"
 	"flag"
+	"main/utils"
 )
 
 var (
