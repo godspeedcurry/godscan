@@ -21,7 +21,6 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 
 	if Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
 	resp, err := Client.Do(req)
@@ -42,22 +41,25 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	return "", "", "", nil
 }
 
-func FindKeyWord(data string) {
-	m := make(map[string]int)
+func GetFingerList() []string {
 	box := packr.NewBox(".")
 	fingers, err := box.FindString("finger.txt")
 	if err != nil {
 		fmt.Println(err)
-		return
+		return []string{}
 	}
-	var fingerList = strings.Split(fingers, "\r\n")
+	return strings.Split(fingers, "\r\n")
+}
+
+func FindKeyWord(data string) {
+	m := make(map[string]int)
+	fingerList := GetFingerList()
 	for _, finger := range fingerList {
 		if strings.Contains(data, finger) {
 			cnt := strings.Count(data, finger)
 			m[finger] = cnt
 		}
 	}
-
 	mSorted := mysort(m)
 	table := termtables.CreateTable()
 	table.AddHeaders("Key1", "Value1", "Key2", "Value2", "Key3", "Value3", "Key4", "Value4", "Key5", "Value5")
@@ -86,6 +88,15 @@ func IsVuePath(Path string) bool {
 	return len(res) > 0
 }
 
+func PrettyPrint(data string, keywords []string) {
+	for _, keyword := range keywords {
+		data = strings.ReplaceAll(data, keyword, color.RedString(keyword))
+	}
+	for _, keyword := range GetFingerList() {
+		data = strings.ReplaceAll(data, keyword, color.RedString(keyword))
+	}
+	fmt.Println(data)
+}
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
 	if !strings.Contains(Url, RootPath) {
 		fmt.Printf("======Depth %d, target %s =====\n", depth, Url)
@@ -107,23 +118,25 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
 	FindKeyWord(doc.Text())
 
-	//正则提取注释
-	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
-
-	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	if len(AnnotationResult) > 0 {
-		fmt.Println("[*] 注释部分")
-		fmt.Println(AnnotationResult)
-	}
-
 	//正则提取版本
 	VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
 
 	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	var VersionResultNotDupplicated interface{}
 	if len(VersionResult) > 0 {
 		fmt.Println("[*] 版本识别")
-		res, _ := removeDuplicateElement(VersionResult)
-		fmt.Println(strings.Join(res.([]string), "\n"))
+		VersionResultNotDupplicated, _ = removeDuplicateElement(VersionResult)
+		// fmt.Println(strings.Join(VersionResultNotDupplicated.([]string), "\n"))
+	}
+
+	//正则提取注释
+	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
+	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	if len(AnnotationResult) > 0 {
+		fmt.Println("[*] 注释部分")
+		for _, Annotation := range AnnotationResult {
+			PrettyPrint(Annotation, VersionResultNotDupplicated.([]string))
+		}
 	}
 
 	// 如果是vue.js app.xxxxxxxx.js
