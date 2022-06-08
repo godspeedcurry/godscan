@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -19,27 +18,10 @@ import (
 	"github.com/scylladb/termtables"
 )
 
-func mysort(mymap map[string]int) PairList {
-	pl := make(PairList, len(mymap))
-	i := 0
-	for k, v := range mymap {
-		pl[i] = Pair{k, v}
-		i++
-	}
-	sort.Sort(sort.Reverse(pl))
-	return pl
-}
-
 type Pair struct {
 	Key   string
 	Value int
 }
-
-type PairList []Pair
-
-func (p PairList) Len() int           { return len(p) }
-func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
-func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
 func HttpGetServerHeader(Url string, NeedTitle bool) (string, string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
@@ -61,32 +43,8 @@ func HttpGetServerHeader(Url string, NeedTitle bool) (string, string, error) {
 	return "", "", nil
 }
 
-func Normalize(Path string, RootPath string) string {
-	if strings.Contains(Path, "javascript:") {
-		return ""
-	} else if strings.HasPrefix(Path, "http://") {
-		return Path
-	} else if strings.HasPrefix(Path, "https://") {
-		return Path
-	} else if strings.HasPrefix(Path, "./") {
-		return RootPath + Path[1:]
-	} else if strings.HasPrefix(Path, "/") {
-		return RootPath + Path
-	} else {
-		return RootPath + "/" + Path
-	}
-}
-
-func StringListToInterfaceList(tmpList []string) []interface{} {
-	vals := make([]interface{}, len(tmpList))
-	for i, v := range tmpList {
-		vals[i] = v
-	}
-	return vals
-}
 func FindKeyWord(data string) {
 	fi, err := os.Open("utils/finger.txt")
-
 	m := make(map[string]int)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err)
@@ -95,7 +53,6 @@ func FindKeyWord(data string) {
 	defer fi.Close()
 
 	br := bufio.NewReader(fi)
-
 	for {
 		a, _, c := br.ReadLine()
 		if c == io.EOF {
@@ -117,7 +74,7 @@ func FindKeyWord(data string) {
 		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
 		cnt++
 		if cnt%5 == 0 {
-			table.AddRow(StringListToInterfaceList(tmpList)...)
+			table.AddRow(StringListToInterfaceList(tmpList[:10])...)
 			tmpList = []string{}
 		}
 	}
@@ -126,7 +83,7 @@ func FindKeyWord(data string) {
 			tmpList = append(tmpList, "None")
 			tmpList = append(tmpList, "None")
 		}
-		table.AddRow(StringListToInterfaceList(tmpList)...)
+		table.AddRow(StringListToInterfaceList(tmpList[:10])...)
 	}
 	color.Cyan("%s\n", table.Render())
 }
@@ -154,7 +111,9 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	reg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 
 	result := reg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	fmt.Println(result)
+	if len(result) > 0 {
+		fmt.Println(result)
+	}
 
 	// a标签
 	doc.Find("a").Each(func(i int, a *goquery.Selection) {
