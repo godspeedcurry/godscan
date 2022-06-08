@@ -902,7 +902,6 @@ destroy
 devalcms
 devices
 dg834
-dg834(g)
 dg834g
 dg834gb
 dg834gl
@@ -1106,7 +1105,8 @@ easypanel
 easysite
 easysitecms
 easytalk微博客
-easytrace(botwave)
+easytrace
+botwave
 easyui
 easywebcms
 eazycms
@@ -1114,10 +1114,12 @@ ebcms
 ebuilding
 ebuycms
 ec2
-ecjia到家(h5微商城)
+ecjia到家
+h5微商城
 eclass
 ecmall
-ecmos(ecmall深度定制的系统)
+ecmos
+ecmall深度定制的系统
 edu智慧校园
 ecocms
 ecology
@@ -1904,8 +1906,8 @@ jspgencms
 jsphost
 jspwiki
 jspxcms
-jtbc(cms
-jtbc(cms)
+jtbc
+jtbccms
 jtbc网站内容管理系统
 jtopcms
 juhaoyongcms
