@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,6 +77,13 @@ func Normalize(Path string, RootPath string) string {
 	}
 }
 
+func StringListToInterfaceList(tmpList []string) []interface{} {
+	vals := make([]interface{}, len(tmpList))
+	for i, v := range tmpList {
+		vals[i] = v
+	}
+	return vals
+}
 func FindKeyWord(data string) {
 	fi, err := os.Open("utils/finger.txt")
 
@@ -109,17 +117,16 @@ func FindKeyWord(data string) {
 		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
 		cnt++
 		if cnt%5 == 0 {
-			table.AddRow(tmpList[0], tmpList[1], tmpList[2], tmpList[3], tmpList[4], tmpList[5], tmpList[6], tmpList[7], tmpList[8], tmpList[9])
+			table.AddRow(StringListToInterfaceList(tmpList)...)
 			tmpList = []string{}
 		}
-
 	}
 	if cnt%5 != 0 {
 		for i := 0; i <= 5-cnt%5; i++ {
 			tmpList = append(tmpList, "None")
 			tmpList = append(tmpList, "None")
 		}
-		table.AddRow(tmpList[0], tmpList[1], tmpList[2], tmpList[3], tmpList[4], tmpList[5], tmpList[6], tmpList[7], tmpList[8], tmpList[9])
+		table.AddRow(StringListToInterfaceList(tmpList)...)
 	}
 	color.Cyan("%s\n", table.Render())
 }
@@ -141,17 +148,13 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		return "", err
 	}
 	defer resp.Body.Close()
-	x, _ := io.ReadAll(resp.Body)
-	y := string(x)
-	FindKeyWord(y)
-
-	doc, _ := goquery.NewDocument(Url)
-
+	doc, _ := goquery.NewDocumentFromReader(resp.Body)
+	FindKeyWord(doc.Text())
 	//正则提取注释
-	// reg := regexp.MustCompile("/\\*[\u0000-\uffff]*?\\*/")
+	reg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 
-	// result := reg.FindAllString(doc.Text(), -1)
-	// fmt.Println(result)
+	result := reg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	fmt.Println(result)
 
 	// a标签
 	doc.Find("a").Each(func(i int, a *goquery.Selection) {
@@ -198,5 +201,4 @@ func PrintFinger(Url string) {
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
 	Spider(Host.Scheme+"://"+Host.Hostname(), Url, 10, s1)
-
 }
