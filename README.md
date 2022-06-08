@@ -6,6 +6,7 @@
 - [x] POST请求构造报错 
 - [x] 解析html源代码 关键字匹配得到特征, 根据指纹特征进行词频统计, 并表格化输出
 - [x] 爬虫 递归访问
+- [x] 正则提取注释 注释里往往有版本 github仓库等信息
 - [x] 版本识别 一般会有多个 正则实现 如下均可识别
 ```
 版本 4.x
@@ -30,3 +31,15 @@ v2.1.1
 
 ## 弱口令自动生成
 todo
+
+## log4j 扫描 
+todo
+要能指定listener
+好用的dnslog
+
+
+## 更新说明
+* 修复了os.Open导致找不到文件的错误，改用packr库
+
+
+![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
