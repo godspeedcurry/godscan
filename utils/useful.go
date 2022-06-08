@@ -1,0 +1,47 @@
+package utils
+
+import (
+	"sort"
+	"strings"
+)
+
+type PairList []Pair
+
+func (p PairList) Len() int           { return len(p) }
+func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
+func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+
+func mysort(mymap map[string]int) PairList {
+	pl := make(PairList, len(mymap))
+	i := 0
+	for k, v := range mymap {
+		pl[i] = Pair{k, v}
+		i++
+	}
+	sort.Sort(sort.Reverse(pl))
+	return pl
+}
+
+func StringListToInterfaceList(tmpList []string) []interface{} {
+	vals := make([]interface{}, len(tmpList))
+	for i, v := range tmpList {
+		vals[i] = v
+	}
+	return vals
+}
+
+func Normalize(Path string, RootPath string) string {
+	if strings.Contains(Path, "javascript:") {
+		return ""
+	} else if strings.HasPrefix(Path, "http://") {
+		return Path
+	} else if strings.HasPrefix(Path, "https://") {
+		return Path
+	} else if strings.HasPrefix(Path, "./") {
+		return RootPath + Path[1:]
+	} else if strings.HasPrefix(Path, "/") {
+		return RootPath + Path
+	} else {
+		return RootPath + "/" + Path
+	}
+}
