@@ -51,12 +51,14 @@ func GetFingerList() []string {
 	return strings.Split(fingers, "\r\n")
 }
 
-func FindKeyWord(data string) {
+func FindKeyWord(data string) []string {
+	keywords := []string{}
 	m := make(map[string]int)
 	fingerList := GetFingerList()
 	for _, finger := range fingerList {
 		if strings.Contains(data, finger) {
 			cnt := strings.Count(data, finger)
+			keywords = append(keywords, finger)
 			m[finger] = cnt
 		}
 	}
@@ -70,16 +72,17 @@ func FindKeyWord(data string) {
 		tmpList = append(tmpList, tmp.Key)
 		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
 		cnt++
-		if cnt%(maxColumn/2) == 0 {
+		if cnt%(maxColumn>>1) == 0 {
 			table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
 			tmpList = []string{}
 		}
 	}
-	if cnt%5 != 0 {
+	if cnt%(maxColumn>>1) != 0 {
 		tmpList = append(tmpList, make([]string, maxColumn)...)
 		table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
 	}
 	color.Cyan("%s\n", table.Render())
+	return keywords
 }
 
 func IsVuePath(Path string) bool {
@@ -88,15 +91,18 @@ func IsVuePath(Path string) bool {
 	return len(res) > 0
 }
 
-func PrettyPrint(data string, keywords []string) {
+func HighLight(data string, keywords []string, fingers []string) {
 	for _, keyword := range keywords {
-		data = strings.ReplaceAll(data, keyword, color.RedString(keyword))
+		re := regexp.MustCompile("(?i)" + Quote(keyword))
+		data = re.ReplaceAllString(data, color.RedString(keyword))
 	}
-	for _, keyword := range GetFingerList() {
-		data = strings.ReplaceAll(data, keyword, color.RedString(keyword))
+	for _, keyword := range fingers {
+		re := regexp.MustCompile("(?i)(" + Quote(keyword) + ")")
+		data = re.ReplaceAllString(data, color.RedString("$1"))
 	}
 	fmt.Println(data)
 }
+
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
 	if !strings.Contains(Url, RootPath) {
 		fmt.Printf("======Depth %d, target %s =====\n", depth, Url)
@@ -116,7 +122,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	}
 	defer resp.Body.Close()
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
-	FindKeyWord(doc.Text())
+	keywords := FindKeyWord(doc.Text())
 
 	//正则提取版本
 	VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
@@ -124,18 +130,16 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 	var VersionResultNotDupplicated interface{}
 	if len(VersionResult) > 0 {
-		fmt.Println("[*] 版本识别")
 		VersionResultNotDupplicated, _ = removeDuplicateElement(VersionResult)
-		// fmt.Println(strings.Join(VersionResultNotDupplicated.([]string), "\n"))
 	}
 
 	//正则提取注释
 	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 	if len(AnnotationResult) > 0 {
-		fmt.Println("[*] 注释部分")
+		fmt.Println("[*] 注释部分 && 版本识别")
 		for _, Annotation := range AnnotationResult {
-			PrettyPrint(Annotation, VersionResultNotDupplicated.([]string))
+			HighLight(Annotation, VersionResultNotDupplicated.([]string), keywords)
 		}
 	}
 
@@ -144,13 +148,11 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		fmt.Println("[*] Api Path")
 		ApiReg := regexp.MustCompile(`path:"(?P<path>.*?)"`)
 		ApiResult := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-
 		if len(ApiResult) > 0 {
 			for _, tmp := range ApiResult {
 				fmt.Println(RootPath + tmp[1])
 			}
 		}
-
 	}
 
 	// a标签

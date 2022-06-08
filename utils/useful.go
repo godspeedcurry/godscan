@@ -103,3 +103,11 @@ func in(str_array []string, target string) bool {
 	}
 	return false
 }
+
+func Quote(x string) string {
+	keys := []string{"+", "*", "[", "]", "(", ")", "?", ".", "{", "}"}
+	for _, key := range keys {
+		x = strings.ReplaceAll(x, key, "\\"+key)
+	}
+	return x
+}

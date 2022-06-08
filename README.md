@@ -50,7 +50,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags
 
 ## 更新说明
 * 修复了os.Open导致找不到文件的错误，改用packr库
-
+* 修复了大小写导致不高亮的问题
 
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
 
