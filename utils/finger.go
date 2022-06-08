@@ -1,13 +1,10 @@
 package utils
 
 import (
-	"bufio"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +12,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/fatih/color"
+	"github.com/gobuffalo/packr"
 	"github.com/scylladb/termtables"
 )
 
@@ -45,26 +43,21 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 }
 
 func FindKeyWord(data string) {
-	fi, err := os.Open("utils/finger.txt")
+	m := make(map[string]int)
+	box := packr.NewBox(".")
+	fingers, err := box.FindString("finger.txt")
 	if err != nil {
-		fmt.Printf("Error: %s\n", err)
+		fmt.Println(err)
 		return
 	}
-	defer fi.Close()
-
-	m := make(map[string]int)
-	br := bufio.NewReader(fi)
-	for {
-		line, _, err := br.ReadLine()
-		if err == io.EOF {
-			break
-		}
-		x := string(line)
-		if strings.Contains(data, x) {
-			cnt := strings.Count(data, x)
-			m[x] = cnt
+	var fingerList = strings.Split(fingers, "\r\n")
+	for _, finger := range fingerList {
+		if strings.Contains(data, finger) {
+			cnt := strings.Count(data, finger)
+			m[finger] = cnt
 		}
 	}
+
 	mSorted := mysort(m)
 	table := termtables.CreateTable()
 	table.AddHeaders("Key1", "Value1", "Key2", "Value2", "Key3", "Value3", "Key4", "Value4", "Key5", "Value5")
