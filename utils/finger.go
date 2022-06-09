@@ -143,7 +143,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		}
 	}
 
-	// 如果是vue.js app.xxxxxxxx.js
+	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
 		fmt.Println("[*] Api Path")
 		ApiReg := regexp.MustCompile(`path:"(?P<path>.*?)"`)
@@ -154,6 +154,10 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 			}
 		}
 	}
+
+	// 敏感信息搜集
+	html, _ := doc.Html()
+	SensitiveInfoCollect(html)
 
 	// a标签
 	doc.Find("a").Each(func(i int, a *goquery.Selection) {
