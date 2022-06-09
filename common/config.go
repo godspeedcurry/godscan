@@ -2,18 +2,20 @@ package common
 
 var version = "0.0.1"
 var Userdict = map[string][]string{
-	"ftp":        {"ftp", "admin", "www", "web", "root", "db", "wwwroot", "data"},
+	"ftp":        {"ftp", "admin", "www", "web", "root", "db", "wwwroot", "data", "test", "administrator", "anonymous"},
 	"mysql":      {"root", "mysql"},
 	"mssql":      {"sa", "sql"},
-	"smb":        {"administrator", "admin", "guest"},
+	"smb":        {"administrator", "admin", "guest", "test", "user", "manager", "webadmin", "guest"},
 	"rdp":        {"administrator", "admin", "guest"},
-	"postgresql": {"postgres", "admin"},
-	"ssh":        {"root", "admin"},
-	"mongodb":    {"root", "admin", "mongodb"},
-	"oracle":     {"sys", "system", "admin", "test", "web", "orcl", "oracle"},
+	"postgresql": {"postgres", "admin", "test", "web"},
+	"ssh":        {"root", "admin", "ubuntu", "kali", "centos"},
+	"mongodb":    {"root", "admin", "mongodb", "test", "web"},
+	"oracle":     {"sys", "system", "admin", "test", "web", "orcl", "oracle", "root"},
+	"mem":        {"admin", "test", "root", "web", "memcached"},
+	"vnc":        {"root"},
 }
 
-var Passwords = []string{"!QAZ2wsx", "000000", "1", "0", "111111", "123", "123123", "123321", "123456", "123456!a", "12345678", "123456789", "1234567890", "123456~a", "123654", "123qwe", "123qwe!@#", "1q2w3e", "1q2w3e4r", "1qaz!QAZ", "talent", "zxcvbnm", "qazwsxedc", "1qaz2wsx3edc", "!@#QWEASDZXC", "!@#QWEASD", "1qaz2wsx", "1qaz@WSX", "2wsx@WSX", "654321", "654123", "666666", "8888888", "88888888", "a11111", "a123123", "a12345", "a123456", "a123456.", "A123456s!", "Aa123123", "Aa1234", "Aa1234.", "Aa12345", "Aa12345.", "Aa123456", "Aa123456!", "Aa123456789", "abc123", "abc123456", "admin", "admin01", "admin123", "admin123!@#", "admin@({user})", "admin@123", "Admin@123", "admin@{user}", "admin@{user}.com", "Admin@{user}.com", "Charge123", "P@ssw0rd", "P@ssw0rd!", "pass123", "pass@123", "Passw0rd", "password", "qwe123", "qwe123!@#", "root", "sa123456", "sysadmin", "Change_Me", "system", "toor", "test", "test01", "test123", "shell", "{user}", "{user}#123", "{user}1", "{user}111", "{user}123", "{user}12345+", "{user}@01", "{user}@111", "{user}@123", "{user}@123#4", "{user}@2019", "{user}@2020", "{user}@2021", "{user}@2022", "{user}@admin", "{user}_123", "{user}_admin", "{user}admin", "{user}{user}", "manager", "1q2w#E$R", ""}
+var Passwords = []string{"!QAZ2wsx", "000000", "00000000", "1234567", "1", "12", "0", "111111", "123", "123123", "123321", "123456", "123456!a", "12345678", "123456789", "1234567890", "123456~a", "123654", "123qwe", "123qwe!@#", "1q2w3e", "1q2w3e4r", "1qaz!QAZ", "talent", "zxcvbnm", "qazwsxedc", "1qaz2wsx3edc", "!@#QWEASDZXC", "!@#QWEASD", "1qaz2wsx", "1qaz@WSX", "2wsx@WSX", "654321", "654123", "666666", "8888888", "88888888", "a11111", "a123123", "a12345", "a123456", "a123456.", "A123456s!", "Aa123123", "Aa1234", "Aa1234.", "Aa12345", "Aa12345.", "Aa123456", "Aa123456!", "Aa123456789", "abc123", "abc123456", "admin", "admin01", "admin123", "admin123!@#", "admin@({user})", "admin@123", "Admin@123", "admin@{user}", "admin@{user}.com", "Admin@{user}.com", "Charge123", "P@ssw0rd", "P@ssw0rd!", "pass123", "pass@123", "Passw0rd", "password", "qwe123", "qwe123!@#", "root", "sa123456", "sysadmin", "Change_Me", "system", "toor", "test", "test01", "test123", "shell", "{user}", "{user}#123", "{user}1", "{user}111", "{user}123", "{user}12345+", "{user}@01", "{user}@111", "{user}@123", "{user}@123#4", "{user}@2019", "{user}@2020", "{user}@2021", "{user}@2022", "{user}@admin", "{user}_123", "{user}_admin", "{user}admin", "{user}{user}", "manager", "1q2w#E$R", "", "1qaz@wsx#edc"}
 
 var PORTList = map[string]int{
 	"ftp":         21,

@@ -1,6 +1,0 @@
-sysmanager
-operator
-auditor
-system
-admin
-root
