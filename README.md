@@ -21,6 +21,7 @@ v2.1.1
 - [x] 对注释里的内容匹配到关键字并高亮
 - [x] 识别接口 从js里提取
 - [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
+- [x] vue.js 前端 识别app.xxxx.js 并使用正则提取里面的path
 - [x] finger.txt来源
   * Ehole https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json
   * https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf
@@ -30,16 +31,38 @@ v2.1.1
 ## 新增弱口令
 - [x] 在fscan的基础上新增从若干个报告中获取到的弱口令
 
-## 弱口令自动生成
+
+## 敏感信息搜集
+https://gh0st.cn/HaE/
+这里面有很多现成的规则 挑了一下重点
+- [x] JSON-WEB-Token
+- [x] 国内手机号
+- [x] 邮箱
+- [x] hmtl注释
+- [x] ueditor swagger
+
+
+## 弱口令生成模块
+* 人工筛选源代码 筛选可关注
+  * 域名 
+    * 自身域名
+    * 非自身域名 如开发商 很多默认密码和域名有千丝万缕的联系
+  * html注释
+* 根据给定的keyword list 生成
+* 最好可以优化输入
 todo
 
-## log4j 扫描 
+
+## 端口扫描+协议识别 TODO
+https://github.com/4dogs-cn/TXPortMap
+https://github.com/redtoolskobe/scaninfo
+
+## log4j 扫描模块
 todo
 要能指定listener
 好用的dnslog
 
-
-## 
+## 跨平台编译
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_linux_amd64 
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_win_amd64
