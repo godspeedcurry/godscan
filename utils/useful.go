@@ -6,6 +6,31 @@ import (
 	"strings"
 )
 
+const (
+	MININT64 = -922337203685477580
+	MAXINT64 = 9223372036854775807
+)
+
+func Max(nums ...int) int {
+	var maxNum int = MININT64
+	for _, num := range nums {
+		if num > maxNum {
+			maxNum = num
+		}
+	}
+	return maxNum
+}
+
+func Min(nums ...int) int {
+	var minNum int = MAXINT64
+	for _, num := range nums {
+		if num < minNum {
+			minNum = num
+		}
+	}
+	return minNum
+}
+
 type Pair struct {
 	Key   string
 	Value int

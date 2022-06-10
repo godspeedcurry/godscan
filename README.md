@@ -43,7 +43,7 @@ https://gh0st.cn/HaE/
 
 
 ## 弱口令生成模块
-* 人工筛选源代码 筛选可关注
+* 人工筛选 筛选可关注
   * 域名 
     * 自身域名
     * 非自身域名 如开发商 很多默认密码和域名有千丝万缕的联系
@@ -57,10 +57,18 @@ todo
 https://github.com/4dogs-cn/TXPortMap
 https://github.com/redtoolskobe/scaninfo
 
+## web poc
+todo
+
+## 各端口弱口令爆破
+todo
+
 ## log4j 扫描模块
 todo
 要能指定listener
 好用的dnslog
+
+
 
 ## 跨平台编译
 ```
@@ -72,8 +80,10 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags
 
 
 ## 更新说明
-* 修复了os.Open导致找不到文件的错误，改用packr库
-* 修复了大小写导致不高亮的问题
+* 2022-06-10 更新了正则 对输出的表格进行了优化
+* 2022-06-09 修复了大小写导致不高亮的问题
+* 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
+
 
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
 
