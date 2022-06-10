@@ -51,6 +51,15 @@ func GetFingerList() []string {
 	return strings.Split(fingers, "\r\n")
 }
 
+func GenColumn(column int) []interface{} {
+	var headers []interface{} = make([]interface{}, column)
+	for i := 0; i < (column >> 1); i++ {
+
+		headers[i<<1] = "Key" + strconv.Itoa(i+1)
+		headers[(i<<1)+1] = "Value" + strconv.Itoa(i+1)
+	}
+	return headers
+}
 func FindKeyWord(data string) []string {
 	keywords := []string{}
 	m := make(map[string]int)
@@ -64,10 +73,14 @@ func FindKeyWord(data string) []string {
 	}
 	mSorted := mysort(m)
 	table := termtables.CreateTable()
-	table.AddHeaders("Key1", "Value1", "Key2", "Value2", "Key3", "Value3", "Key4", "Value4", "Key5", "Value5")
+	maxColumn := Min(10, len(mSorted)<<1)
+	if maxColumn == 0 {
+		return keywords
+	}
+	table.AddHeaders(GenColumn(maxColumn)...)
 	tmpList := []string{}
 	cnt := 0
-	maxColumn := 10
+
 	for _, tmp := range mSorted {
 		tmpList = append(tmpList, tmp.Key)
 		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
@@ -139,7 +152,12 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	if len(AnnotationResult) > 0 {
 		fmt.Println("[*] 注释部分 && 版本识别")
 		for _, Annotation := range AnnotationResult {
-			HighLight(Annotation, VersionResultNotDupplicated.([]string), keywords)
+			if VersionResultNotDupplicated == nil {
+				HighLight(Annotation, []string{}, keywords)
+			} else {
+				HighLight(Annotation, VersionResultNotDupplicated.([]string), keywords)
+			}
+
 		}
 	}
 
