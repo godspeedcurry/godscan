@@ -89,3 +89,6 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags
 
 
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img2.png)
+
+
+![image](https://github.com/godspeedcurry/godscan/blob/master/images/img3.png)
