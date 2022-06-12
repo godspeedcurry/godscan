@@ -143,7 +143,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 	var VersionResultNotDupplicated interface{}
 	if len(VersionResult) > 0 {
-		VersionResultNotDupplicated, _ = removeDuplicateElement(VersionResult)
+		VersionResultNotDupplicated, _ = RemoveDuplicateElement(VersionResult)
 	}
 
 	//正则提取注释
