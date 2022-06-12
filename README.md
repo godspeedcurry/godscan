@@ -1,6 +1,6 @@
 # godscan
 
-## web应用指纹识别
+## web应用指纹识别 [DONE]
 - [x] HTTP响应 Server字段
 - [x] 构造404 报错 得到中间件的详情
 - [x] POST请求构造报错 
@@ -28,29 +28,31 @@ v2.1.1
   
 * 图标哈希 todo
 
-## 新增弱口令
+## 新增弱口令 [DONE]
 - [x] 在fscan的基础上新增从若干个报告中获取到的弱口令
 
-
-## 敏感信息搜集
+## 敏感信息搜集 [DONE]
 https://gh0st.cn/HaE/
 这里面有很多现成的规则 挑了一下重点
 - [x] JSON-WEB-Token
 - [x] 国内手机号
 - [x] 邮箱
 - [x] hmtl注释
-- [x] ueditor swagger
+- [x] ueditor swagger 等
 
 
-## 弱口令生成模块
+## 弱口令生成模块 [DONE]
 * 人工筛选 筛选可关注
   * 域名 
     * 自身域名
     * 非自身域名 如开发商 很多默认密码和域名有千丝万缕的联系
   * html注释
-* 根据给定的keyword list 生成
-* 最好可以优化输入
-todo
+* 根据给定的keyword list 生成 逗号分隔
+
+```
+go run main.go -k "张三,110101199003070759,18288888888"                    
+```
+
 
 
 ## 端口扫描+协议识别 TODO
