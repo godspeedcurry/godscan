@@ -3,6 +3,7 @@ module main
 go 1.16
 
 require (
+	github.com/Chain-Zhang/pinyin v0.1.3 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/apcera/termtables v0.0.0-20170405184538-bcbc5dc54055 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect

@@ -90,7 +90,7 @@ func Errorf(format string, args ...interface{}) error {
 	return &sliceError{msg}
 }
 
-func removeDuplicateElement(originals interface{}) (interface{}, error) {
+func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 	temp := map[string]struct{}{}
 	switch slice := originals.(type) {
 	case []string:
