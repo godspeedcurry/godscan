@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"log"
+	"main/common"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -54,7 +55,6 @@ func GetFingerList() []string {
 func GenColumn(column int) []interface{} {
 	var headers []interface{} = make([]interface{}, column)
 	for i := 0; i < (column >> 1); i++ {
-
 		headers[i<<1] = "Key" + strconv.Itoa(i+1)
 		headers[(i<<1)+1] = "Value" + strconv.Itoa(i+1)
 	}
@@ -157,7 +157,6 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 			} else {
 				HighLight(Annotation, VersionResultNotDupplicated.([]string), keywords)
 			}
-
 		}
 	}
 
@@ -206,16 +205,16 @@ func DisplayHeader(Url string, Method string) {
 	}
 }
 
-func PrintFinger(Url string) {
+func PrintFinger(Info common.HostInfo) {
 	InitHttp()
-	color.HiRed("Your URL: %s\n", Url)
-	Host, _ := url.Parse(Url)
+	color.HiRed("Your URL: %s\n", Info.Url)
+	Host, _ := url.Parse(Info.Url)
 	RootPath := Host.Scheme + "://" + Host.Hostname()
 	if Host.Port() != "" {
 		RootPath = RootPath + ":" + Host.Port()
 	}
 	// 首页
-	FirstUrl := RootPath
+	FirstUrl := RootPath + Host.Path
 	DisplayHeader(FirstUrl, http.MethodGet)
 
 	// 构造404
@@ -229,5 +228,5 @@ func PrintFinger(Url string) {
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
 	// fmt.Print(s1)
-	Spider(RootPath, Url, 10, s1)
+	Spider(RootPath, Info.Url, Info.Depth, s1)
 }
