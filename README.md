@@ -39,6 +39,8 @@ https://gh0st.cn/HaE/
 - [x] 邮箱
 - [x] hmtl注释
 - [x] ueditor swagger 等
+- [x] OSS accessKey accessId
+- [x] link 识别  
 
 
 ## 弱口令生成模块 [DONE]
@@ -86,6 +88,10 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags
 * 2022-06-09 修复了大小写导致不高亮的问题
 * 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
 
+## TODO
+弱口令生成有点问题
+尽快支持--only-url功能
+没有子路径 http://xxxxx/path
 
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
 
