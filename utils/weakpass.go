@@ -109,7 +109,7 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	return ans
 }
 
-func GeneateWeakPassword(KeywordListStr string) []string {
+func GenerateWeakPassword(KeywordListStr string) []string {
 	var KeywordList = []string{}
 	if strings.Contains(KeywordListStr, ",") {
 		KeywordList = strings.Split(KeywordListStr, ",")
@@ -134,10 +134,12 @@ func GeneateWeakPassword(KeywordListStr string) []string {
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", onlyFirst))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(onlyFirst)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(onlyFirst)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(onlyFirst)))
 
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", firstComplete))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(firstComplete)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(firstComplete)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(firstComplete)))
 			} else {
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(keyword)))
@@ -146,6 +148,7 @@ func GeneateWeakPassword(KeywordListStr string) []string {
 			}
 		}
 	}
+
 	PasswordList = append(PasswordList, BuildFromKeyWordList(KeywordList)...)
 	UniqPasswordList, err := RemoveDuplicateElement(PasswordList)
 	if err != nil {
