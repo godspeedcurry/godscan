@@ -23,7 +23,7 @@ func MightBeChineseName(Name string) bool {
 
 func MightBePhone(Phone string) bool {
 	// 也有可能是qq号 生日什么的
-	result, _ := regexp.MatchString(`^\d{4,11}$`, Phone)
+	result, _ := regexp.MatchString(`^\d{6,11}$`, Phone)
 	return result
 }
 
@@ -102,6 +102,10 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	ans = append(ans, AddStringToString(Phone, onlyFirst, []string{"@", "_", "#", ""})...)
 	ans = append(ans, AddStringToString(Phone, firstComplete, []string{"@", "_", "#", ""})...)
 	ans = append(ans, AddStringToString(Phone, completeName, []string{"@", "_", "#", ""})...)
+	ans = append(ans, AddStringToString(Phone[2:], onlyFirst, []string{"@", "_", "#", ""})...)
+	ans = append(ans, AddStringToString(Phone[2:], firstComplete, []string{"@", "_", "#", ""})...)
+	ans = append(ans, AddStringToString(Phone[2:], completeName, []string{"@", "_", "#", ""})...)
+
 	if IdentityCard != "123456789123456789" {
 		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[8:14], []string{"@", "_", "#", ""})...)
 		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[10:14], []string{"@", "_", "#", ""})...)
