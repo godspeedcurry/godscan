@@ -50,21 +50,25 @@ var MostSensitiveWebPort = "80,443,8080"
 var DefaultPorts = "21,22,80,81,135,139,443,445,1433,1521,3306,5432,6379,7001,8000,8080,8089,9000,9200,11211,27017"
 
 type HostInfo struct {
-	Host      string
-	Ports     string
-	Domain    string
-	Url       string
-	Path      string
-	Timeout   int64
-	Scantype  string
-	Command   string
-	SshKey    string
-	Username  string
-	Password  string
-	Usernames []string
-	Passwords []string
-	Infostr   []string
-	Hash      string
+	Url      string
+	Proxy    string
+	Depth    int
+	Keywords string
+	// Host      string
+	// Ports     string
+	// Domain    string
+	// Url       string
+	// Path      string
+	// Timeout   int64
+	// Scantype  string
+	// Command   string
+	// SshKey    string
+	// Username  string
+	// Password  string
+	// Usernames []string
+	// Passwords []string
+	// Infostr   []string
+	// Hash      string
 }
 
 type PocInfo struct {
@@ -100,7 +104,7 @@ var (
 	// PortFile      string
 	// PocPath       string
 	// Threads       int
-	URL string
+	Url string
 	// UrlFile       string
 	// Urls          []string
 	// NoPorts       string
@@ -112,4 +116,7 @@ var (
 	// BruteThread   int
 	// LiveTop       int
 	Proxy string
+
+	Depth    int
+	Keywords string
 )
