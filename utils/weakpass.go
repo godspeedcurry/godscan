@@ -27,11 +27,11 @@ func MightBePhone(Phone string) bool {
 	return result
 }
 
-func TranslateToEnglish(Name string) (string, string) {
+func TranslateToEnglish(Name string) (string, string, string) {
 	str, err := pinyin.New(Name).Split(" ").Mode(pinyin.WithoutTone).Convert()
 	if err != nil {
 		fmt.Println(err)
-		return "", ""
+		return "", "", ""
 	}
 	// 首字母
 	onlyFirst := ""
@@ -45,7 +45,7 @@ func TranslateToEnglish(Name string) (string, string) {
 			firstComplete = firstComplete + string(x[0])
 		}
 	}
-	return onlyFirst, firstComplete
+	return onlyFirst, firstComplete, strings.ReplaceAll(str, " ", "")
 }
 
 func FirstCharToUpper(Name string) string {
@@ -88,9 +88,10 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	var firstComplete = "zhangs"
 	var Phone = "123456"
 	var IdentityCard = "123456789123456789"
+	var completeName = "zhangsan"
 	for _, Keyword := range KeywordList {
 		if MightBeChineseName((Keyword)) {
-			onlyFirst, firstComplete = TranslateToEnglish(Keyword)
+			onlyFirst, firstComplete, completeName = TranslateToEnglish(Keyword)
 		} else if MightBeIdentityCard(Keyword) {
 			IdentityCard = Keyword
 		} else if MightBePhone(Keyword) {
@@ -100,6 +101,7 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	var ans = []string{}
 	ans = append(ans, AddStringToString(Phone, onlyFirst, []string{"@", "_", "#", ""})...)
 	ans = append(ans, AddStringToString(Phone, firstComplete, []string{"@", "_", "#", ""})...)
+	ans = append(ans, AddStringToString(Phone, completeName, []string{"@", "_", "#", ""})...)
 	if IdentityCard != "123456789123456789" {
 		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[8:14], []string{"@", "_", "#", ""})...)
 		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[10:14], []string{"@", "_", "#", ""})...)
@@ -130,7 +132,7 @@ func GenerateWeakPassword(KeywordListStr string) []string {
 				// 生日
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword[10:14]))
 			} else if MightBeChineseName(keyword) {
-				onlyFirst, firstComplete := TranslateToEnglish(keyword)
+				onlyFirst, firstComplete, completeName := TranslateToEnglish(keyword)
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", onlyFirst))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(onlyFirst)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(onlyFirst)))
@@ -140,6 +142,12 @@ func GenerateWeakPassword(KeywordListStr string) []string {
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(firstComplete)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(firstComplete)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(firstComplete)))
+
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", completeName))
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(completeName)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(completeName)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(completeName)))
+
 			} else {
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword))
 				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(keyword)))
