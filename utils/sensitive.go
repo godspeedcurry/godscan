@@ -17,7 +17,7 @@ func SensitiveInfoCollect(Content string) {
 		"Swagger UI":            `((swagger-ui.html)|(\"swagger\":)|(Swagger UI)|(swaggerUi))`,
 		"Ueditor":               `(ueditor\.(config|all)\.js)`,
 		"Windows File/Dir Path": `([a-fA-FzZ]:(\\{1,2})([^\n ]*\\?)*)`,
-		"accesskey/accessid":    `(?i)(access[_ ]?(key|id)[\&\#0-9\" =;]*?([0-9a-zA-Z]{10,64}))`,
+		"accesskey/accessid":    `(?i)(access([_ ]?(key|id|secret)){1,2}[\&\#0-9\" =;]*?([0-9a-zA-Z]{10,64}))`,
 		"link":                  `(https?://[^"' ]*)`,
 	}
 	output := false
