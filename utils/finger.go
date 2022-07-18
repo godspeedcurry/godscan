@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
+	"hash"
+	"io/ioutil"
 	"log"
 	"main/common"
 	"net/http"
@@ -10,13 +13,26 @@ import (
 	"strconv"
 	"strings"
 
+	b64 "encoding/base64"
+
 	"github.com/PuerkitoBio/goquery"
 	mapset "github.com/deckarep/golang-set"
+
 	"github.com/fatih/color"
 	"github.com/gobuffalo/packr"
 	"github.com/scylladb/termtables"
+	"github.com/twmb/murmur3"
 )
 
+func Mmh3Hash32(raw []byte) string {
+	var h32 hash.Hash32 = murmur3.New32()
+	_, err := h32.Write([]byte(raw))
+	if err == nil {
+		return fmt.Sprintf("%d", int32(h32.Sum32()))
+	} else {
+		return "0"
+	}
+}
 func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, string, string, error) {
 	req, _ := http.NewRequest(Method, Url, nil)
 
@@ -205,6 +221,36 @@ func DisplayHeader(Url string, Method string) {
 	}
 }
 
+func StandBase64(braw []byte) []byte {
+	bckd := b64.StdEncoding.EncodeToString(braw)
+	var buffer bytes.Buffer
+	for i := 0; i < len(bckd); i++ {
+		ch := bckd[i]
+		buffer.WriteByte(ch)
+		if (i+1)%76 == 0 {
+			buffer.WriteByte('\n')
+		}
+	}
+	buffer.WriteByte('\n')
+	return buffer.Bytes()
+
+}
+func IconDetect(Url string) (string, error) {
+	req, _ := http.NewRequest(http.MethodGet, Url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
+	resp, err := Client.Do(req)
+
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	// b64 := b64.StdEncoding.EncodeToString(bodyBytes)
+	fmt.Println(Mmh3Hash32(StandBase64(bodyBytes)))
+	return "", nil
+}
+
 func PrintFinger(Info common.HostInfo) {
 	InitHttp()
 	color.HiRed("Your URL: %s\n", Info.Url)
@@ -224,6 +270,10 @@ func PrintFinger(Info common.HostInfo) {
 	// 构造POST
 	ThirdUrl := RootPath
 	DisplayHeader(ThirdUrl, http.MethodPost)
+
+	IconUrl := RootPath + "/favicon.ico"
+	IconDetect(IconUrl)
+	// DisplayHeader(IconUrl, )
 
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
