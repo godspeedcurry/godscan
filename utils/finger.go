@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	b64 "encoding/base64"
+	"encoding/json"
 
 	"github.com/PuerkitoBio/goquery"
 	mapset "github.com/deckarep/golang-set"
@@ -233,8 +234,8 @@ func StandBase64(braw []byte) []byte {
 	}
 	buffer.WriteByte('\n')
 	return buffer.Bytes()
-
 }
+
 func IconDetect(Url string) (string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
@@ -246,8 +247,15 @@ func IconDetect(Url string) (string, error) {
 	defer resp.Body.Close()
 
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-	// b64 := b64.StdEncoding.EncodeToString(bodyBytes)
-	fmt.Println(Mmh3Hash32(StandBase64(bodyBytes)))
+	ico := Mmh3Hash32(StandBase64(bodyBytes))
+	var box = packr.NewBox(".")
+	icon_json, _ := box.FindString("icon.json")
+	var icon_hash_map map[string]interface{}
+	json.Unmarshal([]byte(icon_json), &icon_hash_map)
+	tmp := icon_hash_map[ico]
+	if tmp != nil {
+		color.Red("[*] icon_hash `%s`", tmp)
+	}
 	return "", nil
 }
 
@@ -273,7 +281,6 @@ func PrintFinger(Info common.HostInfo) {
 
 	IconUrl := RootPath + "/favicon.ico"
 	IconDetect(IconUrl)
-	// DisplayHeader(IconUrl, )
 
 	// 爬虫递归爬
 	s1 := mapset.NewSet()

@@ -26,7 +26,7 @@ v2.1.1
   * Ehole https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json
   * https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf
   
-* 图标哈希 todo
+* [x]图标哈希
 
 ## 新增弱口令 [DONE]
 - [x] 在fscan的基础上新增从若干个报告中获取到的弱口令
