@@ -132,13 +132,13 @@ func HighLight(data string, keywords []string, fingers []string) {
 
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
 	if !strings.Contains(Url, RootPath) {
-		fmt.Printf("======Depth %d, target %s =====\n", depth, Url)
+		fmt.Printf("[Depth %d] %s\n", depth, Url)
 		s1.Add(Url)
 		return "", nil
 	} else if depth == 0 || strings.Contains(Url, ".min.js") || strings.Contains(Url, ".ico") {
 		return "", nil
 	}
-	fmt.Printf("======Depth %d, target %s =====\n", depth, Url)
+	fmt.Printf("[Depth %d] %s\n", depth, Url)
 	s1.Add(Url)
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")

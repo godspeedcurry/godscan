@@ -18,7 +18,7 @@ func SensitiveInfoCollect(Content string) {
 		"Ueditor":               `(ueditor\.(config|all)\.js)`,
 		"Windows File/Dir Path": `([a-fA-FzZ]:(\\{1,2})([^\n ]*\\?)*)`,
 		"accesskey/accessid":    `(?i)(access([_ ]?(key|id|secret)){1,2}[\&\#0-9\" =;]*?([0-9a-zA-Z]{10,64}))`,
-		"link":                  `(https?://[\S]{5,})`,
+		"link":                  `(https?://[^\s\"\)\>]{5,})`,
 	}
 	output := false
 	for key := range infoMap {
