@@ -84,7 +84,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 
 
 ## 更新说明
-* 2022-07-04 修复没有子路径的bug
+* 2022-07-04 修复没有子路径的bug, 移除packr 改用原生的embed库进行静态资源的打包
 * 2022-06-10 更新了正则 对输出的表格进行了优化
 * 2022-06-09 修复了大小写导致不高亮的问题
 * 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
