@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"hash"
 	"io/ioutil"
@@ -20,7 +21,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/fatih/color"
-	"github.com/gobuffalo/packr"
 	"github.com/scylladb/termtables"
 	"github.com/twmb/murmur3"
 )
@@ -59,13 +59,10 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	return "", "", "", nil
 }
 
+//go:embed finger.txt
+var fingers string
+
 func GetFingerList() []string {
-	box := packr.NewBox(".")
-	fingers, err := box.FindString("finger.txt")
-	if err != nil {
-		fmt.Println(err)
-		return []string{}
-	}
 	return strings.Split(fingers, "\r\n")
 }
 
@@ -236,6 +233,9 @@ func StandBase64(braw []byte) []byte {
 	return buffer.Bytes()
 }
 
+//go:embed icon.json
+var icon_json string
+
 func IconDetect(Url string) (string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
@@ -245,11 +245,9 @@ func IconDetect(Url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	var box = packr.NewBox(".")
-	icon_json, _ := box.FindString("icon.json")
+
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
