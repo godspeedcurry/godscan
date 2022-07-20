@@ -76,10 +76,10 @@ todo
 
 ## 跨平台编译
 ```
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_linux_amd64 
-CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_win_amd64
-CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_darwin_amd64
-CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(go env GOPATH)/bin/packr build -ldflags="-s -w " -trimpath -o godscan_darwin_arm64
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_linux_amd64 
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_win_amd64
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_darwin_amd64
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o godscan_darwin_arm64
 ```
 
 
