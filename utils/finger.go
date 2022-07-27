@@ -181,7 +181,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		ApiResult := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 		if len(ApiResult) > 0 {
 			for _, tmp := range ApiResult {
-				fmt.Println(RootPath + tmp[1])
+				fmt.Println(RootPath + "/" + tmp[1])
 			}
 		}
 	}
@@ -201,6 +201,15 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	// script 标签
 	doc.Find("script").Each(func(i int, script *goquery.Selection) {
 		src, _ := script.Attr("src")
+		normalizeUrl := Normalize(src, RootPath)
+		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
+			Spider(RootPath, normalizeUrl, depth-1, s1)
+		}
+	})
+
+	//iframe 标签
+	doc.Find("iframe").Each(func(i int, iframe *goquery.Selection) {
+		src, _ := iframe.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
 		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
 			Spider(RootPath, normalizeUrl, depth-1, s1)
@@ -247,7 +256,7 @@ func IconDetect(Url string) (string, error) {
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-
+	color.Red("[*] icon_hash `%s`", ico)
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
