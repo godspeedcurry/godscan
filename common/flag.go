@@ -26,6 +26,7 @@ func Flag(Info *HostInfo) {
 	flag.StringVar(&Proxy, "p", "", "your proxy")
 	flag.IntVar(&Info.Depth, "d", 1, "your search depth")
 	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by `,`")
+	flag.StringVar(&Info.Sep, "s", "", "your separator list, for example 123,qwe,@,# separate by `,`")
 	// flag.StringVar(&Info.Host, "h", "", "IP address of the host you want to scan,for example: 192.168.11.11 | 192.168.11.11-255 | 192.168.11.11,192.168.11.12")
 	// flag.StringVar(&NoHosts, "hn", "", "the hosts no scan,as: -hn 192.168.1.1/24")
 	// flag.StringVar(&Info.Ports, "p", DefaultPorts, "Select a port,for example: 22 | 1-65535 | 22,80,3306")
