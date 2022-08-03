@@ -61,22 +61,12 @@ func LastCharToUpper(Name string) string {
 
 func AddStringToString(x string, y string, seps []string) []string {
 	var mylist = []string{}
-	for _, sep := range seps {
-		mylist = append(mylist, x+sep+y)
-		mylist = append(mylist, x+sep+y)
-		mylist = append(mylist, FirstCharToUpper(x)+sep+FirstCharToUpper(y))
-		mylist = append(mylist, FirstCharToUpper(x)+sep+y)
-		mylist = append(mylist, x+sep+FirstCharToUpper(y))
-		mylist = append(mylist, LastCharToUpper(x)+sep+LastCharToUpper(y))
-		mylist = append(mylist, LastCharToUpper(x)+sep+y)
-		mylist = append(mylist, x+sep+LastCharToUpper(y))
-		mylist = append(mylist, y+sep+x)
-		mylist = append(mylist, FirstCharToUpper(y)+sep+FirstCharToUpper(x))
-		mylist = append(mylist, FirstCharToUpper(y)+sep+x)
-		mylist = append(mylist, y+sep+FirstCharToUpper(x))
-		mylist = append(mylist, LastCharToUpper(y)+sep+LastCharToUpper(x))
-		mylist = append(mylist, LastCharToUpper(y)+sep+x)
-		mylist = append(mylist, y+sep+LastCharToUpper(x))
+	for _, first := range []string{x, FirstCharToUpper(x), strings.ToUpper(x), LastCharToUpper(x)} {
+		for _, sep := range seps {
+			for _, last := range []string{y, FirstCharToUpper(y), strings.ToUpper(y), LastCharToUpper(y)} {
+				mylist = append(mylist, first+sep+last)
+			}
+		}
 	}
 
 	notDuplcated, _ := RemoveDuplicateElement(mylist)
@@ -99,12 +89,14 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 		}
 	}
 	var ans = []string{}
-	ans = append(ans, AddStringToString(Phone, onlyFirst, []string{"@", "_", "#", ""})...)
-	ans = append(ans, AddStringToString(Phone, firstComplete, []string{"@", "_", "#", ""})...)
-	ans = append(ans, AddStringToString(Phone, completeName, []string{"@", "_", "#", ""})...)
-	ans = append(ans, AddStringToString(Phone[2:], onlyFirst, []string{"@", "_", "#", ""})...)
-	ans = append(ans, AddStringToString(Phone[2:], firstComplete, []string{"@", "_", "#", ""})...)
-	ans = append(ans, AddStringToString(Phone[2:], completeName, []string{"@", "_", "#", ""})...)
+	if Phone != "123456" {
+		ans = append(ans, AddStringToString(Phone, onlyFirst, []string{"@", "_", "#", ""})...)
+		ans = append(ans, AddStringToString(Phone, firstComplete, []string{"@", "_", "#", ""})...)
+		ans = append(ans, AddStringToString(Phone, completeName, []string{"@", "_", "#", ""})...)
+		ans = append(ans, AddStringToString(Phone[2:], onlyFirst, []string{"@", "_", "#", ""})...)
+		ans = append(ans, AddStringToString(Phone[2:], firstComplete, []string{"@", "_", "#", ""})...)
+		ans = append(ans, AddStringToString(Phone[2:], completeName, []string{"@", "_", "#", ""})...)
+	}
 
 	if IdentityCard != "123456789123456789" {
 		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[8:14], []string{"@", "_", "#", ""})...)
@@ -115,7 +107,7 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	return ans
 }
 
-func GenerateWeakPassword(KeywordListStr string) []string {
+func GenerateWeakPassword(KeywordListStr string, SepListStr string) []string {
 	var KeywordList = []string{}
 	if strings.Contains(KeywordListStr, ",") {
 		KeywordList = strings.Split(KeywordListStr, ",")
@@ -123,40 +115,57 @@ func GenerateWeakPassword(KeywordListStr string) []string {
 		KeywordList = append(KeywordList, KeywordListStr)
 	}
 	var PasswordList = []string{}
+
+	var SepList = []string{}
+	if !(SepListStr == "") {
+		SepList = strings.Split(SepListStr, ",")
+	}
+
 	for _, keyword := range KeywordList {
-		for _, user := range common.Passwords {
+		for _, sep := range SepList {
+			PasswordList = append(PasswordList, AddStringToString(keyword, sep, []string{"@", "_", "#", "!@#", "", "123", "qwe"})...)
+		}
+	}
+
+	for _, password := range common.Passwords {
+		if !strings.Contains(password, "{user}") {
+			PasswordList = append(PasswordList, password)
+			continue
+		}
+		for _, keyword := range KeywordList {
+
 			//如果是身份证格式
 			if MightBeIdentityCard(keyword) {
 				// 2009
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword[6:10]))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[6:10]))
 				// 后六位
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword[12:18]))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[12:18]))
 				// 年份后两位 + 生日
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword[8:14]))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[8:14]))
 				// 生日
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword[10:14]))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[10:14]))
 			} else if MightBeChineseName(keyword) {
 				onlyFirst, firstComplete, completeName := TranslateToEnglish(keyword)
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", onlyFirst))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(onlyFirst)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(onlyFirst)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(onlyFirst)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", onlyFirst))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(onlyFirst)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(onlyFirst)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(onlyFirst)))
 
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", firstComplete))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(firstComplete)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(firstComplete)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(firstComplete)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", firstComplete))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(firstComplete)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(firstComplete)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(firstComplete)))
 
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", completeName))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(completeName)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(completeName)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(completeName)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", completeName))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(completeName)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(completeName)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(completeName)))
 
 			} else {
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", keyword))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", FirstCharToUpper(keyword)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", LastCharToUpper(keyword)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(user, "{user}", strings.ToUpper(keyword)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(keyword)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(keyword)))
+				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(keyword)))
 			}
 		}
 	}

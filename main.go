@@ -13,6 +13,6 @@ func main() {
 		utils.PrintFinger(Info)
 	}
 	if Info.Keywords != "" {
-		utils.GenerateWeakPassword(Info.Keywords)
+		utils.GenerateWeakPassword(Info.Keywords, Info.Sep)
 	}
 }

@@ -15,7 +15,8 @@ var Userdict = map[string][]string{
 	"vnc":        {"root"},
 }
 
-var Passwords = []string{"!@#QWEASD", "!@#QWEASDZXC", "!QAZ2wsx", "0", "000000", "00000000", "1", "111111", "12", "123", "123123", "123321", "123456", "123456!a", "1234567", "12345678", "123456789", "1234567890", "123456~a", "123654", "123qwe", "123qwe!@#", "1q2w#E$R", "1q2w3e", "1q2w3e4r", "1qaz!QAZ", "1qaz2wsx", "1qaz2wsx3edc", "1qaz@WSX", "1qaz@wsx#edc", "2wsx@WSX", "654123", "654321", "666666", "8888888", "88888888", "a11111", "a123123", "a12345", "a123456", "a123456.", "A123456s!", "Aa123123", "Aa1234", "Aa1234.", "Aa12345", "Aa12345.", "Aa123456", "Aa123456!", "Aa123456789", "abc123", "abc123456", "admin", "admin01", "admin123", "admin123!@#", "admin@({user})", "admin@123", "Admin@123", "admin@{user}", "admin@{user}.com", "Admin@{user}.com", "Change_Me", "Charge123", "manager", "P@ssw0rd", "P@ssw0rd!", "pass123", "pass@123", "Passw0rd", "password", "qazwsxedc", "qwe123", "qwe123!@#", "root", "sa123456", "shell", "sysadmin", "system", "talent", "test", "test01", "test123", "toor", "{user}", "{user}#123", "{user}1", "{user}111", "{user}123", "{user}12345+", "{user}@01", "{user}@111", "{user}@123", "{user}@123#4", "{user}@2019", "{user}@2020", "{user}@2021", "{user}@2022", "{user}@admin", "{user}_123", "{user}_admin", "{user}admin", "{user}{user}", ""}
+var Seperators = []string{"@", "_", "#", ""}
+var Passwords = []string{"!@#QWEASD", "!@#QWEASDZXC", "!QAZ2wsx", "0", "000000", "00000000", "1", "111111", "12", "123", "123123", "123321", "123456", "123456!a", "1234567", "12345678", "123456789", "1234567890", "123456~a", "123654", "123qwe", "123qwe!@#", "1q2w#E$R", "1q2w3e", "1q2w3e4r", "1qaz!QAZ", "1qaz2wsx", "1qaz2wsx3edc", "1qaz@WSX", "1qaz@wsx#edc", "2wsx@WSX", "654123", "654321", "666666", "8888888", "88888888", "a11111", "a123123", "a12345", "a123456", "a123456.", "A123456s!", "Aa123123", "Aa1234", "Aa1234.", "Aa12345", "Aa12345.", "Aa123456", "Aa123456!", "Aa123456789", "abc123", "abc123456", "admin", "admin01", "admin123", "admin123!@#", "admin@({user})", "admin@123", "Admin@123", "admin@{user}", "admin@{user}.com", "Admin@{user}.com", "Change_Me", "Charge123", "manager", "P@ssw0rd", "P@ssw0rd!", "pass123", "pass@123", "Passw0rd", "password", "qazwsxedc", "qwe123", "qwe123!@#", "root", "sa123456", "shell", "sysadmin", "system", "talent", "test", "test01", "test123", "toor", "{user}", "{user}#123", "{user}1", "{user}111", "{user}123", "{user}12345", "{user}12345+", "{user}@01", "{user}@111", "{user}@123", "{user}@123#4", "{user}@2019", "{user}@2020", "{user}@2021", "{user}@2022", "{user}@2019!", "{user}@2020!", "{user}@2021!", "{user}@2022!", "{user}@admin", "{user}_123", "{user}_admin", "{user}admin", "{user}{user}", "123!@#qwe"}
 
 var PORTList = map[string]int{
 	"ftp":         21,
@@ -54,6 +55,7 @@ type HostInfo struct {
 	Proxy    string
 	Depth    int
 	Keywords string
+	Sep      string
 	// Host      string
 	// Ports     string
 	// Domain    string
