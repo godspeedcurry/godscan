@@ -7,19 +7,9 @@
 - [x] 解析html源代码 关键字匹配得到特征, 根据指纹特征进行词频统计, 并表格化输出
 - [x] 爬虫 递归访问
 - [x] 正则提取注释 注释里往往有版本 github仓库等信息
-- [x] 版本识别 一般会有多个 正则实现 如下均可识别
-```
-版本 4.x
-v6
-v1.11.3
-version 2.1
-version: 4.2.2
-v1.7.2
-v2.1.1
-版本 5.x
-```
+- [x] 版本识别并高亮
 - [x] 对注释里的内容匹配到关键字并高亮
-- [x] 识别接口 从js里提取
+- [x] 识别接口 主要从js里提取
 - [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
 - [x] vue.js 前端 识别app.xxxx.js 并使用正则提取里面的path
 - [x] finger.txt来源
@@ -42,7 +32,7 @@ v2.1.1
 
 
 ## 功能三：敏感信息搜集
-https://gh0st.cn/HaE/
+* https://gh0st.cn/HaE/
 这里面有很多现成的规则 挑了一下重点
 - [x] JSON-WEB-Token
 - [x] 国内手机号
@@ -56,20 +46,22 @@ https://gh0st.cn/HaE/
 ---
 # 未来目标
 
+## ICP备案查询 ip反查
+
+## C端常见web端口扫描及指纹识别
+
 ## 端口扫描+协议识别 TODO
-https://github.com/4dogs-cn/TXPortMap
-https://github.com/redtoolskobe/scaninfo
+* https://github.com/4dogs-cn/TXPortMap
+* https://github.com/redtoolskobe/scaninfo
 
 ## web poc
-todo
+暂不考虑加入
 
 ## 各端口弱口令爆破
-todo
+暂不考虑加入
 
 ## log4j 扫描模块
-todo
-要能指定listener
-好用的dnslog
+暂不考虑加入
 
 
 
@@ -83,19 +75,18 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 
 
 ## 更新说明
+* 2022-08-01 新增部分真实场景中得到的弱口令 新增弱口令后缀，如123,qwe等，丰富生成后的弱口令
 * 2022-07-04 修复没有子路径的bug, 移除packr 改用原生的embed库进行静态资源的打包
 * 2022-06-10 更新了正则 对输出的表格进行了优化
 * 2022-06-09 修复了大小写导致不高亮的问题
 * 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
 
-## TODO
-弱口令生成有点问题
-尽快支持--only-url功能
+## 功能截图
+* icon_hash计算、关键字识别
+![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.jpg)
 
-![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.png)
-
-
+* cms高亮
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img2.png)
 
-
+* 敏感信息识别
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img3.png)
