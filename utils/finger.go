@@ -119,15 +119,24 @@ func IsVuePath(Path string) bool {
 }
 
 func HighLight(data string, keywords []string, fingers []string) {
+	var output bool = false
 	for _, keyword := range keywords {
 		re := regexp.MustCompile("(?i)" + Quote(keyword))
-		data = re.ReplaceAllString(data, color.RedString(keyword))
+		if len(re.FindAllString(data, -1)) > 0 {
+			output = true
+			data = re.ReplaceAllString(data, color.RedString(keyword))
+		}
 	}
 	for _, keyword := range fingers {
 		re := regexp.MustCompile("(?i)(" + Quote(keyword) + ")")
-		data = re.ReplaceAllString(data, color.RedString("$1"))
+		if len(re.FindAllString(data, -1)) > 0 {
+			output = true
+			data = re.ReplaceAllString(data, color.RedString("$1"))
+		}
 	}
-	fmt.Println(data)
+	if output {
+		fmt.Println(data)
+	}
 }
 
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {

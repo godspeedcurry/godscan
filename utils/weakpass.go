@@ -107,7 +107,7 @@ func BuildFromKeyWordList(KeywordList []string) []string {
 	return ans
 }
 
-func GenerateWeakPassword(KeywordListStr string, SepListStr string) []string {
+func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string {
 	var KeywordList = []string{}
 	if strings.Contains(KeywordListStr, ",") {
 		KeywordList = strings.Split(KeywordListStr, ",")
@@ -116,13 +116,13 @@ func GenerateWeakPassword(KeywordListStr string, SepListStr string) []string {
 	}
 	var PasswordList = []string{}
 
-	var SepList = []string{}
-	if !(SepListStr == "") {
-		SepList = strings.Split(SepListStr, ",")
+	var SuffixList = []string{}
+	if !(SuffixListStr == "") {
+		SuffixList = strings.Split(SuffixListStr, ",")
 	}
 
 	for _, keyword := range KeywordList {
-		for _, sep := range SepList {
+		for _, sep := range SuffixList {
 			PasswordList = append(PasswordList, AddStringToString(keyword, sep, []string{"@", "_", "#", "!@#", "", "123", "qwe"})...)
 		}
 	}
