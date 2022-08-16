@@ -7,12 +7,12 @@ import (
 )
 
 const (
-	MAXINT64 = int(^uint(0) >> 1)
-	MININT64 = ^MAXINT64
+	INT_MAX = int(^uint(0) >> 1)
+	INT_MIN = ^INT_MAX
 )
 
 func Max(nums ...int) int {
-	var maxNum int = MININT64
+	var maxNum int = INT_MIN
 	for _, num := range nums {
 		if num > maxNum {
 			maxNum = num
@@ -22,7 +22,7 @@ func Max(nums ...int) int {
 }
 
 func Min(nums ...int) int {
-	var minNum int = MAXINT64
+	var minNum int = INT_MAX
 	for _, num := range nums {
 		if num < minNum {
 			minNum = num
