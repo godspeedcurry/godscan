@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	MININT64 = -922337203685477580
-	MAXINT64 = 9223372036854775807
+	MAXINT64 = int(^uint(0) >> 1)
+	MININT64 = ^MAXINT64
 )
 
 func Max(nums ...int) int {
