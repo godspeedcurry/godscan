@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"main/common"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -140,7 +141,9 @@ func HighLight(data string, keywords []string, fingers []string) {
 }
 
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
-	if !strings.Contains(Url, RootPath) {
+	url_struct, _ := url.Parse(RootPath)
+	host, _, _ := net.SplitHostPort(url_struct.Host)
+	if !strings.Contains(Url, host) {
 		fmt.Printf("[Depth %d] %s\n", depth, Url)
 		s1.Add(Url)
 		return "", nil
