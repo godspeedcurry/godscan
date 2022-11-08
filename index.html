@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>aaa</title>
+</head>
+<body>
+<script type="text/javascript">
+	let  websocket = new WebSocket('ws://127.0.0.1:8888/bot')
+	websocket.addEventListener('open', function (event) {
+	    websocket.send('changepw aaanb');
+	});
+	websocket.addEventListener('message', function (event) {
+	   websocket.send('changepw aaanb');
+	});
+
+</script>
+
+</body>
+</html>
+
