@@ -54,16 +54,6 @@
 * https://github.com/4dogs-cn/TXPortMap
 * https://github.com/redtoolskobe/scaninfo
 
-## web poc
-暂不考虑加入
-
-## 各端口弱口令爆破
-暂不考虑加入
-
-## log4j 扫描模块
-暂不考虑加入
-
-
 
 ## 跨平台编译
 ```
@@ -90,3 +80,10 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 
 * 敏感信息识别
 ![image](https://github.com/godspeedcurry/godscan/blob/master/images/img3.png)
+
+## 开发
+```
+git add . && git commit -m "fix bug" && git push -u origin master
+git tag -a v1.xx
+git push -u origin v1.xx
+```
