@@ -57,7 +57,6 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	retServerValue := ""
 	if len(ServerValue) != 0 {
 		retServerValue = ServerValue[0]
-		// return ServerValue[0], Status, title, nil
 	}
 	return retServerValue, Status, title, nil
 }
