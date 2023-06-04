@@ -54,10 +54,12 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	}
 	ServerValue := resp.Header["Server"]
 	Status := resp.Status
+	retServerValue := ""
 	if len(ServerValue) != 0 {
-		return ServerValue[0], Status, title, nil
+		retServerValue = ServerValue[0]
+		// return ServerValue[0], Status, title, nil
 	}
-	return "", "", "", nil
+	return retServerValue, Status, title, nil
 }
 
 //go:embed finger.txt
