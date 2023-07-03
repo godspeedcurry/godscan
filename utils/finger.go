@@ -148,7 +148,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 		fmt.Printf("[Depth %d] %s\n", depth, Url)
 		s1.Add(Url)
 		return "", nil
-	} else if depth == 0 || strings.Contains(Url, ".min.js") || strings.Contains(Url, ".ico") {
+	} else if depth == 0 || strings.Contains(Url, ".min.js") || strings.Contains(Url, ".ico") || strings.Contains(Url, "chunk-vendors") {
 		return "", nil
 	}
 	fmt.Printf("[Depth %d] %s\n", depth, Url)
