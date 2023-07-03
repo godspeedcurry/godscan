@@ -46,9 +46,7 @@
 ---
 # 未来目标
 
-## ICP备案查询 ip反查
-
-## C端常见web端口扫描及指纹识别
+## 批量指纹识别、关键信息提取
 
 ## 端口扫描+协议识别 TODO
 * https://github.com/4dogs-cn/TXPortMap
