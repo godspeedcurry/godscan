@@ -127,15 +127,16 @@ func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string 
 		}
 	}
 
+	var idcard, onlyFirst, firstComplete, completeName string
 	for _, password := range common.Passwords {
 		if !strings.Contains(password, "{user}") {
 			PasswordList = append(PasswordList, password)
 			continue
 		}
 		for _, keyword := range KeywordList {
-
 			//如果是身份证格式
 			if MightBeIdentityCard(keyword) {
+				idcard = keyword
 				// 2009
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[6:10]))
 				// 后六位
@@ -145,7 +146,7 @@ func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string 
 				// 生日
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[10:14]))
 			} else if MightBeChineseName(keyword) {
-				onlyFirst, firstComplete, completeName := TranslateToEnglish(keyword)
+				onlyFirst, firstComplete, completeName = TranslateToEnglish(keyword)
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", onlyFirst))
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(onlyFirst)))
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(onlyFirst)))
@@ -168,6 +169,12 @@ func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string 
 				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(keyword)))
 			}
 		}
+	}
+	if idcard != "" && onlyFirst != "" && firstComplete != "" && completeName != "" {
+		PasswordList = append(PasswordList, completeName+idcard[10:14])
+		PasswordList = append(PasswordList, completeName+idcard[8:14])
+		PasswordList = append(PasswordList, completeName+idcard[12:18])
+		PasswordList = append(PasswordList, completeName+idcard[6:10])
 	}
 
 	PasswordList = append(PasswordList, BuildFromKeyWordList(KeywordList)...)
