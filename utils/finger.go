@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"main/common"
+
 	"net"
 	"net/http"
 	"net/url"
@@ -41,7 +42,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	if Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
+	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 	if err != nil {
 		return "", "", "", err
@@ -154,7 +155,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	fmt.Printf("[Depth %d] %s\n", depth, Url)
 	s1.Add(Url)
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
+	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 	if err != nil {
 		fmt.Println(err)
@@ -261,7 +262,7 @@ var icon_json string
 func IconDetect(Url string) (string, error) {
 	InitHttp()
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
+	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
 	if err != nil {
@@ -270,7 +271,7 @@ func IconDetect(Url string) (string, error) {
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	color.Red("[*] icon_hash `%s`", ico)
+	color.Red("[*] icon_hash `%s` %d", ico, resp.StatusCode)
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
@@ -288,8 +289,14 @@ func PrintFinger(Info common.HostInfo) {
 	if Host.Port() != "" {
 		RootPath = RootPath + ":" + Host.Port()
 	}
+
 	// 首页
 	FirstUrl := RootPath + Host.Path
+	res := fingerScan(FirstUrl)
+	if res != "" {
+		color.Red(res)
+	}
+
 	DisplayHeader(FirstUrl, http.MethodGet)
 
 	// 构造404
@@ -305,6 +312,5 @@ func PrintFinger(Info common.HostInfo) {
 
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
-	// fmt.Print(s1)
 	Spider(RootPath, Info.Url, Info.Depth, s1)
 }
