@@ -1,6 +1,6 @@
 package common
 
-var version = "1.0.5"
+var version = "1.1"
 var Userdict = map[string][]string{
 	"ftp":        {"ftp", "admin", "www", "web", "root", "db", "wwwroot", "data", "test", "administrator", "anonymous"},
 	"mysql":      {"root", "mysql"},
@@ -77,6 +77,8 @@ type HostInfo struct {
 	// Infostr   []string
 	// Hash      string
 }
+
+var DEFAULT_UA string = "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36"
 
 type PocInfo struct {
 	Num        int
