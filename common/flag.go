@@ -26,7 +26,9 @@ func Flag(Info *HostInfo) {
 	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by `,`")
 	flag.StringVar(&Info.Suffix, "s", "", "your suffix list, for example 123,qwe,@,# separate by `,`")
 
+	flag.StringVar(&Info.IconUrl, "ico", "", "your icon url")
 	flag.StringVar(&Info.UrlFile, "uf", "", "your url list")
+	flag.BoolVar(&Info.DirBrute, "dir", false, "if brute dir")
 
 	// flag.StringVar(&Info.Host, "h", "", "IP address of the host you want to scan,for example: 192.168.11.11 | 192.168.11.11-255 | 192.168.11.11,192.168.11.12")
 	// flag.StringVar(&NoHosts, "hn", "", "the hosts no scan,as: -hn 192.168.1.1/24")

@@ -259,6 +259,7 @@ func StandBase64(braw []byte) []byte {
 var icon_json string
 
 func IconDetect(Url string) (string, error) {
+	InitHttp()
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
 	resp, err := Client.Do(req)
