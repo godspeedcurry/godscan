@@ -1,11 +1,6 @@
 # godscan
 
 ## Usage
-### 批量url目录扫描
-```bash
-go run main.go -uf url.txt
-```
-
 ### 单一url目录扫描
 ```bash
 go run main.go -u http://www.example.com -dir
@@ -39,6 +34,10 @@ go run main.go -u 'http:/www.exmaple.com'
 # -d 1 可以指定爬虫的深度
 ```
 
+### 批量目录扫描+指纹识别(单线程)
+```bash
+go run main.go -uf url.txt
+```
 
 
 
@@ -125,8 +124,6 @@ git push -u origin v1.xx
 
 ---
 ## 未来目标
-
-### 批量指纹识别、关键信息提取
 
 ### 端口扫描+协议识别 TODO
 * https://github.com/4dogs-cn/TXPortMap
