@@ -271,7 +271,7 @@ func IconDetect(Url string) (string, error) {
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	color.Red("[*] icon_hash `%s` %d", ico, resp.StatusCode)
+	color.Red("[*] icon_hash=\"%s\" %d", ico, resp.StatusCode)
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
