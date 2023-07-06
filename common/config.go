@@ -124,8 +124,8 @@ var (
 	// PassAdd       string
 	// BruteThread   int
 	// LiveTop       int
-	Proxy string
-
-	Depth    int
-	Keywords string
+	Proxy      string
+	ListFormat bool
+	Depth      int
+	Keywords   string
 )

@@ -2,6 +2,8 @@ package utils
 
 import (
 	"fmt"
+	"strconv"
+
 	// "github.com/chain-zhang/pinyin"
 	"main/common"
 	"regexp"
@@ -183,6 +185,17 @@ func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string 
 		fmt.Println(err)
 		return []string{}
 	}
-	fmt.Println(strings.Join(UniqPasswordList.([]string), "\n"))
+	if common.ListFormat {
+		var quotedStrings []string
+		for _, str := range UniqPasswordList.([]string) {
+			quotedStrings = append(quotedStrings, strconv.Quote(str))
+		}
+
+		output := "[" + strings.Join(quotedStrings, ", ") + "]"
+		fmt.Println(output)
+	} else {
+		fmt.Println(strings.Join(UniqPasswordList.([]string), "\n"))
+	}
+
 	return UniqPasswordList.([]string)
 }

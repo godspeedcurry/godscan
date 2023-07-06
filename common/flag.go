@@ -30,6 +30,8 @@ func Flag(Info *HostInfo) {
 	flag.StringVar(&Info.UrlFile, "uf", "", "your url list")
 	flag.BoolVar(&Info.DirBrute, "dir", false, "if brute dir")
 
+	flag.BoolVar(&ListFormat, "l", false, "python list format")
+
 	// flag.StringVar(&Info.Host, "h", "", "IP address of the host you want to scan,for example: 192.168.11.11 | 192.168.11.11-255 | 192.168.11.11,192.168.11.12")
 	// flag.StringVar(&NoHosts, "hn", "", "the hosts no scan,as: -hn 192.168.1.1/24")
 	// flag.StringVar(&Info.Ports, "p", DefaultPorts, "Select a port,for example: 22 | 1-65535 | 22,80,3306")

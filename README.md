@@ -24,13 +24,14 @@ go run main.go -k "干饭,干饭集团,干饭有限公司"
 # 自定义后缀
 go run main.go -k "张三,110101199003070759,18288888888" -s '123,qwe,123456'
 
+# -l 获取python格式的list 如["11","222"]
 # mac下拷贝至剪贴板，其余系统可自行探索哈
 go run main.go -k "张三,110101199003070759,18288888888" | pbcopy
 ```
 
 ### 爬虫递归探测URL、指纹和敏感信息
 ```bash
-go run main.go -u 'http:/www.exmaple.com' 
+go run main.go -u 'http://www.exmaple.com' 
 # -d 1 可以指定爬虫的深度
 ```
 
