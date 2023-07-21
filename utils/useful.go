@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"main/common"
 	"sort"
 	"strings"
 )
@@ -117,6 +118,29 @@ func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 		err := Errorf("Unknown type: %T", slice)
 		return nil, err
 	}
+}
+
+func ShowInfo() {
+	fmt.Println("-suffix '" + strings.Join(common.SuffixTop, ",") + "'")
+	fmt.Println("-prefix '" + strings.Join(common.PrefixTop, ",") + "'")
+	fmt.Println("-sep '" + strings.Join(common.SeperatorTop, ",") + "'")
+	fmt.Println("-k '" + strings.Join(common.KeywordTop, ",") + "'")
+}
+func removeDuplicatesString(arr []string) []string {
+	// 创建一个空的map，用于存储唯一的元素
+	uniqueMap := make(map[string]bool)
+	result := []string{}
+
+	// 遍历数组中的每个元素
+	for _, num := range arr {
+		// 将元素添加到map中，键为元素的值，值为true
+		if !uniqueMap[num] {
+			uniqueMap[num] = true
+			result = append(result, num)
+		}
+	}
+
+	return result
 }
 
 func in(str_array []string, target string) bool {

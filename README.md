@@ -22,7 +22,15 @@ go run main.go -k "张三,110101199003070759,18288888888"
 go run main.go -k "干饭,干饭集团,干饭有限公司"
 
 # 自定义后缀
-go run main.go -k "张三,110101199003070759,18288888888" -s '123,qwe,123456'
+go run main.go -k "张三,110101199003070759,18288888888" -suffix '123,qwe,123456'
+
+# 查看工具默认的后缀
+go run main.go -show
+# 更为复杂的前后缀，适合本地跑hashcat
+go run main.go -k '百度' -full > 1.txt  
+
+# 自定义后缀
+go run main.go -k '百度,baidu.com,password,pass,root,server,qwer,admin' -prefix '@,!,",123' -suffix '!,1234,123,321' -sep '_,!,.,/,&,+' > 1.txt
 
 # -l 获取python格式的list 如["11","222"]
 # mac下拷贝至剪贴板，其余系统可自行探索哈
