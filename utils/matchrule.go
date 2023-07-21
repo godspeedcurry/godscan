@@ -70,7 +70,7 @@ func fingerScan(url string) string {
 
 	if err != nil {
 		fmt.Println(err)
-		return ""
+		return "no finger!!"
 	}
 	headers := MapToJson(resp.Header)
 
@@ -79,19 +79,19 @@ func fingerScan(url string) string {
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		fmt.Println(err)
-		return ""
+		return "no finger!!"
 	}
 	var cms []string
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
-		return ""
+		return "no finger!!"
 	}
 	body := string(bodyBytes)
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return ""
+		return "no finger!!"
 	}
 
 	// 查找标题元素并获取内容
@@ -140,5 +140,5 @@ func fingerScan(url string) string {
 	if len(cms) != 0 {
 		return strings.Join(cms, ",")
 	}
-	return ""
+	return "no finger!!"
 }
