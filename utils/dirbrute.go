@@ -32,6 +32,7 @@ func DirBrute(filename string) {
 
 func DirSingleBrute(baseUrl string) {
 	InitHttp()
+	statusCode := make(map[int]int)
 	baseUrl = strings.TrimSpace(baseUrl)
 	// 检查URL的存活性
 	req, _ := http.NewRequest(http.MethodGet, baseUrl, nil)
@@ -42,7 +43,10 @@ func DirSingleBrute(baseUrl string) {
 		color.Red("[failed] %s: %v\n", baseUrl, err)
 		return
 	}
+	respBody, err := ioutil.ReadAll(resp.Body)
 	color.White("[*] %s is alive, start to brute...\n", baseUrl)
+	color.HiGreen("[200] %s len=%d status_code=%d finger=%s", baseUrl, len(respBody), resp.StatusCode, fingerScan(baseUrl))
+	statusCode[resp.StatusCode] += 1
 
 	baseURL, _ := url.Parse(baseUrl)
 	tempDirList := common.DirList
@@ -75,12 +79,16 @@ func DirSingleBrute(baseUrl string) {
 		respBody, err := ioutil.ReadAll(resp.Body)
 
 		if resp.StatusCode == 200 && len(respBody) > 0 {
-			color.HiGreen("[success] %s len=%d status_code=%d finger=%s", fullURL, len(respBody), resp.StatusCode, fingerScan(fullURL.String()))
+			color.HiGreen("[200] %s len=%d status_code=%d finger=%s", fullURL, len(respBody), resp.StatusCode, fingerScan(fullURL.String()))
 		} else if resp.StatusCode == 500 {
-			color.HiGreen("[warning] %s len=%d status_code=%d", fullURL, len(respBody), resp.StatusCode)
-		} else {
-			color.HiBlue("[info] %s len=%d status_code=%d", fullURL, len(respBody), resp.StatusCode)
+			color.HiGreen("[500] %s len=%d status_code=%d finger=%s", fullURL, len(respBody), resp.StatusCode, fingerScan(fullURL.String()))
 		}
+		statusCode[resp.StatusCode] += 1
 	}
+	l := []string{}
+	for key, value := range statusCode {
+		l = append(l, fmt.Sprintf("%d, %d个", key, value))
+	}
+	fmt.Println("状态码: " + strings.Join(l, "|"))
 	resp.Body.Close()
 }

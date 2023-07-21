@@ -266,19 +266,81 @@ func IconDetect(Url string) (string, error) {
 	resp, err := Client.Do(req)
 
 	if err != nil {
+		fmt.Println(err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	color.Red("[*] icon_hash=\"%s\" %d", ico, resp.StatusCode)
+	color.Red("[*] icon_url=\"%s\" icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
 	if tmp != nil {
-		color.Red("[*] icon_hash `%s`", tmp)
+		color.Red("[*] icon_url=\"%s\" icon_finger=\"%s\"", Url, tmp)
 	}
 	return "", nil
+}
+func FindFaviconURL(urlStr string) (string, error) {
+	// 解析基准URL
+	InitHttp()
+	baseURL, err := url.Parse(urlStr)
+	if err != nil {
+		return "", err
+	}
+
+	// 获取HTML内容
+	req, _ := http.NewRequest(http.MethodGet, urlStr, nil)
+	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	resp, err := Client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	// 从响应中创建goquery文档
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	// 创建正则表达式，模糊匹配rel属性值
+	r := regexp.MustCompile(`icon`)
+
+	// 查找匹配的<link>标签
+	var faviconURL string
+	doc.Find("link").Each(func(i int, s *goquery.Selection) {
+		// 检查rel属性值是否匹配正则表达式
+		rel, exists := s.Attr("rel")
+		if exists && r.MatchString(rel) {
+			// 提取href属性值
+			href, exists := s.Attr("href")
+			if exists {
+				// 检查是否是绝对路径
+				if isAbsoluteURL(href) {
+					faviconURL = href
+				} else {
+					// 解析相对路径并构建完整URL
+					faviconURL = baseURL.ResolveReference(&url.URL{Path: href}).String()
+				}
+			}
+		}
+	})
+
+	if faviconURL == "" {
+		return "", fmt.Errorf("Favicon URL not found, might used javascript, please find it manually and use `-ico url` to calculate it")
+	}
+
+	return faviconURL, nil
+}
+
+// 检查URL是否是绝对路径
+func isAbsoluteURL(urlStr string) bool {
+	u, err := url.Parse(urlStr)
+	if err != nil {
+		return false
+	}
+	return u.IsAbs()
 }
 
 func PrintFinger(Info common.HostInfo) {
@@ -307,8 +369,12 @@ func PrintFinger(Info common.HostInfo) {
 	ThirdUrl := RootPath
 	DisplayHeader(ThirdUrl, http.MethodPost)
 
-	IconUrl := RootPath + "/favicon.ico"
-	IconDetect(IconUrl)
+	IconUrl, err := FindFaviconURL(RootPath)
+	if err == nil {
+		IconDetect(IconUrl)
+	} else {
+		fmt.Println(err)
+	}
 
 	// 爬虫递归爬
 	s1 := mapset.NewSet()

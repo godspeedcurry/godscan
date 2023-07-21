@@ -1,15 +1,18 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 
-	// "github.com/chain-zhang/pinyin"
 	"main/common"
 	"regexp"
 	"strings"
 
 	"github.com/Chain-Zhang/pinyin"
+	"github.com/Lofanmi/chinese-calendar-golang/calendar"
 )
 
 func MightBeIdentityCard(IdentityCard string) bool {
@@ -19,7 +22,6 @@ func MightBeIdentityCard(IdentityCard string) bool {
 
 func MightBeChineseName(Name string) bool {
 	result, _ := regexp.MatchString("^[\u4e00-\u9fa5]*$", Name)
-	// fmt.Println(result)
 	return result
 }
 
@@ -61,7 +63,7 @@ func LastCharToUpper(Name string) string {
 	return ""
 }
 
-func AddStringToString(x string, y string, seps []string) []string {
+func AddStringToString(x string, seps []string, y string) []string {
 	var mylist = []string{}
 	for _, first := range []string{x, FirstCharToUpper(x), strings.ToUpper(x), LastCharToUpper(x)} {
 		for _, sep := range seps {
@@ -70,116 +72,166 @@ func AddStringToString(x string, y string, seps []string) []string {
 			}
 		}
 	}
-
-	notDuplcated, _ := RemoveDuplicateElement(mylist)
-	return notDuplcated.([]string)
+	notDuplicated, _ := RemoveDuplicateElement(mylist)
+	return notDuplicated.([]string)
 }
 
-func BuildFromKeyWordList(KeywordList []string) []string {
-	var onlyFirst = "zs"
-	var firstComplete = "zhangs"
-	var Phone = "123456"
-	var IdentityCard = "123456789123456789"
-	var completeName = "zhangsan"
-	for _, Keyword := range KeywordList {
-		if MightBeChineseName((Keyword)) {
-			onlyFirst, firstComplete, completeName = TranslateToEnglish(Keyword)
-		} else if MightBeIdentityCard(Keyword) {
-			IdentityCard = Keyword
-		} else if MightBePhone(Keyword) {
-			Phone = Keyword
+func getLunar(keyword string) string {
+
+	year, _ := strconv.ParseInt(keyword[6:10], 10, 64)
+	month, _ := strconv.ParseInt(keyword[10:12], 10, 64)
+	day, _ := strconv.ParseInt(keyword[12:14], 10, 64)
+
+	c := calendar.BySolar(year, month, day, 12, 0, 0)
+	bytes, _ := c.ToJSON()
+
+	var data map[string]interface{}
+	err := json.Unmarshal(bytes, &data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	// 获得农历生日
+	lunar := fmt.Sprintf("%02d%02d", int(data["lunar"].(map[string]interface{})["month"].(float64)), int(data["lunar"].(map[string]interface{})["day"].(float64)))
+	return lunar
+
+}
+
+func ReplaceWithTable(input string) string {
+	var tmp = input
+	for _, char := range tmp {
+		switch char {
+		case 'a':
+			tmp = strings.ReplaceAll(tmp, string(char), "@")
+		case 's':
+			tmp = strings.ReplaceAll(tmp, string(char), "5")
+		case 'o':
+			tmp = strings.ReplaceAll(tmp, string(char), "0")
+		case 'i':
+			tmp = strings.ReplaceAll(tmp, string(char), "1")
 		}
 	}
-	var ans = []string{}
-	if Phone != "123456" {
-		ans = append(ans, AddStringToString(Phone, onlyFirst, []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(Phone, firstComplete, []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(Phone, completeName, []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(Phone[2:], onlyFirst, []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(Phone[2:], firstComplete, []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(Phone[2:], completeName, []string{"@", "_", "#", ""})...)
-	}
-
-	if IdentityCard != "123456789123456789" {
-		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[8:14], []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[10:14], []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[6:10], []string{"@", "_", "#", ""})...)
-		ans = append(ans, AddStringToString(onlyFirst, IdentityCard[12:18], []string{"@", "_", "#", ""})...)
-	}
-	return ans
+	return tmp
+}
+func generateVariants(input string) []string {
+	variants := []string{}
+	variants = append(variants, strings.ReplaceAll(input, "a", "@"))
+	// variants = append(variants, strings.ReplaceAll(input, "a", "4"))
+	variants = append(variants, strings.ReplaceAll(input, "s", "5"))
+	variants = append(variants, strings.ReplaceAll(input, "o", "0"))
+	variants = append(variants, strings.ReplaceAll(input, "i", "1"))
+	variants = append(variants, ReplaceWithTable(input))
+	return variants
 }
 
-func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string {
-	var KeywordList = []string{}
-	if strings.Contains(KeywordListStr, ",") {
-		KeywordList = strings.Split(KeywordListStr, ",")
-	} else {
-		KeywordList = append(KeywordList, KeywordListStr)
-	}
-	var PasswordList = []string{}
-
+func getSuffixList(Info common.HostInfo) []string {
 	var SuffixList = []string{}
-	if !(SuffixListStr == "") {
-		SuffixList = strings.Split(SuffixListStr, ",")
+	if Info.Full {
+		SuffixList = append(SuffixList, common.SuffixTop...)
 	}
+	year := time.Now().Year()
+	for i := year - 15; i <= year; i++ {
+		SuffixList = append(SuffixList, strconv.Itoa(i))
+	}
+	SuffixList = append(SuffixList, strings.Split(Info.Suffix, ",")...)
+	SuffixList = removeDuplicatesString(SuffixList)
+	return SuffixList
+}
 
-	for _, keyword := range KeywordList {
-		for _, sep := range SuffixList {
-			PasswordList = append(PasswordList, AddStringToString(keyword, sep, []string{"@", "_", "#", "!@#", "", "123", "qwe"})...)
-		}
+func getKeywordList(Info common.HostInfo) []string {
+	var KeywordList = []string{}
+	if Info.Full {
+		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
+	KeywordList = append(KeywordList, strings.Split(Info.Keywords, ",")...)
+	KeywordList = removeDuplicatesString(KeywordList)
+	return KeywordList
+}
+
+func getSepList(Info common.HostInfo) []string {
+	var SepList = []string{}
+	if Info.Full {
+		SepList = append(SepList, common.SeperatorTop...)
+	}
+	SepList = append(SepList, strings.Split(Info.Seperator, ",")...)
+	SepList = removeDuplicatesString(SepList)
+	return SepList
+}
+
+func getPrefixList(Info common.HostInfo) []string {
+	var PrefixList = []string{}
+	if Info.Full {
+		PrefixList = append(PrefixList, common.PrefixTop...)
+	}
+	PrefixList = append(PrefixList, strings.Split(Info.Prefix, ",")...)
+	PrefixList = removeDuplicatesString(PrefixList)
+	return PrefixList
+}
+
+func GenerateWeakPassword(Info common.HostInfo) []string {
+	var PasswordList = []string{}
+	var KeywordList = getKeywordList(Info)
+	var SuffixList = getSuffixList(Info)
+	var SepList = getSepList(Info)
+
+	var PrefixList = getPrefixList(Info)
 
 	var idcard, onlyFirst, firstComplete, completeName string
-	for _, password := range common.Passwords {
-		if !strings.Contains(password, "{user}") {
-			PasswordList = append(PasswordList, password)
-			continue
+
+	PasswordList = append(PasswordList, common.Passwords...)
+
+	KeywordTmpList := []string{"Admin,admin"}
+	for _, keyword := range KeywordList {
+		if MightBeIdentityCard(keyword) {
+			idcard = keyword
+			lunar := getLunar(keyword)
+			// 2009
+			KeywordTmpList = append(KeywordTmpList, keyword[6:10])
+
+			// 生日
+			KeywordTmpList = append(KeywordTmpList, keyword[10:14])
+
+			// 后六位
+			KeywordTmpList = append(KeywordTmpList, keyword[12:18])
+
+			// 年份后两位 + 生日
+			KeywordTmpList = append(KeywordTmpList, keyword[8:14])
+			// 年份后两位 + 农历生日
+			KeywordTmpList = append(KeywordTmpList, keyword[8:10]+lunar)
+
+			// 年份 + 农历生日
+			KeywordTmpList = append(KeywordTmpList, keyword[6:10]+lunar)
+		} else if MightBeChineseName(keyword) {
+			onlyFirst, firstComplete, completeName = TranslateToEnglish(keyword)
+			// 也可以作为前后缀
+			PrefixList = append(PrefixList, completeName)
+			SuffixList = append(SuffixList, completeName)
+
+			KeywordTmpList = append(KeywordTmpList, onlyFirst, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst))
+			KeywordTmpList = append(KeywordTmpList, firstComplete, FirstCharToUpper(firstComplete), LastCharToUpper(firstComplete), strings.ToUpper(firstComplete))
+			KeywordTmpList = append(KeywordTmpList, completeName, FirstCharToUpper(completeName), LastCharToUpper(completeName), strings.ToUpper(completeName))
+			KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
+		} else {
+			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
+			KeywordTmpList = append(KeywordTmpList, generateVariants(keyword)...)
 		}
-		for _, keyword := range KeywordList {
-			//如果是身份证格式
-			if MightBeIdentityCard(keyword) {
-				idcard = keyword
-				// 2009
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[6:10]))
-				// 后六位
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[12:18]))
-				// 年份后两位 + 生日
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[8:14]))
-				// 生日
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword[10:14]))
-			} else if MightBeChineseName(keyword) {
-				onlyFirst, firstComplete, completeName = TranslateToEnglish(keyword)
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", onlyFirst))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(onlyFirst)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(onlyFirst)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(onlyFirst)))
+	}
 
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", firstComplete))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(firstComplete)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(firstComplete)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(firstComplete)))
-
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", completeName))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(completeName)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(completeName)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(completeName)))
-
-			} else {
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", keyword))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", FirstCharToUpper(keyword)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", LastCharToUpper(keyword)))
-				PasswordList = append(PasswordList, strings.ReplaceAll(password, "{user}", strings.ToUpper(keyword)))
+	for _, pre := range PrefixList {
+		for _, keyword := range KeywordTmpList {
+			for _, sep := range SepList {
+				for _, suffix := range SuffixList {
+					PasswordList = append(PasswordList, pre+keyword+sep+suffix)
+				}
 			}
 		}
 	}
-	if idcard != "" && onlyFirst != "" && firstComplete != "" && completeName != "" {
-		PasswordList = append(PasswordList, completeName+idcard[10:14])
-		PasswordList = append(PasswordList, completeName+idcard[8:14])
-		PasswordList = append(PasswordList, completeName+idcard[12:18])
-		PasswordList = append(PasswordList, completeName+idcard[6:10])
-	}
 
-	PasswordList = append(PasswordList, BuildFromKeyWordList(KeywordList)...)
+	if idcard != "" && completeName != "" {
+		arr := []string{onlyFirst, firstComplete, completeName, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst), FirstCharToUpper(firstComplete), LastCharToUpper(completeName), strings.ToUpper(completeName)}
+		for _, k := range arr {
+			PasswordList = append(PasswordList, k+idcard[10:14], k+idcard[8:14], k+idcard[12:18], k+idcard[6:10], k+idcard[6:14])
+		}
+	}
 	UniqPasswordList, err := RemoveDuplicateElement(PasswordList)
 	if err != nil {
 		fmt.Println(err)
@@ -190,12 +242,11 @@ func GenerateWeakPassword(KeywordListStr string, SuffixListStr string) []string 
 		for _, str := range UniqPasswordList.([]string) {
 			quotedStrings = append(quotedStrings, strconv.Quote(str))
 		}
-
 		output := "[" + strings.Join(quotedStrings, ", ") + "]"
 		fmt.Println(output)
 	} else {
 		fmt.Println(strings.Join(UniqPasswordList.([]string), "\n"))
 	}
-
+	println("total:", len(UniqPasswordList.([]string)))
 	return UniqPasswordList.([]string)
 }

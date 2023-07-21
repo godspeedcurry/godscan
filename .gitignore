@@ -1,5 +1,6 @@
-getfinger.py
+*.py
 main
 godscan_*
 dist/
-1.txt
+*.txt
+*.sh

@@ -23,14 +23,18 @@ func Flag(Info *HostInfo) {
 	// flag.StringVar(&Info.Proxy, "p", "", "your proxy")
 	flag.StringVar(&Proxy, "p", "", "your proxy")
 	flag.IntVar(&Info.Depth, "d", 1, "your search depth")
-	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by `,`")
-	flag.StringVar(&Info.Suffix, "s", "", "your suffix list, for example 123,qwe,@,# separate by `,`")
+	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by ','")
+	flag.StringVar(&Info.Suffix, "suffix", "", "your suffix list, default: 01,111,123,321,12345,123456,001,admin,adminn,12345+,654321 separate by ','")
+	flag.StringVar(&Info.Seperator, "sep", "", "your seperator list, default: @,#,$ separate by ','")
+	flag.StringVar(&Info.Prefix, "prefix", "", "your prefix list, default: null separate by ','")
 
 	flag.StringVar(&Info.IconUrl, "ico", "", "your icon url")
 	flag.StringVar(&Info.UrlFile, "uf", "", "your url list")
 	flag.BoolVar(&Info.DirBrute, "dir", false, "if brute dir")
 
 	flag.BoolVar(&ListFormat, "l", false, "python list format")
+	flag.BoolVar(&Info.Show, "show", false, "show all seperator,suffix,prefix")
+	flag.BoolVar(&Info.Full, "full", false, "use full dict")
 
 	// flag.StringVar(&Info.Host, "h", "", "IP address of the host you want to scan,for example: 192.168.11.11 | 192.168.11.11-255 | 192.168.11.11,192.168.11.12")
 	// flag.StringVar(&NoHosts, "hn", "", "the hosts no scan,as: -hn 192.168.1.1/24")
