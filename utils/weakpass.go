@@ -31,29 +31,36 @@ func MightBePhone(Phone string) bool {
 	return result
 }
 
-func TranslateToEnglish(Name string) (string, string, string) {
+func TranslateToEnglish(Name string) (string, string, string, string) {
 	str, err := pinyin.New(Name).Split(" ").Mode(pinyin.WithoutTone).Convert()
 	if err != nil {
 		fmt.Println(err)
-		return "", "", ""
+		return "", "", "", ""
 	}
 	// 首字母
 	onlyFirst := ""
 	// 姓全称其他只取首字母
 	firstComplete := ""
+	// 所有拼音首字母大写
+	firstUpper := ""
 	for idx, x := range strings.Split(str, " ") {
 		onlyFirst = onlyFirst + string(x[0])
+		firstUpper = firstUpper + strings.Title(x)
 		if idx == 0 {
 			firstComplete = firstComplete + x
 		} else {
 			firstComplete = firstComplete + string(x[0])
 		}
 	}
-	return onlyFirst, firstComplete, strings.ReplaceAll(str, " ", "")
+	return onlyFirst, firstComplete, strings.ReplaceAll(str, " ", ""), firstUpper
 }
 
 func FirstCharToUpper(Name string) string {
 	return strings.ToUpper(Name[:1]) + Name[1:]
+}
+
+func HalfCharToUpper(Name string) string {
+	return strings.ToUpper(Name[:len(Name)>>1]) + Name[len(Name)>>1:]
 }
 
 func LastCharToUpper(Name string) string {
@@ -132,6 +139,11 @@ func getSuffixList(Info common.HostInfo) []string {
 	for i := year - 15; i <= year; i++ {
 		SuffixList = append(SuffixList, strconv.Itoa(i))
 	}
+	if Info.Full {
+		for i := year - 50; i < year-15; i++ {
+			SuffixList = append(SuffixList, strconv.Itoa(i))
+		}
+	}
 	SuffixList = append(SuffixList, strings.Split(Info.Suffix, ",")...)
 	SuffixList = removeDuplicatesString(SuffixList)
 	return SuffixList
@@ -175,7 +187,7 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 
 	var PrefixList = getPrefixList(Info)
 
-	var idcard, onlyFirst, firstComplete, completeName string
+	var idcard, onlyFirst, firstComplete, completeName, firstUpper string
 
 	PasswordList = append(PasswordList, common.Passwords...)
 
@@ -201,14 +213,17 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 			// 年份 + 农历生日
 			KeywordTmpList = append(KeywordTmpList, keyword[6:10]+lunar)
 		} else if MightBeChineseName(keyword) {
-			onlyFirst, firstComplete, completeName = TranslateToEnglish(keyword)
+			onlyFirst, firstComplete, completeName, firstUpper = TranslateToEnglish(keyword)
+			fmt.Println(HalfCharToUpper(onlyFirst))
+			fmt.Println("===================")
 			// 也可以作为前后缀
 			PrefixList = append(PrefixList, completeName)
 			SuffixList = append(SuffixList, completeName)
 
-			KeywordTmpList = append(KeywordTmpList, onlyFirst, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst))
+			KeywordTmpList = append(KeywordTmpList, onlyFirst, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst), HalfCharToUpper(onlyFirst))
 			KeywordTmpList = append(KeywordTmpList, firstComplete, FirstCharToUpper(firstComplete), LastCharToUpper(firstComplete), strings.ToUpper(firstComplete))
-			KeywordTmpList = append(KeywordTmpList, completeName, FirstCharToUpper(completeName), LastCharToUpper(completeName), strings.ToUpper(completeName))
+			KeywordTmpList = append(KeywordTmpList, completeName, FirstCharToUpper(completeName), LastCharToUpper(completeName), strings.ToUpper(completeName), HalfCharToUpper(completeName))
+			KeywordTmpList = append(KeywordTmpList, firstUpper)
 			KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
 		} else {
 			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
