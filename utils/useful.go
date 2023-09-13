@@ -139,7 +139,7 @@ func removeDuplicatesString(arr []string) []string {
 			result = append(result, num)
 		}
 	}
-
+	sort.Strings(result)
 	return result
 }
 

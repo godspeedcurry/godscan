@@ -4,21 +4,19 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"main/common"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
-
-	"github.com/fatih/color"
 )
 
 func DirBrute(filename string) {
 	urlFile, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		Warning(err.Error())
+		return
 	}
 	defer urlFile.Close()
 
@@ -32,20 +30,30 @@ func DirBrute(filename string) {
 
 func DirSingleBrute(baseUrl string) {
 	InitHttp()
+	if !strings.HasPrefix(baseUrl, "http") {
+		baseUrl = "http://" + baseUrl
+	}
 	statusCode := make(map[int]int)
 	baseUrl = strings.TrimSpace(baseUrl)
 	// 检查URL的存活性
-	req, _ := http.NewRequest(http.MethodGet, baseUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, baseUrl, nil)
+	if err != nil {
+		Failed(baseUrl + err.Error())
+		return
+	}
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		color.Red("[failed] %s: %v\n", baseUrl, err)
+		Failed(baseUrl + err.Error())
 		return
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
-	color.White("[*] %s is alive, start to brute...\n", baseUrl)
-	color.HiGreen("[200] %s len=%d status_code=%d finger=%s", baseUrl, len(respBody), resp.StatusCode, fingerScan(baseUrl))
+	if err != nil {
+		Failed(baseUrl + err.Error())
+		return
+	}
+	Success("[%d] %d {%s} %s", resp.StatusCode, len(respBody), fingerScan(baseUrl), baseUrl)
 	statusCode[resp.StatusCode] += 1
 
 	baseURL, _ := url.Parse(baseUrl)
@@ -59,7 +67,7 @@ func DirSingleBrute(baseUrl string) {
 		for i := 0; i < len(parts)-1; i++ {
 			for j := i + 1; j <= len(parts); j++ {
 				substr := strings.Join(parts[i:j], ".")
-				tempDirList = append(tempDirList, substr+".tar.gz")
+				tempDirList = append(tempDirList, substr+".tar.gz", substr+".zip")
 			}
 		}
 	} else {
@@ -69,19 +77,22 @@ func DirSingleBrute(baseUrl string) {
 
 	for _, _path := range tempDirList {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: _path})
-		req, _ := http.NewRequest(http.MethodGet, fullURL.String(), nil)
+		req, err := http.NewRequest(http.MethodGet, fullURL.String(), nil)
+		if err != nil {
+			continue
+		}
 		req.Header.Set("User-Agent", common.DEFAULT_UA)
 		resp, err := Client.Do(req)
 		if err != nil {
-			fmt.Println(err)
-			return
+			continue
 		}
 		respBody, err := ioutil.ReadAll(resp.Body)
-
-		if resp.StatusCode == 200 && len(respBody) > 0 {
-			color.HiGreen("[200] %s len=%d status_code=%d finger=%s", fullURL, len(respBody), resp.StatusCode, fingerScan(fullURL.String()))
-		} else if resp.StatusCode == 500 {
-			color.HiGreen("[500] %s len=%d status_code=%d finger=%s", fullURL, len(respBody), resp.StatusCode, fingerScan(fullURL.String()))
+		if err != nil {
+			continue
+		}
+		n := len(respBody)
+		if resp.StatusCode == 200 || resp.StatusCode == 500 {
+			Success("[%d] %d {%s} %s", resp.StatusCode, n, fingerScan(fullURL.String()), fullURL)
 		}
 		statusCode[resp.StatusCode] += 1
 	}
@@ -89,6 +100,6 @@ func DirSingleBrute(baseUrl string) {
 	for key, value := range statusCode {
 		l = append(l, fmt.Sprintf("%d, %d个", key, value))
 	}
-	fmt.Println("状态码: " + strings.Join(l, "|"))
+	Info("状态码: " + strings.Join(l, "|"))
 	resp.Body.Close()
 }
