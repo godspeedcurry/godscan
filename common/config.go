@@ -1,6 +1,6 @@
 package common
 
-var version = "1.1.3"
+var version = "1.1.4"
 var Userdict = map[string][]string{
 	"ftp":        {"ftp", "admin", "www", "web", "root", "db", "wwwroot", "data", "test", "administrator", "anonymous"},
 	"mysql":      {"root", "mysql"},
@@ -183,6 +183,8 @@ var (
 	// PassAdd       string
 	// BruteThread   int
 	// LiveTop       int
+	ApiPrefix  string
+	LogLevel   int
 	Proxy      string
 	ListFormat bool
 	Depth      int

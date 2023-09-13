@@ -26,7 +26,7 @@ go run main.go -k "张三,110101199003070759,18288888888" -suffix '123,qwe,12345
 
 # 查看工具默认的后缀
 go run main.go -show
-# 更为复杂的前后缀，适合本地跑hashcat
+# 更为复杂的前后缀，适合本地跑hashcat,会对字符串作变异，如o->0,i->1,a->4等等
 go run main.go -k '百度' -full > 1.txt  
 
 # 自定义后缀
@@ -46,6 +46,13 @@ go run main.go -u 'http://www.exmaple.com'
 ### 批量目录扫描+指纹识别(单线程)
 ```bash
 go run main.go -uf url.txt
+```
+
+### 爬取js中的api地址，用于未授权测试
+```bash
+go run main.go -u http://example.com -d 2
+# 假如知道前缀，可以得到一些路径，便于burp中爆破，这些路径可能需要GET、POST等类型去做多种测试 
+go run main.go -u http://example.com -d 2 -api "/api/v1"
 ```
 
 
