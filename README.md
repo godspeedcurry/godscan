@@ -6,15 +6,15 @@
 go run main.go -u http://www.example.com -dir
 ```
 1. 目录扫描数量较少，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
-2. 目录扫描会根据域名、ip生成对应的备份文件路径，说不定会有意外之喜
-3. 要对单一url进行大线程探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
+2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜
+3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
 
 ### 根据图标地址计算图标hash
 ```bash
 go run main.go -ico http://www.example.com/ico.ico
 ```
 
-### 弱口令生成
+### 弱口令生成、离线爆破
 会自动识别身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
 ```bash
 go run main.go -k "张三,110101199003070759,18288888888"
@@ -26,7 +26,7 @@ go run main.go -k "张三,110101199003070759,18288888888" -suffix '123,qwe,12345
 
 # 查看工具默认的后缀
 go run main.go -show
-# 更为复杂的前后缀，适合本地跑hashcat,会对字符串作变异，如o->0,i->1,a->4等等
+# 更为复杂的前后缀，适合本地跑hashcat,本方法还会对字符串作变异，如o->0,i->1,a->4等等
 go run main.go -k '百度' -full > 1.txt  
 
 # 自定义后缀
@@ -51,7 +51,7 @@ go run main.go -uf url.txt
 ### 爬取js中的api地址，用于未授权测试
 ```bash
 go run main.go -u http://example.com -d 2
-# 假如知道前缀，可以得到一些路径，便于burp中爆破，这些路径可能需要GET、POST等类型去做多种测试 
+# 假如知道前缀，可以得到一些路径，便于burp中爆破，这些路径可能需要GET、POST等类型去做测试 
 go run main.go -u http://example.com -d 2 -api "/api/v1"
 ```
 
@@ -70,7 +70,7 @@ go run main.go -u http://example.com -d 2 -api "/api/v1"
 - [x] 对注释里的内容匹配到关键字并高亮
 - [x] 识别接口 主要从js里提取
 - [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
-- [x] vue.js 前端 识别app.xxxx.js 并使用正则提取里面的path
+- [x] vue.js 前端 识别`(app|index|main|config).xxxx.js` 并使用正则提取里面的path
 - [x] finger.txt来源
   * [Ehole](https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json)
   * [nemasis](https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf)
@@ -113,6 +113,8 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 ```
 
 ## 更新说明
+* 2023-09-13 新增js中提取api路径的功能
+* 2023-08-11 新增目录单线程爆破的功能，并会根据域名爆破一些备份文件
 * 2023-07-03 新增直接对icon计算hash的功能
 * 2023-07-02 新增批量url关键路径扫描的功能
 * 2022-08-01 新增部分真实场景中得到的弱口令 新增弱口令后缀，如123,qwe等，丰富生成后的弱口令
