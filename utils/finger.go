@@ -37,8 +37,10 @@ func Mmh3Hash32(raw []byte) string {
 	}
 }
 func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, string, string, error) {
-	req, _ := http.NewRequest(Method, Url, nil)
-
+	req, err := http.NewRequest(Method, Url, nil)
+	if err != nil {
+		return "", "", "", err
+	}
 	if Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -116,7 +118,7 @@ func FindKeyWord(data string) []string {
 }
 
 func IsVuePath(Path string) bool {
-	reg := regexp.MustCompile(`app\.[0-9a-z]+\.js`)
+	reg := regexp.MustCompile(`(app|index|config|main|chunk)[0-9a-f\.]*js`)
 	res := reg.FindAllString(Path, -1)
 	return len(res) > 0
 }
@@ -143,7 +145,10 @@ func HighLight(data string, keywords []string, fingers []string) {
 }
 
 func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
-	url_struct, _ := url.Parse(RootPath)
+	url_struct, err := url.Parse(RootPath)
+	if err != nil {
+		return "", err
+	}
 	host, _, _ := net.SplitHostPort(url_struct.Host)
 	if !strings.Contains(Url, host) {
 		fmt.Printf("[Depth %d] %s\n", depth, Url)
@@ -154,15 +159,18 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	}
 	fmt.Printf("[Depth %d] %s\n", depth, Url)
 	s1.Add(Url)
-	req, _ := http.NewRequest(http.MethodGet, Url, nil)
+	req, err := http.NewRequest(http.MethodGet, Url, nil)
+
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
+
 	if err != nil {
 		fmt.Println(err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
+
 	keywords := FindKeyWord(doc.Text())
 
 	//正则提取版本
@@ -191,12 +199,16 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
 		fmt.Println("[*] Api Path")
-		ApiReg := regexp.MustCompile(`path:"(?P<path>.*?)"`)
-		ApiResult := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-		if len(ApiResult) > 0 {
-			for _, tmp := range ApiResult {
-				fmt.Println(RootPath + "/" + tmp[1])
+		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
+		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+		ApiResult := []string{}
+
+		if len(ApiResultTuple) > 0 {
+			for _, tmp := range ApiResultTuple {
+				ApiResult = append(ApiResult, common.ApiPrefix+tmp[1])
 			}
+			ApiResult = removeDuplicatesString(ApiResult)
+			fmt.Println(strings.Join(ApiResult, "\n"))
 		}
 	}
 
@@ -345,6 +357,9 @@ func isAbsoluteURL(urlStr string) bool {
 
 func PrintFinger(Info common.HostInfo) {
 	InitHttp()
+	if !strings.HasPrefix(Info.Url, "http") {
+		Info.Url = "http://" + Info.Url
+	}
 	color.HiRed("Your URL: %s\n", Info.Url)
 	Host, _ := url.Parse(Info.Url)
 	RootPath := Host.Scheme + "://" + Host.Hostname()
@@ -375,7 +390,6 @@ func PrintFinger(Info common.HostInfo) {
 	} else {
 		fmt.Println(err)
 	}
-
 	// 爬虫递归爬
 	s1 := mapset.NewSet()
 	Spider(RootPath, Info.Url, Info.Depth, s1)

@@ -20,7 +20,6 @@ godscan version: ` + version + `
 func Flag(Info *HostInfo) {
 	Banner()
 	flag.StringVar(&Info.Url, "u", "", "your url")
-	// flag.StringVar(&Info.Proxy, "p", "", "your proxy")
 	flag.StringVar(&Proxy, "p", "", "your proxy")
 	flag.IntVar(&Info.Depth, "d", 1, "your search depth")
 	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by ','")
@@ -35,6 +34,8 @@ func Flag(Info *HostInfo) {
 	flag.BoolVar(&ListFormat, "l", false, "python list format")
 	flag.BoolVar(&Info.Show, "show", false, "show all seperator,suffix,prefix")
 	flag.BoolVar(&Info.Full, "full", false, "use full dict")
+	flag.IntVar(&LogLevel, "v", 2, "level of your log")
+	flag.StringVar(&ApiPrefix, "api", "", "prefix of api, such as /api/v1")
 
 	// flag.StringVar(&Info.Host, "h", "", "IP address of the host you want to scan,for example: 192.168.11.11 | 192.168.11.11-255 | 192.168.11.11,192.168.11.12")
 	// flag.StringVar(&NoHosts, "hn", "", "the hosts no scan,as: -hn 192.168.1.1/24")
