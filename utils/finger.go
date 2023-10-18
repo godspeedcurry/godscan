@@ -7,7 +7,8 @@ import (
 	"hash"
 	"io/ioutil"
 	"log"
-	"main/common"
+
+	"github.com/godspeedcurry/godscan/common"
 
 	"net"
 	"net/http"
