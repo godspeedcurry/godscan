@@ -90,7 +90,7 @@ func IsVuePath(Path string) bool {
 	return len(res) > 0
 }
 
-func HighLight(data string, keywords []string, fingers []string) {
+func HighLight(data string, keywords []string, fingers []string, Url string) {
 	var output bool = false
 	for _, keyword := range keywords {
 		re := regexp.MustCompile("(?i)" + Quote(keyword))
@@ -107,7 +107,7 @@ func HighLight(data string, keywords []string, fingers []string) {
 		}
 	}
 	if output {
-		fmt.Println(data)
+		fmt.Println(Url + "\n" + data + "\n")
 	}
 }
 
@@ -157,15 +157,14 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 	if len(AnnotationResult) > 0 {
-		Info("[*] 注释部分 && 版本识别")
 		for _, Annotation := range AnnotationResult {
-			HighLight(Annotation, VersionResultNotDupplicated, keywords)
+			HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
 		}
 	}
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
-		Info("[*] Api Path")
+		color.HiYellow("->[*] Api Path")
 		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 		ApiResult := []string{}
@@ -357,7 +356,12 @@ func PrintFinger(HostInfo common.HostInfo) {
 	for depth, url := range myMap {
 		url := removeDuplicatesString(url)
 		sort.Strings(url)
-		Success("Depth: %d", depth)
-		fmt.Printf("%s\n", strings.Join(url, "\n"))
+		Success("Depth: %d total=%d", depth, len(url))
+		fmt.Printf("%s\n", strings.Join(url[:Min(10, len(url))], "\n"))
+		if len(url) > 10 {
+			filename := fmt.Sprintf("%s_%d_%s.log", Host.Hostname(), depth, RandomString(4))
+			Success("More at ./%s", filename)
+			ioutil.WriteFile(filename, []byte(strings.Join(url, "\n")), 0644)
+		}
 	}
 }

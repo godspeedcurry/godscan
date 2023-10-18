@@ -35,15 +35,15 @@ func Debug(format string, args ...interface{}) {
 }
 
 func Info(format string, args ...interface{}) {
-	color.White("[%s] [%s] %s", get_current_time(), "INFO", fmt.Sprintf(format, args...))
+	color.Cyan("[%s] [%s] %s", get_current_time(), "INFO", fmt.Sprintf(format, args...))
 }
 
 func Success(format string, args ...interface{}) {
-	color.Green("[%s] [%s] %s", get_current_time(), "SUCC", fmt.Sprintf(format, args...))
+	color.Green("[%s] [%s] %s", get_current_time(), "SUCCESS", fmt.Sprintf(format, args...))
 }
 
 func Failed(format string, args ...interface{}) {
-	color.Green("[%s] [%s] %s", get_current_time(), "FAIL", fmt.Sprintf(format, args...))
+	color.Green("[%s] [%s] %s", get_current_time(), "FAILED", fmt.Sprintf(format, args...))
 }
 
 func Warning(format string, args ...interface{}) {
