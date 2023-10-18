@@ -123,7 +123,7 @@ func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 func ShowInfo() {
 	fmt.Println("-suffix '" + strings.Join(common.SuffixTop, ",") + "'")
 	fmt.Println("-prefix '" + strings.Join(common.PrefixTop, ",") + "'")
-	fmt.Println("-sep '" + strings.Join(common.SeperatorTop, ",") + "'")
+	fmt.Println("-sep '" + strings.Join(common.SeparatorTop, ",") + "'")
 	fmt.Println("-k '" + strings.Join(common.KeywordTop, ",") + "'")
 }
 func removeDuplicatesString(arr []string) []string {

@@ -160,7 +160,10 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	fmt.Printf("[Depth %d] %s\n", depth, Url)
 	s1.Add(Url)
 	req, err := http.NewRequest(http.MethodGet, Url, nil)
-
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
