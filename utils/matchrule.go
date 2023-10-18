@@ -13,14 +13,9 @@ import (
 )
 
 func iskeyword(str string, keyword []string) bool {
-	var x bool
-	x = true
+	var x bool = true
 	for _, k := range keyword {
-		if strings.Contains(str, k) {
-			x = x && true
-		} else {
-			x = x && false
-		}
+		x = x && strings.Contains(str, k)
 	}
 	return x
 }
@@ -30,11 +25,7 @@ func isregular(str string, keyword []string) bool {
 	x = true
 	for _, k := range keyword {
 		re := regexp.MustCompile(k)
-		if re.Match([]byte(str)) {
-			x = x && true
-		} else {
-			x = x && false
-		}
+		x = x && re.Match([]byte(str))
 	}
 	return x
 }
@@ -59,9 +50,26 @@ type Fingerprint struct {
 //go:embed ehole.json
 var eholeJson string
 
+type methodMatcher func(content string, keyword []string) bool
+
+var methodMatchers = map[string]methodMatcher{
+	"keyword": iskeyword,
+	"regular": isregular,
+}
+
+func chooseLocator(headers string, body string, title string, fp Fingerprint) string {
+	if fp.Location == "header" {
+		return headers
+	} else if fp.Location == "body" {
+		return body
+	} else if fp.Location == "title" {
+		return title
+	}
+	return ""
+}
+
 func fingerScan(url string) string {
 	InitHttp()
-
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return "request error"
@@ -72,7 +80,7 @@ func fingerScan(url string) string {
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		return "no finger!!"
+		return "No finger!!"
 	}
 	headers := MapToJson(resp.Header)
 
@@ -81,66 +89,36 @@ func fingerScan(url string) string {
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		fmt.Println(err)
-		return "no finger!!"
+		return "No finger!!"
 	}
 	var cms []string
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
-		return "no finger!!"
+		return "No finger!!"
 	}
 	body := string(bodyBytes)
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return "no finger!!"
+		return "No finger!!"
 	}
 
 	// 查找标题元素并获取内容
 	title := doc.Find("title").Text()
 
-	for _, finp := range config.Fingerprint {
+	for _, fp := range config.Fingerprint {
+		matcher, found := methodMatchers[fp.Method]
+		if found {
+			locator := chooseLocator(headers, body, title, fp)
+			if matcher(locator, fp.Keyword) {
+				cms = append(cms, fp.Cms)
+			}
+		}
 
-		if finp.Location == "body" {
-			if finp.Method == "keyword" {
-				if iskeyword(body, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-
-			if finp.Method == "regular" {
-				if isregular(body, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-		}
-		if finp.Location == "header" {
-			if finp.Method == "keyword" {
-				if iskeyword(headers, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-			if finp.Method == "regular" {
-				if isregular(headers, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-		}
-		if finp.Location == "title" {
-			if finp.Method == "keyword" {
-				if iskeyword(title, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-			if finp.Method == "regular" {
-				if isregular(title, finp.Keyword) {
-					cms = append(cms, finp.Cms)
-				}
-			}
-		}
 	}
 	if len(cms) != 0 {
 		return strings.Join(cms, ",")
 	}
-	return "no finger!!"
+	return "No finger!!"
 }

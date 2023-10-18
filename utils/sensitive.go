@@ -26,12 +26,16 @@ func SensitiveInfoCollect(Content string) {
 		res := reg.FindAllStringSubmatch(html.UnescapeString(Content), -1)
 		if len(res) > 0 {
 			if !output {
-				color.Green("[*] Sensitive information")
+				Success("Sensitive information")
 				output = true
 			}
 			color.HiYellow("->[*] %s\n", key)
 			mylist := []string{}
 			for _, tmp := range res {
+				r := regexp.MustCompile("png|gif|svg|jpeg|jpg|otf|woff|eot|ttf")
+				if key == "link" && r.MatchString(tmp[1]) {
+					continue
+				}
 				mylist = append(mylist, tmp[1])
 			}
 			unDupList, _ := RemoveDuplicateElement(mylist)
