@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash"
 	"io/ioutil"
+	"sort"
 
 	"github.com/godspeedcurry/godscan/common"
 
@@ -20,7 +21,6 @@ import (
 	"encoding/json"
 
 	"github.com/PuerkitoBio/goquery"
-	mapset "github.com/deckarep/golang-set"
 
 	"github.com/fatih/color"
 	"github.com/twmb/murmur3"
@@ -85,7 +85,7 @@ func FindKeyWord(data string) []string {
 }
 
 func IsVuePath(Path string) bool {
-	reg := regexp.MustCompile(`(app|index|config|main|chunk)\.[0-9a-f]*\.js`)
+	reg := regexp.MustCompile(`(app|index|config|main|chunk)`)
 	res := reg.FindAllString(Path, -1)
 	return len(res) > 0
 }
@@ -111,30 +111,38 @@ func HighLight(data string, keywords []string, fingers []string) {
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
-	url_struct, err := url.Parse(RootPath)
+func parseHost(RootPath string) (string, error) {
+	urlStruct, err := url.Parse(RootPath)
 	if err != nil {
-		return err
+		return "", err
 	}
-	host, _, _ := net.SplitHostPort(url_struct.Host)
-	if !strings.Contains(Url, host) {
-		Info("[Depth %d] %s", depth, Url)
-		s.Add(Url)
-		return nil
-	} else if depth == 0 || strings.Contains(Url, ".min.js") || strings.Contains(Url, ".ico") || strings.Contains(Url, "chunk-vendors") {
+	host, _, _ := net.SplitHostPort(urlStruct.Host)
+	return host, nil
+}
+
+func uselessUrl(url string) bool {
+	return strings.Contains(url, ".min.js") || strings.Contains(url, ".ico") || strings.Contains(url, "chunk-vendors")
+}
+
+func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
+	myMap[depth] = append(myMap[depth], Url)
+	host, _ := parseHost(RootPath)
+	if !strings.Contains(Url, host) || depth == 0 || uselessUrl(Url) {
 		return nil
 	}
-	Info("[Depth %d] %s", depth, Url)
-	s.Add(Url)
+
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
-
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	doc, _ := goquery.NewDocumentFromReader(resp.Body)
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		Error("%s", err)
+		return nil
+	}
 
 	keywords := FindKeyWord(doc.Text())
 
@@ -175,19 +183,19 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 	SensitiveInfoCollect(html)
 
 	// a标签
-	doc.Find("a").Each(func(i int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
+	doc.Find("a").Each(func(i int, selector *goquery.Selection) {
+		href, _ := selector.Attr("href")
 		normalizeUrl := Normalize(href, RootPath)
-		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s)
+		if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+			Spider(RootPath, normalizeUrl, depth-1, myMap)
 		}
 	})
 	// iframe, script 标签
-	doc.Find("script, iframe").Each(func(i int, script *goquery.Selection) {
-		src, _ := script.Attr("src")
+	doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
+		src, _ := selector.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
-		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s)
+		if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+			Spider(RootPath, normalizeUrl, depth-1, myMap)
 		}
 	})
 	return nil
@@ -198,8 +206,7 @@ func DisplayHeader(Url string, Method string) {
 	if err != nil {
 		Error("Error: %s", err)
 	} else {
-		Info("Url: %s\tMethod: %s", Url, Method)
-		Info("Server: %s\tStatus: %s\tTitle: %s", ServerHeader, Status, Title)
+		Info("[%s] [%s] [%s] [%s] [%s]", Url, Method, ServerHeader, Status, Title)
 	}
 }
 
@@ -340,9 +347,17 @@ func PrintFinger(HostInfo common.HostInfo) {
 		Error("%s", err)
 	}
 	// 爬虫递归爬
-	s := mapset.NewSet()
-	err = Spider(RootPath, HostInfo.Url, HostInfo.Depth, s)
+	// s := mapset.NewSet()
+	myMap := make(map[int][]string)
+
+	err = Spider(RootPath, HostInfo.Url, HostInfo.Depth, myMap)
 	if err != nil {
 		Error("%s", err)
+	}
+	for depth, url := range myMap {
+		url := removeDuplicatesString(url)
+		sort.Strings(url)
+		Success("Depth: %d", depth)
+		fmt.Printf("%s\n", strings.Join(url, "\n"))
 	}
 }

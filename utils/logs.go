@@ -20,7 +20,7 @@ const (
 )
 
 func get_current_time() string {
-	return time.Now().Format("2006-01-02 15:04:05")
+	return time.Now().Format("15:04:05")
 }
 
 func log_print(level int, detail string) {
@@ -31,27 +31,27 @@ func log_print(level int, detail string) {
 }
 
 func Debug(format string, args ...interface{}) {
-	color.White("[%s] [%s] %s", get_current_time(), "Warning", fmt.Sprintf(format, args...))
+	color.Cyan("[%s] [%s] %s", get_current_time(), "DEBUG", fmt.Sprintf(format, args...))
 }
 
 func Info(format string, args ...interface{}) {
-	color.Blue("[%s] [%s] %s", get_current_time(), "Info", fmt.Sprintf(format, args...))
+	color.White("[%s] [%s] %s", get_current_time(), "INFO", fmt.Sprintf(format, args...))
 }
 
 func Success(format string, args ...interface{}) {
-	color.Green("[%s] [%s] %s", get_current_time(), "Info", fmt.Sprintf(format, args...))
+	color.Green("[%s] [%s] %s", get_current_time(), "SUCC", fmt.Sprintf(format, args...))
 }
 
 func Failed(format string, args ...interface{}) {
-	color.Green("[%s] [%s] %s", get_current_time(), "Failed", fmt.Sprintf(format, args...))
+	color.Green("[%s] [%s] %s", get_current_time(), "FAIL", fmt.Sprintf(format, args...))
 }
 
 func Warning(format string, args ...interface{}) {
-	color.Yellow("[%s] [%s] %s", get_current_time(), "Warning", fmt.Sprintf(format, args...))
+	color.Yellow("[%s] [%s] %s", get_current_time(), "WARN", fmt.Sprintf(format, args...))
 }
 
 func Error(format string, args ...interface{}) {
-	color.Red("[%s] [%s] %s", get_current_time(), "Error", fmt.Sprintf(format, args...))
+	color.Red("[%s] [%s] %s", get_current_time(), "ERROR", fmt.Sprintf(format, args...))
 }
 
 func Fatal(format string, args ...interface{}) {
