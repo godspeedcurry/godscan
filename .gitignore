@@ -4,3 +4,4 @@ godscan_*
 dist/
 *.txt
 *.sh
+*.log
