@@ -2,8 +2,10 @@ package utils
 
 import (
 	"fmt"
+	"math/rand"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/godspeedcurry/godscan/common"
 )
@@ -72,13 +74,29 @@ func Normalize(Path string, RootPath string) string {
 		return Path
 	} else if strings.HasPrefix(Path, "./") {
 		return RootPath + Path[1:]
+	} else if strings.HasPrefix(Path, "//") {
+		return "https://" + strings.Replace(Path, "//", "", 1)
 	} else if strings.HasPrefix(Path, "/") {
 		return RootPath + Path
-	} else if strings.HasPrefix(Path, "//") {
-		return strings.Replace(Path, "//", "", 1)
 	} else {
 		return RootPath + "/" + Path
 	}
+}
+
+func RandomString(length int) string {
+	// 定义字符集
+	charset := "0123456789abcdef"
+
+	// 初始化随机数生成器
+	rand.Seed(time.Now().UnixNano())
+
+	// 生成随机字符
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[rand.Intn(len(charset))]
+	}
+
+	return string(result)
 }
 
 type sliceError struct {
