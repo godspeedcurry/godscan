@@ -1,4 +1,17 @@
 # godscan
+<h4 align="center">你的下一台扫描器，又何必是扫描器</h4>
+
+<p align="center">
+  <a href="https://goreportcard.com/report/github.com/godspeedcurry/godscan">
+    <img src="https://goreportcard.com/badge/github.com/godspeedcurry/godscan">	
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/license-MIT-_red.svg">
+  </a>
+  <a href="https://github.com/godspeedcurry/godscan/releases">
+  	<img src="https://img.shields.io/github/downloads/niudaii/zpscan/total">
+  </a>
+</p>
 
 ## Usage
 ### 单一url目录扫描

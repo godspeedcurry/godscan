@@ -74,15 +74,12 @@ var SuffixTop = []string{
 	"#@!", "!@#$", "!@#",
 	"ABC", "abc", "qwer",
 	"Aa", "aA",
-	"",
 }
 var PrefixTop = []string{
 	"@",
 	"!",
-	"\"",
 	"123",
 	"_",
-	"",
 }
 
 var SeperatorTop = []string{
@@ -95,7 +92,6 @@ var SeperatorTop = []string{
 	"/",
 	"&",
 	"+",
-	"",
 }
 
 var KeywordTop = []string{
@@ -120,6 +116,7 @@ type HostInfo struct {
 	DirBrute  bool
 	Show      bool
 	Full      bool
+	Variant   bool
 	// Host      string
 	// Ports     string
 	// Domain    string
