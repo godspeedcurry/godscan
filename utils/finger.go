@@ -85,7 +85,7 @@ func FindKeyWord(data string) []string {
 }
 
 func IsVuePath(Path string) bool {
-	reg := regexp.MustCompile(`(app|index|config|main|chunk)[0-9a-f\.]*js`)
+	reg := regexp.MustCompile(`(app|index|config|main|chunk)\.[0-9a-f]*\.js`)
 	res := reg.FindAllString(Path, -1)
 	return len(res) > 0
 }
@@ -126,10 +126,7 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 	}
 	Info("[Depth %d] %s", depth, Url)
 	s.Add(Url)
-	req, err := http.NewRequest(http.MethodGet, Url, nil)
-	if err != nil {
-		return err
-	}
+	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
@@ -145,10 +142,8 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 	VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
 
 	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	var VersionResultNotDupplicated interface{}
-	if len(VersionResult) > 0 {
-		VersionResultNotDupplicated, _ = RemoveDuplicateElement(VersionResult)
-	}
+
+	VersionResultNotDupplicated := removeDuplicatesString(VersionResult)
 
 	//正则提取注释
 	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
@@ -156,11 +151,7 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 	if len(AnnotationResult) > 0 {
 		Info("[*] 注释部分 && 版本识别")
 		for _, Annotation := range AnnotationResult {
-			if VersionResultNotDupplicated == nil {
-				HighLight(Annotation, []string{}, keywords)
-			} else {
-				HighLight(Annotation, VersionResultNotDupplicated.([]string), keywords)
-			}
+			HighLight(Annotation, VersionResultNotDupplicated, keywords)
 		}
 	}
 
@@ -171,13 +162,12 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 		ApiResult := []string{}
 
-		if len(ApiResultTuple) > 0 {
-			for _, tmp := range ApiResultTuple {
-				ApiResult = append(ApiResult, common.ApiPrefix+tmp[1])
-			}
-			ApiResult = removeDuplicatesString(ApiResult)
-			fmt.Println(strings.Join(ApiResult, "\n"))
+		for _, tmp := range ApiResultTuple {
+			ApiResult = append(ApiResult, common.ApiPrefix+tmp[1])
 		}
+		ApiResult = removeDuplicatesString(ApiResult)
+		fmt.Println(strings.Join(ApiResult, "\n"))
+
 	}
 
 	// 敏感信息搜集
@@ -192,23 +182,12 @@ func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 			Spider(RootPath, normalizeUrl, depth-1, s)
 		}
 	})
-	// script 标签
-	doc.Find("script").Each(func(i int, script *goquery.Selection) {
+	// iframe, script 标签
+	doc.Find("script, iframe").Each(func(i int, script *goquery.Selection) {
 		src, _ := script.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
 		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
 			Spider(RootPath, normalizeUrl, depth-1, s)
-
-		}
-	})
-
-	//iframe 标签
-	doc.Find("iframe").Each(func(i int, iframe *goquery.Selection) {
-		src, _ := iframe.Attr("src")
-		normalizeUrl := Normalize(src, RootPath)
-		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s)
-
 		}
 	})
 	return nil
