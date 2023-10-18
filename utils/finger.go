@@ -3,10 +3,10 @@ package utils
 import (
 	"bytes"
 	_ "embed"
+	"errors"
 	"fmt"
 	"hash"
 	"io/ioutil"
-	"log"
 
 	"github.com/godspeedcurry/godscan/common"
 
@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 
 	b64 "encoding/base64"
@@ -24,7 +23,6 @@ import (
 	mapset "github.com/deckarep/golang-set"
 
 	"github.com/fatih/color"
-	"github.com/scylladb/termtables"
 	"github.com/twmb/murmur3"
 )
 
@@ -54,7 +52,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	title := doc.Find("title").Text()
 	if err != nil {
-		log.Fatal(err)
+		Fatal("%s", err)
 	}
 	ServerValue := resp.Header["Server"]
 	Status := resp.Status
@@ -72,14 +70,6 @@ func GetFingerList() []string {
 	return strings.Split(fingers, "\r\n")
 }
 
-func GenColumn(column int) []interface{} {
-	var headers []interface{} = make([]interface{}, column)
-	for i := 0; i < (column >> 1); i++ {
-		headers[i<<1] = "Key" + strconv.Itoa(i+1)
-		headers[(i<<1)+1] = "Value" + strconv.Itoa(i+1)
-	}
-	return headers
-}
 func FindKeyWord(data string) []string {
 	keywords := []string{}
 	m := make(map[string]int)
@@ -91,30 +81,6 @@ func FindKeyWord(data string) []string {
 			m[finger] = cnt
 		}
 	}
-	mSorted := mysort(m)
-	table := termtables.CreateTable()
-	maxColumn := Min(10, len(mSorted)<<1)
-	if maxColumn == 0 {
-		return keywords
-	}
-	table.AddHeaders(GenColumn(maxColumn)...)
-	tmpList := []string{}
-	cnt := 0
-
-	for _, tmp := range mSorted {
-		tmpList = append(tmpList, tmp.Key)
-		tmpList = append(tmpList, strconv.Itoa(tmp.Value))
-		cnt++
-		if cnt%(maxColumn>>1) == 0 {
-			table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
-			tmpList = []string{}
-		}
-	}
-	if cnt%(maxColumn>>1) != 0 {
-		tmpList = append(tmpList, make([]string, maxColumn)...)
-		table.AddRow(StringListToInterfaceList(tmpList[:maxColumn])...)
-	}
-	color.Cyan("%s\n", table.Render())
 	return keywords
 }
 
@@ -145,32 +111,30 @@ func HighLight(data string, keywords []string, fingers []string) {
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, error) {
+func Spider(RootPath string, Url string, depth int, s mapset.Set) error {
 	url_struct, err := url.Parse(RootPath)
 	if err != nil {
-		return "", err
+		return err
 	}
 	host, _, _ := net.SplitHostPort(url_struct.Host)
 	if !strings.Contains(Url, host) {
-		fmt.Printf("[Depth %d] %s\n", depth, Url)
-		s1.Add(Url)
-		return "", nil
+		Info("[Depth %d] %s", depth, Url)
+		s.Add(Url)
+		return nil
 	} else if depth == 0 || strings.Contains(Url, ".min.js") || strings.Contains(Url, ".ico") || strings.Contains(Url, "chunk-vendors") {
-		return "", nil
+		return nil
 	}
-	fmt.Printf("[Depth %d] %s\n", depth, Url)
-	s1.Add(Url)
+	Info("[Depth %d] %s", depth, Url)
+	s.Add(Url)
 	req, err := http.NewRequest(http.MethodGet, Url, nil)
 	if err != nil {
-		fmt.Println(err)
-		return "", err
+		return err
 	}
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		fmt.Println(err)
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 	doc, _ := goquery.NewDocumentFromReader(resp.Body)
@@ -190,7 +154,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 	if len(AnnotationResult) > 0 {
-		fmt.Println("[*] 注释部分 && 版本识别")
+		Info("[*] 注释部分 && 版本识别")
 		for _, Annotation := range AnnotationResult {
 			if VersionResultNotDupplicated == nil {
 				HighLight(Annotation, []string{}, keywords)
@@ -202,7 +166,7 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
-		fmt.Println("[*] Api Path")
+		Info("[*] Api Path")
 		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 		ApiResult := []string{}
@@ -224,16 +188,17 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	doc.Find("a").Each(func(i int, a *goquery.Selection) {
 		href, _ := a.Attr("href")
 		normalizeUrl := Normalize(href, RootPath)
-		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s1)
+		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
+			Spider(RootPath, normalizeUrl, depth-1, s)
 		}
 	})
 	// script 标签
 	doc.Find("script").Each(func(i int, script *goquery.Selection) {
 		src, _ := script.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
-		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s1)
+		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
+			Spider(RootPath, normalizeUrl, depth-1, s)
+
 		}
 	})
 
@@ -241,20 +206,21 @@ func Spider(RootPath string, Url string, depth int, s1 mapset.Set) (string, erro
 	doc.Find("iframe").Each(func(i int, iframe *goquery.Selection) {
 		src, _ := iframe.Attr("src")
 		normalizeUrl := Normalize(src, RootPath)
-		if normalizeUrl != "" && !s1.Contains(normalizeUrl) {
-			Spider(RootPath, normalizeUrl, depth-1, s1)
+		if normalizeUrl != "" && !s.Contains(normalizeUrl) {
+			Spider(RootPath, normalizeUrl, depth-1, s)
+
 		}
 	})
-	return "", nil
+	return nil
 }
 
 func DisplayHeader(Url string, Method string) {
 	ServerHeader, Status, Title, err := HttpGetServerHeader(Url, true, Method)
 	if err != nil {
-		color.HiRed("Error: %s\n", err)
+		Error("Error: %s", err)
 	} else {
-		color.Cyan("Url: %s\tMethod: %s\n", Url, Method)
-		color.Cyan("Server: %s\tStatus: %s\tTitle: %s\n", ServerHeader, Status, Title)
+		Info("Url: %s\tMethod: %s", Url, Method)
+		Info("Server: %s\tStatus: %s\tTitle: %s", ServerHeader, Status, Title)
 	}
 }
 
@@ -282,18 +248,18 @@ func IconDetect(Url string) (string, error) {
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		fmt.Println(err)
+		Error("%s", err)
 		return "", err
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	color.Red("[*] icon_url=\"%s\" icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
+	Info("icon_url=\"%s\" icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
 	if tmp != nil {
-		color.Red("[*] icon_url=\"%s\" icon_finger=\"%s\"", Url, tmp)
+		Success("icon_url=\"%s\" icon_finger=\"%s\"", Url, tmp)
 	}
 	return "", nil
 }
@@ -344,7 +310,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 	})
 
 	if faviconURL == "" {
-		return "", fmt.Errorf("Favicon URL not found, might used javascript, please find it manually and use `-ico url` to calculate it")
+		return "", errors.New("Favicon URL not found, might used javascript, please find it manually and use `-ico url` to calculate it")
 	}
 
 	return faviconURL, nil
@@ -359,13 +325,13 @@ func isAbsoluteURL(urlStr string) bool {
 	return u.IsAbs()
 }
 
-func PrintFinger(Info common.HostInfo) {
+func PrintFinger(HostInfo common.HostInfo) {
 	InitHttp()
-	if !strings.HasPrefix(Info.Url, "http") {
-		Info.Url = "http://" + Info.Url
+	if !strings.HasPrefix(HostInfo.Url, "http") {
+		HostInfo.Url = "http://" + HostInfo.Url
 	}
-	color.HiRed("Your URL: %s\n", Info.Url)
-	Host, _ := url.Parse(Info.Url)
+	Info("Your URL: %s", HostInfo.Url)
+	Host, _ := url.Parse(HostInfo.Url)
 	RootPath := Host.Scheme + "://" + Host.Hostname()
 	if Host.Port() != "" {
 		RootPath = RootPath + ":" + Host.Port()
@@ -375,7 +341,7 @@ func PrintFinger(Info common.HostInfo) {
 	FirstUrl := RootPath + Host.Path
 	res := fingerScan(FirstUrl)
 	if res != "" {
-		color.Red(res)
+		Info(res)
 	}
 
 	DisplayHeader(FirstUrl, http.MethodGet)
@@ -392,9 +358,12 @@ func PrintFinger(Info common.HostInfo) {
 	if err == nil {
 		IconDetect(IconUrl)
 	} else {
-		fmt.Println(err)
+		Error("%s", err)
 	}
 	// 爬虫递归爬
-	s1 := mapset.NewSet()
-	Spider(RootPath, Info.Url, Info.Depth, s1)
+	s := mapset.NewSet()
+	err = Spider(RootPath, HostInfo.Url, HostInfo.Depth, s)
+	if err != nil {
+		Error("%s", err)
+	}
 }
