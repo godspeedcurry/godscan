@@ -3,12 +3,13 @@ package utils
 import (
 	"crypto/tls"
 	"errors"
-	"main/common"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/godspeedcurry/godscan/common"
 
 	"golang.org/x/net/proxy"
 )

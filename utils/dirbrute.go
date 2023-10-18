@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"io/ioutil"
-	"main/common"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/godspeedcurry/godscan/common"
 )
 
 func DirBrute(filename string) {

@@ -2,8 +2,9 @@ package utils
 
 import (
 	"fmt"
-	"main/common"
 	"time"
+
+	"github.com/godspeedcurry/godscan/common"
 
 	"github.com/fatih/color"
 )
