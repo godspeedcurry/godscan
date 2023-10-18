@@ -21,7 +21,7 @@ func MightBeIdentityCard(IdentityCard string) bool {
 }
 
 func MightBeChineseName(Name string) bool {
-	result, _ := regexp.MatchString("^[\u4e00-\u9fa5]*$", Name)
+	result, _ := regexp.MatchString("^[\u4e00-\u9fa5]+$", Name)
 	return result
 }
 
@@ -131,7 +131,7 @@ func generateVariants(input string) []string {
 }
 
 func getSuffixList(Info common.HostInfo) []string {
-	var SuffixList = []string{}
+	var SuffixList = []string{""}
 	if Info.Full {
 		SuffixList = append(SuffixList, common.SuffixTop...)
 	}
@@ -150,7 +150,7 @@ func getSuffixList(Info common.HostInfo) []string {
 }
 
 func getKeywordList(Info common.HostInfo) []string {
-	var KeywordList = []string{}
+	var KeywordList = []string{"admin"}
 	if Info.Full {
 		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
@@ -160,7 +160,7 @@ func getKeywordList(Info common.HostInfo) []string {
 }
 
 func getSepList(Info common.HostInfo) []string {
-	var SepList = []string{}
+	var SepList = []string{""}
 	if Info.Full {
 		SepList = append(SepList, common.SeperatorTop...)
 	}
@@ -170,7 +170,7 @@ func getSepList(Info common.HostInfo) []string {
 }
 
 func getPrefixList(Info common.HostInfo) []string {
-	var PrefixList = []string{}
+	var PrefixList = []string{""}
 	if Info.Full {
 		PrefixList = append(PrefixList, common.PrefixTop...)
 	}
@@ -191,7 +191,7 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 
 	PasswordList = append(PasswordList, common.Passwords...)
 
-	KeywordTmpList := []string{"Admin,admin"}
+	KeywordTmpList := []string{}
 	for _, keyword := range KeywordList {
 		if MightBeIdentityCard(keyword) {
 			idcard = keyword
@@ -224,10 +224,14 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 			KeywordTmpList = append(KeywordTmpList, firstComplete, FirstCharToUpper(firstComplete), LastCharToUpper(firstComplete), strings.ToUpper(firstComplete))
 			KeywordTmpList = append(KeywordTmpList, completeName, FirstCharToUpper(completeName), LastCharToUpper(completeName), strings.ToUpper(completeName), HalfCharToUpper(completeName))
 			KeywordTmpList = append(KeywordTmpList, firstUpper)
-			KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
+			if Info.Variant {
+				KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
+			}
 		} else {
 			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
-			KeywordTmpList = append(KeywordTmpList, generateVariants(keyword)...)
+			if Info.Variant {
+				KeywordTmpList = append(KeywordTmpList, generateVariants(keyword)...)
+			}
 		}
 	}
 

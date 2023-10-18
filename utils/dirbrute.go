@@ -38,19 +38,19 @@ func DirSingleBrute(baseUrl string) {
 	// 检查URL的存活性
 	req, err := http.NewRequest(http.MethodGet, baseUrl, nil)
 	if err != nil {
-		Failed(baseUrl + err.Error())
+		Failed(baseUrl + " " + err.Error())
 		return
 	}
 	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		Failed(baseUrl + err.Error())
+		Failed(baseUrl + " " + err.Error())
 		return
 	}
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		Failed(baseUrl + err.Error())
+		Failed(baseUrl + " " + err.Error())
 		return
 	}
 	Success("[%d] %d {%s} %s", resp.StatusCode, len(respBody), fingerScan(baseUrl), baseUrl)
