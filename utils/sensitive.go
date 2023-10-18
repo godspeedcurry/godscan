@@ -17,17 +17,11 @@ func SensitiveInfoCollect(Content string) {
 		"Ueditor":               `(ueditor\.(config|all)\.js)`,
 		"Windows File/Dir Path": `([a-fA-FzZ]:(\\{1,2})([^\n ]*\\?)*)`,
 		"accesskey/accessid":    `(?i)(access([_ ]?(key|id|secret)){1,2}[\&\#0-9\" =;]*?([0-9a-zA-Z]{10,64}))`,
-		"link":                  `(https?://[^\s\"\'\)\(\>\<]{5,}[^\\"])`,
 	}
-	output := false
 	for key := range infoMap {
 		reg := regexp.MustCompile(infoMap[key])
 		res := reg.FindAllStringSubmatch(html.UnescapeString(Content), -1)
 		if len(res) > 0 {
-			if !output {
-				Success("Sensitive information")
-				output = true
-			}
 			color.HiYellow("->[*] %s\n", key)
 			mylist := []string{}
 			for _, tmp := range res {
@@ -37,8 +31,8 @@ func SensitiveInfoCollect(Content string) {
 				}
 				mylist = append(mylist, tmp[1])
 			}
-			unDupList, _ := RemoveDuplicateElement(mylist)
-			for _, a := range unDupList.([]string) {
+			unDupList := removeDuplicatesString(mylist)
+			for _, a := range unDupList {
 				color.HiMagenta(a)
 			}
 		}
