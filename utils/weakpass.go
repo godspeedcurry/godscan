@@ -248,8 +248,6 @@ func GenerateWeakPassword(HostInfo common.HostInfo) []string {
 			}
 		}
 	}
-	fmt.Println(KeywordTmpList)
-	fmt.Println("=====")
 	for _, pre := range PrefixList {
 		for _, keyword := range KeywordTmpList {
 			for _, sep := range SepList {
