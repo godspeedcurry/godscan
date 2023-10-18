@@ -1,4 +1,4 @@
-module main
+module github.com/godspeedcurry/godscan
 
 go 1.16
 
