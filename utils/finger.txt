@@ -103,7 +103,6 @@ activecollab
 activehtml
 activemq
 activeweb
-content
 server
 rs设备
 adapcms
@@ -2597,7 +2596,6 @@ phenotype
 php!
 php(reactor)
 php+mysql
-address
 addressbook
 affiliate
 bjyblog
