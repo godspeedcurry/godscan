@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"main/common"
 	"regexp"
 	"strings"
+
+	"github.com/godspeedcurry/godscan/common"
 
 	"github.com/Chain-Zhang/pinyin"
 	"github.com/Lofanmi/chinese-calendar-golang/calendar"

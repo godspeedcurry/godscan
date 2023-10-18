@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"main/common"
 	"sort"
 	"strings"
+
+	"github.com/godspeedcurry/godscan/common"
 )
 
 const (

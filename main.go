@@ -1,8 +1,8 @@
 package main
 
 import (
-	"main/common"
-	"main/utils"
+	"github.com/godspeedcurry/godscan/common"
+	"github.com/godspeedcurry/godscan/utils"
 )
 
 var Info common.HostInfo
