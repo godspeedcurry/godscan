@@ -9,7 +9,7 @@
     <img src="https://img.shields.io/badge/license-MIT-_red.svg">
   </a>
   <a href="https://github.com/godspeedcurry/godscan/releases">
-  	<img src="https://img.shields.io/github/downloads/niudaii/zpscan/total">
+  	<img src="https://img.shields.io/github/downloads/godspeedcurry/godscan/total">
   </a>
 </p>
 
