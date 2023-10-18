@@ -162,9 +162,9 @@ func getKeywordList(Info common.HostInfo) []string {
 func getSepList(Info common.HostInfo) []string {
 	var SepList = []string{""}
 	if Info.Full {
-		SepList = append(SepList, common.SeperatorTop...)
+		SepList = append(SepList, common.SeparatorTop...)
 	}
-	SepList = append(SepList, strings.Split(Info.Seperator, ",")...)
+	SepList = append(SepList, strings.Split(Info.Separator, ",")...)
 	SepList = removeDuplicatesString(SepList)
 	return SepList
 }

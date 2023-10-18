@@ -24,7 +24,7 @@ func Flag(Info *HostInfo) {
 	flag.IntVar(&Info.Depth, "d", 1, "your search depth")
 	flag.StringVar(&Info.Keywords, "k", "", "your keyword list, separate by ','")
 	flag.StringVar(&Info.Suffix, "suffix", "", "your suffix list, default: 01,111,123,321,12345,123456,001,admin,adminn,12345+,654321 separate by ','")
-	flag.StringVar(&Info.Seperator, "sep", "", "your seperator list, default: @,#,$ separate by ','")
+	flag.StringVar(&Info.Separator, "sep", "", "your separator list, default: @,#,$ separate by ','")
 	flag.StringVar(&Info.Prefix, "prefix", "", "your prefix list, default: null separate by ','")
 
 	flag.StringVar(&Info.IconUrl, "ico", "", "your icon url")
@@ -32,7 +32,7 @@ func Flag(Info *HostInfo) {
 	flag.BoolVar(&Info.DirBrute, "dir", false, "if brute dir")
 
 	flag.BoolVar(&ListFormat, "l", false, "python list format")
-	flag.BoolVar(&Info.Show, "show", false, "show all seperator,suffix,prefix")
+	flag.BoolVar(&Info.Show, "show", false, "show all separator,suffix,prefix")
 	flag.BoolVar(&Info.Full, "full", false, "use full dict")
 	flag.IntVar(&LogLevel, "v", 2, "level of your log")
 	flag.StringVar(&ApiPrefix, "api", "", "prefix of api, such as /api/v1")

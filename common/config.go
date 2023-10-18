@@ -82,7 +82,7 @@ var PrefixTop = []string{
 	"_",
 }
 
-var SeperatorTop = []string{
+var SeparatorTop = []string{
 	"@",
 	"#",
 	"$",
@@ -110,7 +110,7 @@ type HostInfo struct {
 	Keywords  string
 	Suffix    string
 	Prefix    string
-	Seperator string
+	Separator string
 	UrlFile   string
 	IconUrl   string
 	DirBrute  bool
