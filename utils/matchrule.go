@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/godspeedcurry/godscan/common"
 )
 
 func iskeyword(str string, keyword []string) bool {
@@ -74,7 +75,7 @@ func fingerScan(url string) string {
 	if err != nil {
 		return "request error"
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 100) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/1.0.5005.61 Safari/537.36")
+	req.Header.Set("User-Agent", common.DEFAULT_UA)
 	req.Header.Set("Cookie", "rememberMe=me")
 
 	resp, err := Client.Do(req)
