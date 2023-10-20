@@ -35,3 +35,11 @@ func main() {
 		return
 	}
 }
+
+// package main
+
+// import "github.com/godspeedcurry/godscan/cmd"
+
+// func main() {
+// 	cmd.Execute()
+// }
