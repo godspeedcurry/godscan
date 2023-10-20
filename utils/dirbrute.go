@@ -1,41 +1,66 @@
 package utils
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
+	"sync"
 
+	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/gosuri/uiprogress"
 )
 
+var fingerHashMap = make(map[uint64]bool)
+var result = []string{}
+
+func formatUrl(raw string) string {
+	if !strings.HasPrefix(raw, "http") {
+		raw = "http://" + raw
+	}
+	return strings.TrimSpace(raw)
+}
+
 func DirBrute(filename string) {
-	urlFile, err := os.Open(filename)
+	InitHttp()
+	data, err := ioutil.ReadFile(filename)
 	if err != nil {
-		Warning(err.Error())
+		Error(err.Error())
 		return
 	}
-	defer urlFile.Close()
+	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
+	lines = removeDuplicatesString(lines)
 
-	scanner := bufio.NewScanner(urlFile)
+	uiprogress.Start()
+	var wg sync.WaitGroup
+	bar := uiprogress.AddBar(len(lines)).AppendCompleted().PrependElapsed()
+	Info("Total: %d urls", len(lines))
+	for _, line := range lines {
+		wg.Add(1)
+		go func(line string) {
+			defer wg.Done()
+			DirSingleBrute(line)
+			bar.Incr()
+		}(line)
+	}
+	wg.Wait()
+	uiprogress.Stop()
+	Success(color.GreenString("\n" + strings.Join(result, "\n")))
+}
 
-	for scanner.Scan() {
-		baseUrl := scanner.Text()
-		DirSingleBrute(baseUrl)
+func CheckFinger(url string, statusCode int, length int, hash uint64) {
+	ret := fingerScan(url)
+	if !fingerHashMap[hash] {
+		fingerHashMap[hash] = true
+		result = append(result, fmt.Sprintf("[%d] %d {%s} %s", statusCode, length, ret, url))
 	}
 }
 
 func DirSingleBrute(baseUrl string) {
-	InitHttp()
-	if !strings.HasPrefix(baseUrl, "http") {
-		baseUrl = "http://" + baseUrl
-	}
-	statusCode := make(map[int]int)
-	baseUrl = strings.TrimSpace(baseUrl)
+	baseUrl = formatUrl(baseUrl)
 	// 检查URL的存活性
 	req, err := http.NewRequest(http.MethodGet, baseUrl, nil)
 	if err != nil {
@@ -54,8 +79,7 @@ func DirSingleBrute(baseUrl string) {
 		Failed(baseUrl + " " + err.Error())
 		return
 	}
-	Success("[%d] %d {%s} %s", resp.StatusCode, len(respBody), fingerScan(baseUrl), baseUrl)
-	statusCode[resp.StatusCode] += 1
+	CheckFinger(baseUrl, resp.StatusCode, len(respBody), SimHash(respBody))
 
 	baseURL, _ := url.Parse(baseUrl)
 	tempDirList := common.DirList
@@ -73,7 +97,7 @@ func DirSingleBrute(baseUrl string) {
 		}
 	} else {
 		// is a ip
-		tempDirList = append(tempDirList, baseURL.Hostname()+".tar.gz")
+		tempDirList = append(tempDirList, baseURL.Hostname()+".tar.gz", baseURL.Hostname()+".zip")
 	}
 
 	for _, _path := range tempDirList {
@@ -91,16 +115,9 @@ func DirSingleBrute(baseUrl string) {
 		if err != nil {
 			continue
 		}
-		n := len(respBody)
 		if resp.StatusCode == 200 || resp.StatusCode == 500 {
-			Success("[%d] %d {%s} %s", resp.StatusCode, n, fingerScan(fullURL.String()), fullURL)
+			CheckFinger(fullURL.String(), resp.StatusCode, len(respBody), SimHash(respBody))
 		}
-		statusCode[resp.StatusCode] += 1
 	}
-	l := []string{}
-	for key, value := range statusCode {
-		l = append(l, fmt.Sprintf("%d, %d个", key, value))
-	}
-	Info("状态码: " + strings.Join(l, "|"))
 	resp.Body.Close()
 }

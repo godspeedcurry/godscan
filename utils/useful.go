@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/mfonda/simhash"
 )
 
 const (
@@ -180,4 +181,8 @@ func Quote(x string) string {
 		x = strings.ReplaceAll(x, key, "\\"+key)
 	}
 	return x
+}
+
+func SimHash(input []byte) uint64 {
+	return simhash.Simhash(simhash.NewWordFeatureSet(input))
 }
