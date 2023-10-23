@@ -7,7 +7,7 @@ import (
 	"github.com/fatih/color"
 )
 
-func SensitiveInfoCollect(Content string) {
+func SensitiveInfoCollect(Url string, Content string) {
 	infoMap := map[string]string{
 		"Chinese Mobile Number": `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`,
 		"Email":                 `([0-9a-z][_.0-9a-z-]{0,31}@([0-9a-z][0-9a-z-]{0,30}[0-9a-z]\.){1,4}(com|net|cn))`,
@@ -33,7 +33,7 @@ func SensitiveInfoCollect(Content string) {
 			}
 			unDupList := removeDuplicatesString(mylist)
 			for _, a := range unDupList {
-				color.HiMagenta(a)
+				color.HiMagenta(Url + " " + a)
 			}
 		}
 	}
