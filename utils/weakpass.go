@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/spf13/viper"
 
 	"github.com/Chain-Zhang/pinyin"
 	"github.com/Lofanmi/chinese-calendar-golang/calendar"
@@ -95,7 +95,7 @@ func getLunar(keyword string) string {
 	var data map[string]interface{}
 	err := json.Unmarshal(bytes, &data)
 	if err != nil {
-		log.Fatal(err)
+		Fatal("%s", err)
 	}
 	// 获得农历生日
 	lunar := fmt.Sprintf("%02d%02d", int(data["lunar"].(map[string]interface{})["month"].(float64)), int(data["lunar"].(map[string]interface{})["day"].(float64)))
@@ -130,51 +130,54 @@ func generateVariants(input string) []string {
 	return variants
 }
 
-func getSuffixList(Info common.HostInfo) []string {
+func getSuffixList() []string {
 	var SuffixList = []string{""}
-	if Info.Full {
+	if viper.GetBool("full") {
 		SuffixList = append(SuffixList, common.SuffixTop...)
 	}
-	year := time.Now().Year()
+	year := time.Now().Year() + 5
 	for i := year - 15; i <= year; i++ {
 		SuffixList = append(SuffixList, strconv.Itoa(i))
 	}
-	if Info.Full {
+	if viper.GetBool("full") {
 		for i := year - 50; i < year-15; i++ {
 			SuffixList = append(SuffixList, strconv.Itoa(i))
 		}
 	}
-	SuffixList = append(SuffixList, strings.Split(Info.Suffix, ",")...)
+	SuffixList = append(SuffixList, strings.Split(viper.GetString("suffix"), ",")...)
 	SuffixList = removeDuplicatesString(SuffixList)
 	return SuffixList
 }
 
-func getKeywordList(Info common.HostInfo) []string {
+func getKeywordList() []string {
 	var KeywordList = []string{"admin"}
-	if Info.Full {
+	if viper.GetBool("full") {
 		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
-	KeywordList = append(KeywordList, strings.Split(Info.Keywords, ",")...)
+	fmt.Println(viper.GetString("keyword"))
+	// fmt.Println(len(KeywordList))
+	KeywordList = append(KeywordList, strings.Split(viper.GetString("keyword"), ",")...)
+
 	KeywordList = removeDuplicatesString(KeywordList)
 	return KeywordList
 }
 
-func getSepList(Info common.HostInfo) []string {
+func getSepList() []string {
 	var SepList = []string{""}
-	if Info.Full {
+	if viper.GetBool("full") {
 		SepList = append(SepList, common.SeparatorTop...)
 	}
-	SepList = append(SepList, strings.Split(Info.Separator, ",")...)
+	SepList = append(SepList, strings.Split(viper.GetString("sep"), ",")...)
 	SepList = removeDuplicatesString(SepList)
 	return SepList
 }
 
-func getPrefixList(Info common.HostInfo) []string {
+func getPrefixList() []string {
 	var PrefixList = []string{""}
-	if Info.Full {
+	if viper.GetBool("full") {
 		PrefixList = append(PrefixList, common.PrefixTop...)
 	}
-	PrefixList = append(PrefixList, strings.Split(Info.Prefix, ",")...)
+	PrefixList = append(PrefixList, strings.Split(viper.GetString("prefix"), ",")...)
 	PrefixList = removeDuplicatesString(PrefixList)
 	return PrefixList
 }
@@ -199,8 +202,8 @@ func processIdentityCard(keyword string) []string {
 	arr = append(arr, keyword[6:10]+lunar)
 	return arr
 }
-func outputListFormat(UniqPasswordList []string, HostInfo common.HostInfo) {
-	if common.ListFormat {
+func outputListFormat(UniqPasswordList []string) {
+	if viper.GetBool("list") {
 		var quotedStrings []string
 		for _, str := range UniqPasswordList {
 			quotedStrings = append(quotedStrings, strconv.Quote(str))
@@ -212,12 +215,12 @@ func outputListFormat(UniqPasswordList []string, HostInfo common.HostInfo) {
 	}
 
 }
-func GenerateWeakPassword(HostInfo common.HostInfo) []string {
+func GenerateWeakPassword() []string {
 	var PasswordList = []string{}
-	var KeywordList = getKeywordList(HostInfo)
-	var SuffixList = getSuffixList(HostInfo)
-	var SepList = getSepList(HostInfo)
-	var PrefixList = getPrefixList(HostInfo)
+	var KeywordList = getKeywordList()
+	var SuffixList = getSuffixList()
+	var SepList = getSepList()
+	var PrefixList = getPrefixList()
 
 	var idcard, onlyFirst, firstComplete, completeName, firstUpper string
 
@@ -238,12 +241,12 @@ func GenerateWeakPassword(HostInfo common.HostInfo) []string {
 				KeywordTmpList = append(KeywordTmpList, name, FirstCharToUpper(name), LastCharToUpper(name), strings.ToUpper(name), HalfCharToUpper(name))
 			}
 			KeywordTmpList = append(KeywordTmpList, firstUpper)
-			if HostInfo.Variant {
+			if viper.GetBool("variant") {
 				KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
 			}
 		} else {
 			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
-			if HostInfo.Variant {
+			if viper.GetBool("variant") {
 				KeywordTmpList = append(KeywordTmpList, generateVariants(keyword)...)
 			}
 		}
@@ -269,7 +272,7 @@ func GenerateWeakPassword(HostInfo common.HostInfo) []string {
 		Error("%s", err)
 		return []string{}
 	}
-	outputListFormat(UniqPasswordList.([]string), HostInfo)
+	outputListFormat(UniqPasswordList.([]string))
 	println("total:", len(UniqPasswordList.([]string)))
 	return UniqPasswordList.([]string)
 }
