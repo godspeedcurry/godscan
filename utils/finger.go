@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash"
 	"io/ioutil"
+	"os"
 	"sort"
 
 	"github.com/spf13/viper"
@@ -141,7 +142,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		Error("%s", err)
-		return nil
+		return err
 	}
 
 	keywords := FindKeyWord(doc.Text())
@@ -163,7 +164,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	}
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
-	if IsVuePath(Url) {
+	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
 		color.HiYellow("->[*] Api Path")
 		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
@@ -174,29 +175,31 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		}
 		ApiResult = removeDuplicatesString(ApiResult)
 		fmt.Println(strings.Join(ApiResult, "\n"))
+	} else {
+		// 敏感信息搜集
+		html, err := doc.Html()
+		if err != nil {
+			return err
+		}
+		SensitiveInfoCollect(Url, html)
 
+		// a标签
+		doc.Find("a").Each(func(i int, selector *goquery.Selection) {
+			href, _ := selector.Attr("href")
+			normalizeUrl := Normalize(href, RootPath)
+			if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+				Spider(RootPath, normalizeUrl, depth-1, myMap)
+			}
+		})
+		// iframe, script 标签
+		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
+			src, _ := selector.Attr("src")
+			normalizeUrl := Normalize(src, RootPath)
+			if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+				Spider(RootPath, normalizeUrl, depth-1, myMap)
+			}
+		})
 	}
-
-	// 敏感信息搜集
-	html, _ := doc.Html()
-	SensitiveInfoCollect(html)
-
-	// a标签
-	doc.Find("a").Each(func(i int, selector *goquery.Selection) {
-		href, _ := selector.Attr("href")
-		normalizeUrl := Normalize(href, RootPath)
-		if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
-			Spider(RootPath, normalizeUrl, depth-1, myMap)
-		}
-	})
-	// iframe, script 标签
-	doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
-		src, _ := selector.Attr("src")
-		normalizeUrl := Normalize(src, RootPath)
-		if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
-			Spider(RootPath, normalizeUrl, depth-1, myMap)
-		}
-	})
 	return nil
 }
 
@@ -357,10 +360,10 @@ func PrintFinger(Url string, Depth int) {
 	for depth, url := range myMap {
 		url := removeDuplicatesString(url)
 		sort.Strings(url)
-		if len(url) > 0 {
-			filename := fmt.Sprintf("%s_%d_%s.log", Host.Hostname(), depth, RandomString(4))
+		if len(url) > 1 {
+			filename := fmt.Sprintf("%s_%d_%d.log", Host.Hostname(), depth, len(url))
 			Success("Depth: %d total=%d, More at ./%s", depth, len(url), filename)
-			ioutil.WriteFile(filename, []byte(strings.Join(url, "\n")), 0644)
+			os.WriteFile(filename, []byte(strings.Join(url, "\n")), 0644)
 		}
 	}
 }
