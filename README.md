@@ -29,7 +29,7 @@ source /tmp/x
 
 ### 批量目录扫描+指纹识别(协程)
 ```bash
-./godscan dirbrute -uf url.txt
+./godscan dirbrute --url-file url.txt
 ```
 
 ### 根据图标地址计算图标hash
