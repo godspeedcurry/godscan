@@ -21,7 +21,7 @@ source /tmp/x
 ```
 ### 目录扫描
 ```bash
-./godscan dirbrute --url http://www.example.com
+./godscan dirbrute -u http://www.example.com
 ```
 1. 目录扫描数量较少，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
 2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜
@@ -34,7 +34,7 @@ source /tmp/x
 
 ### 根据图标地址计算图标hash
 ```bash
-./godscan icon --url http://www.example.com/ico.ico
+./godscan icon -u http://www.example.com/ico.ico
 ```
 
 ### 弱口令生成、离线爆破
@@ -62,7 +62,7 @@ source /tmp/x
 
 ### 爬虫递归探测URL、指纹和敏感信息
 ```bash
-./godscan weakpass --url 'http://www.exmaple.com' 
+./godscan weakpass -u 'http://www.exmaple.com' 
 # -d 1 可以指定爬虫的深度
 ```
 
