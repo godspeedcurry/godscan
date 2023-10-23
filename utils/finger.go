@@ -122,7 +122,13 @@ func parseHost(RootPath string) (string, error) {
 }
 
 func uselessUrl(url string) bool {
-	return strings.Contains(url, ".min.js") || strings.Contains(url, ".ico") || strings.Contains(url, "chunk-vendors")
+	ignore := []string{".min.js", ".ico", "chunk-vendors", ".mp4", ".gif", ".jpg", ".jpeg", ".png"}
+	for _, ign := range ignore {
+		if strings.Contains(url, ign) {
+			return false
+		}
+	}
+	return true
 }
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
@@ -165,7 +171,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
-		color.HiYellow("->[*] Api Path")
+		color.HiYellow("->[*] [%s] Api Path", Url)
 		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 		ApiResult := []string{}
