@@ -1,6 +1,5 @@
 package common
 
-var version = "1.1.7"
 var Userdict = map[string][]string{
 	"ftp":        {"ftp", "admin", "www", "web", "root", "db", "wwwroot", "data", "test", "administrator", "anonymous"},
 	"mysql":      {"root", "mysql"},
