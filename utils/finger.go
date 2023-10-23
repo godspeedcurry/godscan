@@ -12,7 +12,6 @@ import (
 
 	"github.com/spf13/viper"
 
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -112,28 +111,28 @@ func HighLight(data string, keywords []string, fingers []string, Url string) {
 	}
 }
 
-func parseHost(RootPath string) (string, error) {
-	urlStruct, err := url.Parse(RootPath)
+func parseHost(input string) string {
+	parsedURL, err := url.Parse(input)
 	if err != nil {
-		return "", err
+		return ""
 	}
-	host, _, _ := net.SplitHostPort(urlStruct.Host)
-	return host, nil
+	return parsedURL.Hostname()
 }
 
 func uselessUrl(url string) bool {
-	ignore := []string{".min.js", ".ico", "chunk-vendors", ".mp4", ".gif", ".jpg", ".jpeg", ".png"}
+	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors"}
 	for _, ign := range ignore {
 		if strings.Contains(url, ign) {
-			return false
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
 	myMap[depth] = append(myMap[depth], Url)
-	host, _ := parseHost(RootPath)
+	host := parseHost(RootPath)
+
 	if !strings.Contains(Url, host) || depth == 0 || uselessUrl(Url) {
 		return nil
 	}
@@ -355,7 +354,6 @@ func PrintFinger(Url string, Depth int) {
 	}
 	// 爬虫递归爬
 	myMap := make(map[int][]string)
-
 	err = Spider(RootPath, Url, Depth, myMap)
 	if err != nil {
 		Error("%s", err)
