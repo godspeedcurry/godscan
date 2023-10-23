@@ -22,7 +22,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 		reg := regexp.MustCompile(infoMap[key])
 		res := reg.FindAllStringSubmatch(html.UnescapeString(Content), -1)
 		if len(res) > 0 {
-			color.HiYellow("->[*] %s\n", key)
+			color.HiYellow("->[*] [%s] %s\n", Url, key)
 			mylist := []string{}
 			for _, tmp := range res {
 				r := regexp.MustCompile("png|gif|svg|jpeg|jpg|otf|woff|eot|ttf")
@@ -33,7 +33,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 			}
 			unDupList := removeDuplicatesString(mylist)
 			for _, a := range unDupList {
-				color.HiMagenta(Url + " " + a)
+				color.HiMagenta(a)
 			}
 		}
 	}
