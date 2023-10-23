@@ -163,10 +163,8 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	//正则提取注释
 	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
 	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	if len(AnnotationResult) > 0 {
-		for _, Annotation := range AnnotationResult {
-			HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
-		}
+	for _, Annotation := range AnnotationResult {
+		HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
 	}
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
@@ -193,7 +191,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("a").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
 			normalizeUrl := Normalize(href, RootPath)
-			if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
 		})
@@ -201,7 +199,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
 			normalizeUrl := Normalize(src, RootPath)
-			if normalizeUrl != "" && !in(myMap[depth-1], (normalizeUrl)) {
+			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
 		})
