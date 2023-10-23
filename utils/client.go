@@ -25,9 +25,6 @@ func InitHttp() {
 	//PocInfo.Proxy = "http://127.0.0.1:8080"
 	// err := InitHttpClient(
 	// 	PocInfo.Num, PocInfo.Proxy, time.Duration(PocInfo.Timeout)*time.Second)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
 	InitHttpClient(1, "", time.Second*5)
 }
 

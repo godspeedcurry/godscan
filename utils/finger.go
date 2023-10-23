@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"sort"
 
-	"github.com/godspeedcurry/godscan/common"
+	"github.com/spf13/viper"
 
 	"net"
 	"net/http"
@@ -43,7 +43,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	if Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
 	if err != nil {
 		return "", "", "", err
@@ -132,7 +132,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	}
 
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		ApiResult := []string{}
 
 		for _, tmp := range ApiResultTuple {
-			ApiResult = append(ApiResult, common.ApiPrefix+tmp[1])
+			ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
 		}
 		ApiResult = removeDuplicatesString(ApiResult)
 		fmt.Println(strings.Join(ApiResult, "\n"))
@@ -229,7 +229,7 @@ var icon_json string
 func IconDetect(Url string) (string, error) {
 	InitHttp()
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
 
 	if err != nil {
@@ -248,6 +248,7 @@ func IconDetect(Url string) (string, error) {
 	}
 	return "", nil
 }
+
 func FindFaviconURL(urlStr string) (string, error) {
 	// 解析基准URL
 	InitHttp()
@@ -258,7 +259,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 
 	// 获取HTML内容
 	req, _ := http.NewRequest(http.MethodGet, urlStr, nil)
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
 	if err != nil {
 		return "", err
@@ -310,13 +311,12 @@ func isAbsoluteURL(urlStr string) bool {
 	return u.IsAbs()
 }
 
-func PrintFinger(HostInfo common.HostInfo) {
+func PrintFinger(Url string, Depth int) {
 	InitHttp()
-	if !strings.HasPrefix(HostInfo.Url, "http") {
-		HostInfo.Url = "http://" + HostInfo.Url
+	if !strings.HasPrefix(Url, "http") {
+		Url = "http://" + Url
 	}
-	Info("Your URL: %s", HostInfo.Url)
-	Host, _ := url.Parse(HostInfo.Url)
+	Host, _ := url.Parse(Url)
 	RootPath := Host.Scheme + "://" + Host.Hostname()
 	if Host.Port() != "" {
 		RootPath = RootPath + ":" + Host.Port()
@@ -324,9 +324,9 @@ func PrintFinger(HostInfo common.HostInfo) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	res := fingerScan(FirstUrl)
+	res, _, _ := FingerScan(FirstUrl)
 	if res != "" {
-		Info(res)
+		Info(Url + " " + res)
 	}
 
 	DisplayHeader(FirstUrl, http.MethodGet)
@@ -344,23 +344,22 @@ func PrintFinger(HostInfo common.HostInfo) {
 		IconDetect(IconUrl)
 	} else {
 		Error("%s", err)
+		return
 	}
 	// 爬虫递归爬
-	// s := mapset.NewSet()
 	myMap := make(map[int][]string)
 
-	err = Spider(RootPath, HostInfo.Url, HostInfo.Depth, myMap)
+	err = Spider(RootPath, Url, Depth, myMap)
 	if err != nil {
 		Error("%s", err)
+		return
 	}
 	for depth, url := range myMap {
 		url := removeDuplicatesString(url)
 		sort.Strings(url)
-		Success("Depth: %d total=%d", depth, len(url))
-		fmt.Printf("%s\n", strings.Join(url[:Min(10, len(url))], "\n"))
-		if len(url) > 10 {
+		if len(url) > 0 {
 			filename := fmt.Sprintf("%s_%d_%s.log", Host.Hostname(), depth, RandomString(4))
-			Success("More at ./%s", filename)
+			Success("Depth: %d total=%d, More at ./%s", depth, len(url), filename)
 			ioutil.WriteFile(filename, []byte(strings.Join(url, "\n")), 0644)
 		}
 	}
