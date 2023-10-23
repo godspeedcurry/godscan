@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"sort"
 	"strings"
@@ -168,7 +169,6 @@ func removeDuplicatesString(arr []string) []string {
 func in(str_array []string, target string) bool {
 	sort.Strings(str_array)
 	index := sort.SearchStrings(str_array, target)
-	//index的取值：[0,len(str_array)]
 	if index < len(str_array) && str_array[index] == target { //需要注意此处的判断，先判断 &&左侧的条件，如果不满足则结束此处判断，不会再进行右侧的判断
 		return true
 	}
@@ -185,4 +185,14 @@ func Quote(x string) string {
 
 func SimHash(input []byte) uint64 {
 	return simhash.Simhash(simhash.NewWordFeatureSet(input))
+}
+
+func FilRead(filename string) []string {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		fmt.Println(err.Error())
+		return []string{}
+	}
+	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
+	return removeDuplicatesString(lines)
 }

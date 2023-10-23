@@ -11,6 +11,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/spf13/viper"
 )
 
 func iskeyword(str string, keyword []string) bool {
@@ -69,19 +70,19 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 	return ""
 }
 
-func fingerScan(url string) string {
+func FingerScan(url string) (string, []byte, int) {
 	InitHttp()
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return common.NoFinger
+		return common.NoFinger, nil, -1
 	}
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
 
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		return common.NoFinger
+		return common.NoFinger, nil, -1
 	}
 	headers := MapToJson(resp.Header)
 
@@ -90,19 +91,19 @@ func fingerScan(url string) string {
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		fmt.Println(err)
-		return common.NoFinger
+		return common.NoFinger, nil, -1
 	}
 	var cms []string
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Println(err)
-		return common.NoFinger
+		return common.NoFinger, nil, -1
 	}
 	body := string(bodyBytes)
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return common.NoFinger
+		return common.NoFinger, nil, -1
 	}
 
 	// 查找标题元素并获取内容
@@ -119,7 +120,7 @@ func fingerScan(url string) string {
 
 	}
 	if len(cms) != 0 {
-		return strings.Join(cms, ",")
+		return strings.Join(cms, ","), nil, -1
 	}
-	return common.NoFinger
+	return common.NoFinger, bodyBytes, resp.StatusCode
 }

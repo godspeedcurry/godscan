@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/godspeedcurry/godscan/common"
-
 	"github.com/fatih/color"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -24,7 +23,7 @@ func get_current_time() string {
 }
 
 func log_print(level int, detail string) {
-	if level > common.LogLevel {
+	if level > viper.GetInt("loglevel") {
 		return
 	}
 	fmt.Println(detail)

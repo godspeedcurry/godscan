@@ -2,16 +2,13 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync"
 
-	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
-	"github.com/gosuri/uiprogress"
+	"github.com/spf13/viper"
 )
 
 var fingerHashMap = make(map[uint64]bool)
@@ -24,62 +21,38 @@ func formatUrl(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-func DirBrute(filename string) {
-	InitHttp()
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		Error(err.Error())
-		return
-	}
-	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
-	lines = removeDuplicatesString(lines)
-
-	uiprogress.Start()
-	var wg sync.WaitGroup
-	bar := uiprogress.AddBar(len(lines)).AppendCompleted().PrependElapsed()
-	Info("Total: %d urls", len(lines))
-	for _, line := range lines {
-		wg.Add(1)
-		go func(line string) {
-			defer wg.Done()
-			DirSingleBrute(line)
-			bar.Incr()
-		}(line)
-	}
-	wg.Wait()
-	uiprogress.Stop()
-	Success(color.GreenString("\n" + strings.Join(result, "\n")))
-}
-
-func CheckFinger(url string, statusCode int, length int, hash uint64) {
-	ret := fingerScan(url)
+func CheckFinger(finger string, url string, statusCode int, length int, hash uint64) string {
 	if !fingerHashMap[hash] {
 		fingerHashMap[hash] = true
-		result = append(result, fmt.Sprintf("[%d] %d {%s} %s", statusCode, length, ret, url))
+		return fmt.Sprintf("[%d] %d {%s} %s", statusCode, length, finger, url)
 	}
+	return ""
 }
 
-func DirSingleBrute(baseUrl string) {
-	baseUrl = formatUrl(baseUrl)
+func CheckAlive(url string) bool {
 	// 检查URL的存活性
-	req, err := http.NewRequest(http.MethodGet, baseUrl, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		Failed(baseUrl + " " + err.Error())
-		return
+		Fatal(url + " " + err.Error())
 	}
-	req.Header.Set("User-Agent", common.DEFAULT_UA)
-	resp, err := Client.Do(req)
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 
+	_, err = Client.Do(req)
 	if err != nil {
-		Failed(baseUrl + " " + err.Error())
-		return
+		Fatal(url + " " + err.Error())
+		return false
 	}
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		Failed(baseUrl + " " + err.Error())
-		return
+	return true
+}
+
+func DirBrute(baseUrl string) []string {
+
+	result := []string{}
+	baseUrl = formatUrl(baseUrl)
+
+	if CheckAlive(baseUrl) == false {
+		return nil
 	}
-	CheckFinger(baseUrl, resp.StatusCode, len(respBody), SimHash(respBody))
 
 	baseURL, _ := url.Parse(baseUrl)
 	tempDirList := common.DirList
@@ -102,22 +75,14 @@ func DirSingleBrute(baseUrl string) {
 
 	for _, _path := range tempDirList {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: _path})
-		req, err := http.NewRequest(http.MethodGet, fullURL.String(), nil)
-		if err != nil {
-			continue
-		}
-		req.Header.Set("User-Agent", common.DEFAULT_UA)
-		resp, err := Client.Do(req)
-		if err != nil {
-			continue
-		}
-		respBody, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			continue
-		}
-		if resp.StatusCode == 200 || resp.StatusCode == 500 {
-			CheckFinger(fullURL.String(), resp.StatusCode, len(respBody), SimHash(respBody))
+		finger, respBody, statusCode := FingerScan(fullURL.String())
+
+		if statusCode == 200 || statusCode == 500 {
+			ret := CheckFinger(finger, fullURL.String(), statusCode, len(respBody), SimHash(respBody))
+			if ret != "" {
+				result = append(result, ret)
+			}
 		}
 	}
-	resp.Body.Close()
+	return result
 }

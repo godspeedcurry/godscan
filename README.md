@@ -14,61 +14,66 @@
 </p>
 
 ## Usage
-### 针对单一Url进行常见目录扫描
+### 命令自动补全
+```
+./godscan completion zsh > /tmp/x
+source /tmp/x
+```
+### 目录扫描
 ```bash
-go run main.go -u http://www.example.com -dir
+./godscan dirbrute --url http://www.example.com
 ```
 1. 目录扫描数量较少，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
 2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜
 3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
 
+### 批量目录扫描+指纹识别(协程)
+```bash
+./godscan dirbrute -uf url.txt
+```
+
 ### 根据图标地址计算图标hash
 ```bash
-go run main.go -ico http://www.example.com/ico.ico
+./godscan icon --url http://www.example.com/ico.ico
 ```
 
 ### 弱口令生成、离线爆破
 会自动识别身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
 ```bash
-go run main.go -k "张三,110101199003070759,18288888888"
+./godscan weakpass -k "张三,110101199003070759,18288888888"
 # 中文会被转成英文，以一定格式生成弱口令，如干饭集团，需要自己去找一下他在网站中经常提到的一些叫法
-go run main.go -k "干饭,干饭集团,干饭有限公司"
+./godscan weakpass -k "干饭,干饭集团,干饭有限公司"
 
 # 自定义后缀
-go run main.go -k "张三,110101199003070759,18288888888" -suffix '123,qwe,123456'
+./godscan weakpass -k "张三,110101199003070759,18288888888" -suffix '123,qwe,123456'
 
 # 查看工具默认的后缀
-go run main.go -show
+./godscan weakpass --show
 # 更为复杂的前后缀，适合本地跑hashcat,本方法还会对字符串作变异，如o->0,i->1,a->4等等
-go run main.go -k '百度' -full > 1.txt  
+./godscan weakpass -k '百度' --full > 1.txt  
 
 # 自定义后缀
-go run main.go -k '百度,baidu.com,password,pass,root,server,qwer,admin' -prefix '@,!,",123' -suffix '!,1234,123,321' -sep '_,!,.,/,&,+' > 1.txt
+./godscan weakpass -k '百度,baidu.com,password,pass,root,server,qwer,admin' --prefix '@,!,",123' --suffix '!,1234,123,321' --sep '_,!,.,/,&,+' > 1.txt
 
 # -l 获取python格式的list 如["11","222"]
 # mac下拷贝至剪贴板，其余系统可自行探索哈
-go run main.go -k "张三,110101199003070759,18288888888" | pbcopy
+./godscan weakpass -k "张三,110101199003070759,18288888888" | pbcopy
 ```
 
 ### 爬虫递归探测URL、指纹和敏感信息
 ```bash
-go run main.go -u 'http://www.exmaple.com' 
+./godscan weakpass --url 'http://www.exmaple.com' 
 # -d 1 可以指定爬虫的深度
 ```
 
-### 批量目录扫描+指纹识别(单线程)
-```bash
-go run main.go -uf url.txt
-```
+
 
 ### 爬取js中的api地址，用于未授权测试
 ```bash
-go run main.go -u http://example.com -d 2
+./godscan spider -u http://example.com -d 2
 # 假如知道前缀，可以得到一些路径，便于burp中爆破，这些路径可能需要GET、POST等类型去做测试 
-go run main.go -u http://example.com -d 2 -api "/api/v1"
+./godscan spider -u http://example.com -d 2 --api "/api/v1"
 ```
-
-
 
 
 ## 功能详细介绍
@@ -76,7 +81,6 @@ go run main.go -u http://example.com -d 2 -api "/api/v1"
 - [x] HTTP响应 Server字段
 - [x] 构造404 报错 得到中间件的详情
 - [x] POST请求构造报错 
-- [x] 解析html源代码 关键字匹配得到特征, 根据指纹特征进行词频统计, 并表格化输出
 - [x] 爬虫 递归访问
 - [x] 正则提取注释 注释里往往有版本 github仓库等信息
 - [x] 版本识别并高亮
