@@ -42,5 +42,6 @@ func (o *IconOptions) validateOptions() error {
 }
 
 func (o *IconOptions) run() {
+	utils.InitHttp()
 	utils.IconDetect(GlobalOption.Url)
 }
