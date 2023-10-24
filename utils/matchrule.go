@@ -3,8 +3,7 @@ package utils
 import (
 	_ "embed"
 	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -70,40 +69,40 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 	return ""
 }
 
-func FingerScan(url string) (string, []byte, int) {
-	InitHttp()
+func FingerScan(url string) (string, string, []byte, int) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return common.NoFinger, nil, -1
+		Fatal("%s", err)
+		return common.NoFinger, "", nil, -1
 	}
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
-
 	resp, err := Client.Do(req)
-
 	if err != nil {
-		return common.NoFinger, nil, -1
+		Fatal("%s", err)
+		return common.NoFinger, "", nil, -1
 	}
+	defer resp.Body.Close()
 	headers := MapToJson(resp.Header)
 
 	var config Packjson
 
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
-		fmt.Println(err)
-		return common.NoFinger, nil, -1
+		Fatal("%s", err)
+		return common.NoFinger, "", nil, -1
 	}
 	var cms []string
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
-		return common.NoFinger, nil, -1
+		Fatal("%s", err)
+		return common.NoFinger, "", nil, -1
 	}
 	body := string(bodyBytes)
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return common.NoFinger, nil, -1
+		return common.NoFinger, "", nil, -1
 	}
 
 	// 查找标题元素并获取内容
@@ -117,10 +116,10 @@ func FingerScan(url string) (string, []byte, int) {
 				cms = append(cms, fp.Cms)
 			}
 		}
+	}
 
-	}
 	if len(cms) != 0 {
-		return strings.Join(cms, ","), nil, -1
+		return strings.Join(cms, ","), "", nil, -1
 	}
-	return common.NoFinger, bodyBytes, resp.StatusCode
+	return common.NoFinger, headers, bodyBytes, resp.StatusCode
 }

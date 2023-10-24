@@ -9,9 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/godspeedcurry/godscan/common"
-
-	"golang.org/x/net/proxy"
+	"github.com/spf13/viper"
 )
 
 var (
@@ -46,24 +44,8 @@ func InitHttpClient(ThreadsNum int, DownProxy string, Timeout time.Duration) err
 		DisableKeepAlives:   false,
 	}
 
-	if common.Proxy != "" {
-		dialSocksProxy, err := common.Socks5Dailer(dialer)
-		if err != nil {
-			return err
-		}
-		if contextDialer, ok := dialSocksProxy.(proxy.ContextDialer); ok {
-			tr.DialContext = contextDialer.DialContext
-		} else {
-			return errors.New("failed type assertion to DialContext")
-		}
-	} else if DownProxy != "" {
-		if DownProxy == "1" {
-			DownProxy = "http://127.0.0.1:8080"
-		} else if DownProxy == "2" {
-			DownProxy = "socks5://127.0.0.1:1080"
-		} else if !strings.Contains(DownProxy, "://") {
-			DownProxy = "http://127.0.0.1:" + DownProxy
-		}
+	if viper.GetString("proxy") != "" {
+		DownProxy := viper.GetString("proxy")
 		if !strings.HasPrefix(DownProxy, "socks") && !strings.HasPrefix(DownProxy, "http") {
 			return errors.New("do not support the proxy of this type")
 		}

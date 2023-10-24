@@ -6,9 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"io/ioutil"
+	"io"
 	"os"
 	"sort"
+	"sync"
 
 	"github.com/spf13/viper"
 
@@ -53,6 +54,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	title := doc.Find("title").Text()
 	if err != nil {
 		Fatal("%s", err)
+		return "", "", "", err
 	}
 	ServerValue := resp.Header["Server"]
 	Status := resp.Status
@@ -131,13 +133,14 @@ func uselessUrl(url string) bool {
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
 	myMap[depth] = append(myMap[depth], Url)
-	host := parseHost(RootPath)
-
-	if !strings.Contains(Url, host) || depth == 0 || uselessUrl(Url) {
+	if depth == 0 || uselessUrl(Url) {
 		return nil
 	}
 
-	req, _ := http.NewRequest(http.MethodGet, Url, nil)
+	req, err := http.NewRequest(http.MethodGet, Url, nil)
+	if err != nil {
+		return err
+	}
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
 	if err != nil {
@@ -149,25 +152,26 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		Error("%s", err)
 		return err
 	}
+	Info(RootPath + " " + Url)
+	// keywords := FindKeyWord(doc.Text())
 
-	keywords := FindKeyWord(doc.Text())
+	// //正则提取版本
+	// VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
 
-	//正则提取版本
-	VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
+	// VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
 
-	VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-
-	VersionResultNotDupplicated := removeDuplicatesString(VersionResult)
+	// VersionResultNotDupplicated := removeDuplicatesString(VersionResult)
 
 	//正则提取注释
-	AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
-	AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	for _, Annotation := range AnnotationResult {
-		HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
-	}
+	// AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
+	// AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
+	// for _, Annotation := range AnnotationResult {
+	// 	HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
+	// }
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
+		fmt.Println(Url)
 		color.HiYellow("->[*] [%s] Api Path", Url)
 		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
 		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
@@ -178,6 +182,37 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		}
 		ApiResult = removeDuplicatesString(ApiResult)
 		fmt.Println(strings.Join(ApiResult, "\n"))
+		re := regexp.MustCompile(`(/[0-9a-z_-]*?)/`)
+		data := strings.Join(ApiResult, "\n")
+
+		subdir := []string{}
+		matches := re.FindAllStringSubmatch(data, -1)
+
+		for _, match := range matches {
+			if len(match) > 1 {
+				submatch := match[1]
+				subdir = append(subdir, RootPath+submatch)
+			}
+		}
+		subdir = removeDuplicatesString(subdir)
+		fmt.Println(color.YellowString("->[*] sub-directory"))
+		fmt.Println(color.BlueString(strings.Join(subdir, "\n")))
+		var wg sync.WaitGroup
+		result := []string{}
+		for _, line := range subdir {
+			wg.Add(1)
+			go func(url string) {
+				defer wg.Done()
+				result = append(result, DirBrute(url)...)
+			}(line)
+		}
+		wg.Wait()
+		fmt.Println(strings.Join(result, "\n"))
+		if len(result) > 0 {
+			filename := fmt.Sprintf("%s_brute.log", parseHost(RootPath))
+			Success("More at ./%s", filename)
+			os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
+		}
 	} else {
 		// 敏感信息搜集
 		html, err := doc.Html()
@@ -190,6 +225,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("a").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
 			normalizeUrl := Normalize(href, RootPath)
+			Info(normalizeUrl)
 			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
@@ -198,6 +234,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
 			normalizeUrl := Normalize(src, RootPath)
+			Info(normalizeUrl)
 			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
@@ -233,7 +270,6 @@ func StandBase64(braw []byte) []byte {
 var icon_json string
 
 func IconDetect(Url string) (string, error) {
-	InitHttp()
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	resp, err := Client.Do(req)
@@ -243,7 +279,7 @@ func IconDetect(Url string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	bodyBytes, _ := ioutil.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
 	Info("icon_url=\"%s\" icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
 	var icon_hash_map map[string]interface{}
@@ -257,7 +293,6 @@ func IconDetect(Url string) (string, error) {
 
 func FindFaviconURL(urlStr string) (string, error) {
 	// 解析基准URL
-	InitHttp()
 	baseURL, err := url.Parse(urlStr)
 	if err != nil {
 		return "", err
@@ -318,7 +353,6 @@ func isAbsoluteURL(urlStr string) bool {
 }
 
 func PrintFinger(Url string, Depth int) {
-	InitHttp()
 	if !strings.HasPrefix(Url, "http") {
 		Url = "http://" + Url
 	}
@@ -330,7 +364,7 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	res, _, _ := FingerScan(FirstUrl)
+	res, _, _, _ := FingerScan(FirstUrl)
 	if res != "" {
 		Info(Url + " " + res)
 	}

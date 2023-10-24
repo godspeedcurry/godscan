@@ -69,5 +69,8 @@ func Execute() {
 	viper.BindPFlag("DefaultUA", rootCmd.PersistentFlags().Lookup("ua"))
 	viper.SetDefault("DefaultUA", "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5773.219 Safari/537.36 Edg/109.0.1711.53")
 
+	viper.BindPFlag("proxy", rootCmd.PersistentFlags().Lookup("proxy"))
+	viper.SetDefault("proxy", "")
+
 	cobra.CheckErr(rootCmd.Execute())
 }
