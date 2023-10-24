@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/url"
@@ -21,21 +20,11 @@ func formatUrl(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-func JsonToMap(data string) string {
-	headers := make(map[string]interface{})
-	_ = json.Unmarshal([]byte(data), &headers)
-	// fmt.Println(data)
-	if headers["content-type"] != nil {
-		return headers["content-type"].(string)
-	}
-	return ""
-}
-func CheckFinger(finger string, url string, headers string, respBody []byte, statusCode int) string {
+func CheckFinger(finger string, url string, contentType string, respBody []byte, statusCode int) string {
 	hash := SimHash(respBody)
-	header := JsonToMap(headers)
 	if !fingerHashMap[hash] {
 		fingerHashMap[hash] = true
-		return fmt.Sprintf("[%d] %d {%s} %s {%s} [%s]", statusCode, len(respBody), finger, url, header, string(respBody[:50]))
+		return fmt.Sprintf("[%d] %d {%s} {%s} %s", statusCode, len(respBody), finger, contentType, url)
 	}
 	return ""
 }
@@ -65,9 +54,9 @@ func DirBrute(baseUrl string) []string {
 	}
 	for _, _path := range tempDirList {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, _path)})
-		finger, headers, respBody, statusCode := FingerScan(fullURL.String())
+		finger, contentType, respBody, statusCode := FingerScan(fullURL.String())
 		if statusCode == 200 || statusCode == 500 {
-			ret := CheckFinger(finger, fullURL.String(), headers, respBody, statusCode)
+			ret := CheckFinger(finger, fullURL.String(), contentType, respBody, statusCode)
 			if ret != "" {
 				Info(fullURL.String() + " " + ret)
 				result = append(result, ret)
