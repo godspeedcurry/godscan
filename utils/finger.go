@@ -8,6 +8,7 @@ import (
 	"hash"
 	"io"
 	"os"
+	"path"
 	"sort"
 	"sync"
 
@@ -122,7 +123,7 @@ func parseHost(input string) string {
 }
 
 func uselessUrl(url string) bool {
-	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors"}
+	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue"}
 	for _, ign := range ignore {
 		if strings.Contains(url, ign) {
 			return true
@@ -131,11 +132,77 @@ func uselessUrl(url string) bool {
 	return false
 }
 
+func parseDir(fullPath string) []string {
+	// 去除末尾的斜杠
+	dirs := []string{}
+	// 逐级获取目录
+	for {
+		dir, _ := path.Split(fullPath)
+		// 如果已经到达最顶层目录，则退出循环
+		if dir == "/" {
+			break
+		}
+
+		// 更新 fullPath 为父目录路径
+		fullPath = strings.TrimSuffix(dir, "/")
+		dirs = append(dirs, dir)
+	}
+	return dirs
+}
+
+func parseVueUrl(Url string, RootPath string, doc string) {
+	color.HiYellow("->[*] [%s] Api Path", Url)
+	ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
+	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\t", ""), -1)
+	ApiResult := []string{}
+
+	for _, tmp := range ApiResultTuple {
+		if uselessUrl(tmp[1]) {
+			continue
+		}
+		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
+	}
+	ApiResult = removeDuplicatesString(ApiResult)
+	fmt.Println(strings.Join(ApiResult, "\n"))
+
+	subdir := []string{}
+	matches := []string{}
+
+	for _, apiPath := range ApiResult {
+		matches = append(matches, parseDir(apiPath)...)
+	}
+
+	matches = removeDuplicatesString(matches)
+	for _, match := range matches {
+		normalizeUrl := Normalize(match, RootPath)
+		subdir = append(subdir, normalizeUrl)
+	}
+	subdir = removeDuplicatesString(subdir)
+	fmt.Println(color.YellowString("->[*] sub-directory"))
+	fmt.Println(color.BlueString(strings.Join(subdir, "\n")))
+
+	var wg sync.WaitGroup
+	result := []string{}
+	for _, line := range subdir {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			result = append(result, DirBrute(url)...)
+		}(line)
+	}
+	wg.Wait()
+	if len(result) > 0 {
+		filename := fmt.Sprintf("brute_%s.log", parseHost(RootPath))
+		Success("More at ./%s", filename)
+		os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
+	}
+}
+
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
-	myMap[depth] = append(myMap[depth], Url)
 	if depth == 0 || uselessUrl(Url) {
 		return nil
 	}
+	myMap[depth] = append(myMap[depth], Url)
 
 	req, err := http.NewRequest(http.MethodGet, Url, nil)
 	if err != nil {
@@ -152,67 +219,10 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		Error("%s", err)
 		return err
 	}
-	Info(RootPath + " " + Url)
-	// keywords := FindKeyWord(doc.Text())
-
-	// //正则提取版本
-	// VersionReg := regexp.MustCompile(`(?i)(version|ver|v|版本)[ =:]{0,2}(\d+)(\.[0-9a-z]+)*`)
-
-	// VersionResult := VersionReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-
-	// VersionResultNotDupplicated := removeDuplicatesString(VersionResult)
-
-	//正则提取注释
-	// AnnotationReg := regexp.MustCompile("/\\*[\u0000-\uffff]{1,300}?\\*/")
-	// AnnotationResult := AnnotationReg.FindAllString(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-	// for _, Annotation := range AnnotationResult {
-	// 	HighLight(Annotation, VersionResultNotDupplicated, keywords, Url)
-	// }
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
-		fmt.Println(Url)
-		color.HiYellow("->[*] [%s] Api Path", Url)
-		ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
-		ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc.Text(), "\t", ""), -1)
-		ApiResult := []string{}
-
-		for _, tmp := range ApiResultTuple {
-			ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
-		}
-		ApiResult = removeDuplicatesString(ApiResult)
-		fmt.Println(strings.Join(ApiResult, "\n"))
-		re := regexp.MustCompile(`(/[0-9a-z_-]*?)/`)
-		data := strings.Join(ApiResult, "\n")
-
-		subdir := []string{}
-		matches := re.FindAllStringSubmatch(data, -1)
-
-		for _, match := range matches {
-			if len(match) > 1 {
-				submatch := match[1]
-				subdir = append(subdir, RootPath+submatch)
-			}
-		}
-		subdir = removeDuplicatesString(subdir)
-		fmt.Println(color.YellowString("->[*] sub-directory"))
-		fmt.Println(color.BlueString(strings.Join(subdir, "\n")))
-		var wg sync.WaitGroup
-		result := []string{}
-		for _, line := range subdir {
-			wg.Add(1)
-			go func(url string) {
-				defer wg.Done()
-				result = append(result, DirBrute(url)...)
-			}(line)
-		}
-		wg.Wait()
-		fmt.Println(strings.Join(result, "\n"))
-		if len(result) > 0 {
-			filename := fmt.Sprintf("%s_brute.log", parseHost(RootPath))
-			Success("More at ./%s", filename)
-			os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
-		}
+		parseVueUrl(Url, RootPath, doc.Text())
 	} else {
 		// 敏感信息搜集
 		html, err := doc.Html()
@@ -225,7 +235,6 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("a").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
 			normalizeUrl := Normalize(href, RootPath)
-			Info(normalizeUrl)
 			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
@@ -234,7 +243,6 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
 			normalizeUrl := Normalize(src, RootPath)
-			Info(normalizeUrl)
 			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
