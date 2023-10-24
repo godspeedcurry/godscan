@@ -47,8 +47,8 @@ func (o *DirbruteOptions) validateOptions() error {
 }
 
 func (o *DirbruteOptions) run() {
-	targetUrlList := GetTargetList()
 	utils.InitHttp()
+	targetUrlList := GetTargetList()
 	utils.Info("Total: %d url(s)", len(targetUrlList))
 
 	var wg sync.WaitGroup

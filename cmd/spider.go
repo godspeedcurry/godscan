@@ -52,8 +52,8 @@ func (o *SpiderOptions) validateOptions() error {
 }
 
 func (o *SpiderOptions) run() {
-	targetUrlList := GetTargetList()
 	utils.InitHttp()
+	targetUrlList := GetTargetList()
 	utils.Info("Total: %d url(s)", len(targetUrlList))
 
 	var wg sync.WaitGroup
