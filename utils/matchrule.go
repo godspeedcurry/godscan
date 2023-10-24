@@ -121,5 +121,5 @@ func FingerScan(url string) (string, string, []byte, int) {
 	if len(cms) != 0 {
 		return strings.Join(cms, ","), "", nil, -1
 	}
-	return common.NoFinger, headers, bodyBytes, resp.StatusCode
+	return common.NoFinger, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
 }
