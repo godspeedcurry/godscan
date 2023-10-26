@@ -2,8 +2,8 @@ package utils
 
 import (
 	"fmt"
-	"io/ioutil"
 	"math/rand"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -188,11 +188,20 @@ func SimHash(input []byte) uint64 {
 }
 
 func FilRead(filename string) []string {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println(err.Error())
 		return []string{}
 	}
 	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
 	return removeDuplicatesString(lines)
+}
+
+func FileWrite(filename string, format string, args ...interface{}) {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		Fatal("%s", err)
+		return
+	}
+	file.WriteString(fmt.Sprintf(format, args...))
 }

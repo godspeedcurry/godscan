@@ -70,6 +70,9 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 }
 
 func FingerScan(url string) (string, string, []byte, int) {
+	if !isValidUrl(url) {
+		return common.NoFinger, "", nil, -1
+	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		Fatal("%s", err)

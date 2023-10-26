@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"net"
 	"os"
 	"path"
 	"sort"
@@ -52,9 +53,13 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	}
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		Error("%s", err)
+		return "", "", "", err
+	}
 	title := doc.Find("title").Text()
 	if err != nil {
-		Fatal("%s", err)
+		Error("%s", err)
 		return "", "", "", err
 	}
 	ServerValue := resp.Header["Server"]
@@ -122,10 +127,13 @@ func parseHost(input string) string {
 	return parsedURL.Hostname()
 }
 
-func uselessUrl(url string) bool {
+func uselessUrl(Url string) bool {
+	if Url == "" {
+		return false
+	}
 	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue"}
 	for _, ign := range ignore {
-		if strings.Contains(url, ign) {
+		if strings.Contains(Url, ign) {
 			return true
 		}
 	}
@@ -150,10 +158,27 @@ func parseDir(fullPath string) []string {
 	return dirs
 }
 
+func isValidUrl(Url string) bool {
+	// 解析URL
+	parsedURL, err := url.Parse(Url)
+	if err != nil {
+		return false
+	}
+	// 检查URL的格式是否合法
+	if !parsedURL.IsAbs() || parsedURL.Hostname() == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+		return false
+	}
+	ip := net.ParseIP(parsedURL.Hostname())
+	if ip != nil {
+		return ip.IsPrivate()
+	}
+	return true
+}
+
 func parseVueUrl(Url string, RootPath string, doc string) {
-	color.HiYellow("->[*] [%s] Api Path", Url)
-	ApiReg := regexp.MustCompile(`"(?P<path>/.*?)"`)
-	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\t", ""), -1)
+	fmt.Printf("->[*] [%s] Api Path\n", Url)
+	ApiReg := regexp.MustCompile(`"(?P<path>/[^ ]*?)"`)
+	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
 
 	for _, tmp := range ApiResultTuple {
@@ -175,11 +200,14 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 	matches = removeDuplicatesString(matches)
 	for _, match := range matches {
 		normalizeUrl := Normalize(match, RootPath)
+		if !isValidUrl(normalizeUrl) {
+			continue
+		}
 		subdir = append(subdir, normalizeUrl)
 	}
 	subdir = removeDuplicatesString(subdir)
-	fmt.Println(color.YellowString("->[*] sub-directory"))
-	fmt.Println(color.BlueString(strings.Join(subdir, "\n")))
+	fmt.Println("->[*] sub-directory")
+	fmt.Println(strings.Join(subdir, "\n"))
 
 	var wg sync.WaitGroup
 	result := []string{}
@@ -196,6 +224,7 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		Success("More at ./%s", filename)
 		os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
 	}
+	SensitiveInfoCollect(Url, doc)
 }
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
@@ -214,16 +243,35 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		return err
 	}
 	defer resp.Body.Close()
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+
+	host, err := url.Parse(Url)
 	if err != nil {
 		Error("%s", err)
 		return err
 	}
+	filename := host.Hostname() + ".log"
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		Error("%s", err)
+		return err
+	}
+	oldStdout := os.Stdout
+	os.Stdout = file
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
-		parseVueUrl(Url, RootPath, doc.Text())
+		x, err := io.ReadAll(resp.Body)
+		if err != nil {
+			Error("%s", err)
+			return err
+		}
+		parseVueUrl(Url, RootPath, string(x))
 	} else {
+		doc, err := goquery.NewDocumentFromReader(resp.Body)
+		if err != nil {
+			Error("%s", err)
+			return err
+		}
 		// 敏感信息搜集
 		html, err := doc.Html()
 		if err != nil {
@@ -248,6 +296,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 			}
 		})
 	}
+	os.Stdout = oldStdout
 	return nil
 }
 
@@ -345,7 +394,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 	})
 
 	if faviconURL == "" {
-		return "", errors.New("Favicon URL not found, might used javascript, please find it manually and use `-ico url` to calculate it")
+		return "", errors.New("Favicon URL not found, might used javascript, please find it manually and use `icon -u` to calculate it")
 	}
 
 	return faviconURL, nil
@@ -374,7 +423,7 @@ func PrintFinger(Url string, Depth int) {
 	FirstUrl := RootPath + Host.Path
 	res, _, _, _ := FingerScan(FirstUrl)
 	if res != "" {
-		Info(Url + " " + res)
+		Info("%s [%s]", Url, res)
 	}
 
 	DisplayHeader(FirstUrl, http.MethodGet)
@@ -392,7 +441,6 @@ func PrintFinger(Url string, Depth int) {
 		IconDetect(IconUrl)
 	} else {
 		Error("%s", err)
-		return
 	}
 	// 爬虫递归爬
 	myMap := make(map[int][]string)
@@ -401,13 +449,12 @@ func PrintFinger(Url string, Depth int) {
 		Error("%s", err)
 		return
 	}
-	for depth, url := range myMap {
+
+	filename := fmt.Sprintf("%s.log", Host.Hostname())
+	Success("🌲🌲🌲 More info at ./%s", filename)
+	for _, url := range myMap {
 		url := removeDuplicatesString(url)
 		sort.Strings(url)
-		if len(url) > 1 {
-			filename := fmt.Sprintf("%s_%d_%d.log", Host.Hostname(), depth, len(url))
-			Success("Depth: %d total=%d, More at ./%s", depth, len(url), filename)
-			os.WriteFile(filename, []byte(strings.Join(url, "\n")), 0644)
-		}
+		FileWrite(filename, strings.Join(url, "\n")+"\n")
 	}
 }
