@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.8"
+var version = "v1.1.9"
 
 func Banner() string {
 	banner := `
