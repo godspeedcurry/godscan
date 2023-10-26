@@ -1,10 +1,10 @@
 package utils
 
 import (
+	"fmt"
 	"html"
 	"regexp"
-
-	"github.com/fatih/color"
+	"strings"
 )
 
 func SensitiveInfoCollect(Url string, Content string) {
@@ -15,26 +15,22 @@ func SensitiveInfoCollect(Url string, Content string) {
 		"JSON Web Token":        `(eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}|eyJ[A-Za-z0-9_\/+-]{10,}\.[A-Za-z0-9._\/+-]{10,})`,
 		"Swagger UI":            `((swagger-ui.html)|(\"swagger\":)|(Swagger UI)|(swaggerUi))`,
 		"Ueditor":               `(ueditor\.(config|all)\.js)`,
-		"Windows File/Dir Path": `([a-fA-FzZ]:(\\{1,2})([^\n ]*\\?)*)`,
+		"Windows File/Dir Path": `(?i)([a-iA-IzZ]:\\(?:[^\\/:*?"<>|\r\n \t]+\\)*[^\\/:*?"<>|\r\n \t]*)`,
 		"accesskey/accessid":    `(?i)(access([_ ]?(key|id|secret)){1,2}[\&\#0-9\" =;]*?([0-9a-zA-Z]{10,64}))`,
+		"password":              `(?i)(password[\w\s="']{1,25}[0-9a-zA-Z_@!-#\$]{1,64})`,
+		"Password":              `(?i)([0-9a-zA-Z_@!-#\$]{1,64}[\w\s="'\.]{1,25}password)`,
 	}
 	for key := range infoMap {
 		reg := regexp.MustCompile(infoMap[key])
 		res := reg.FindAllStringSubmatch(html.UnescapeString(Content), -1)
 		if len(res) > 0 {
-			color.HiYellow("->[*] [%s] %s\n", Url, key)
+			fmt.Printf("->[*] [%s] %s\n", Url, key)
 			mylist := []string{}
 			for _, tmp := range res {
-				r := regexp.MustCompile("png|gif|svg|jpeg|jpg|otf|woff|eot|ttf")
-				if key == "link" && r.MatchString(tmp[1]) {
-					continue
-				}
 				mylist = append(mylist, tmp[1])
 			}
 			unDupList := removeDuplicatesString(mylist)
-			for _, a := range unDupList {
-				color.HiMagenta(a)
-			}
+			fmt.Println(strings.Join(unDupList, "\n"))
 		}
 	}
 }
