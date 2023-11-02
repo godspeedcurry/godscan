@@ -90,7 +90,7 @@ func RandomString(length int) string {
 	charset := "0123456789abcdef"
 
 	// 初始化随机数生成器
-	rand.Seed(time.Now().UnixNano())
+	rand.NewSource(time.Now().UnixNano())
 
 	// 生成随机字符
 	result := make([]byte, length)
@@ -144,9 +144,9 @@ func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 }
 
 func ShowInfo() {
-	fmt.Println("-suffix '" + strings.Join(common.SuffixTop, ",") + "'")
-	fmt.Println("-prefix '" + strings.Join(common.PrefixTop, ",") + "'")
-	fmt.Println("-sep '" + strings.Join(common.SeparatorTop, ",") + "'")
+	fmt.Println("--suffix '" + strings.Join(common.SuffixTop, ",") + "'")
+	fmt.Println("--prefix '" + strings.Join(common.PrefixTop, ",") + "'")
+	fmt.Println("--sep '" + strings.Join(common.SeparatorTop, ",") + "'")
 	fmt.Println("-k '" + strings.Join(common.KeywordTop, ",") + "'")
 }
 func removeDuplicatesString(arr []string) []string {

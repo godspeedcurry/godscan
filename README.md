@@ -155,6 +155,9 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 git add . && git commit -m "fix bug" && git push -u origin main
 git tag -a v1.xx
 git push -u origin v1.xx
+# delete
+git tag -d v1.xx
+git push origin :refs/tags/v1.1.10
 ```
 
 ---

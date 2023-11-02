@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"path"
-	"sort"
 	"sync"
 
 	"github.com/spf13/viper"
@@ -25,6 +24,7 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	mapset "github.com/deckarep/golang-set"
 	"github.com/fatih/color"
 	"github.com/twmb/murmur3"
 )
@@ -69,27 +69,6 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 		retServerValue = ServerValue[0]
 	}
 	return retServerValue, Status, title, nil
-}
-
-//go:embed finger.txt
-var fingers string
-
-func GetFingerList() []string {
-	return strings.Split(fingers, "\r\n")
-}
-
-func FindKeyWord(data string) []string {
-	keywords := []string{}
-	m := make(map[string]int)
-	fingerList := GetFingerList()
-	for _, finger := range fingerList {
-		if strings.Contains(data, finger) {
-			cnt := strings.Count(data, finger)
-			keywords = append(keywords, finger)
-			m[finger] = cnt
-		}
-	}
-	return keywords
 }
 
 func IsVuePath(Path string) bool {
@@ -182,7 +161,13 @@ func isValidUrl(Url string) bool {
 	return true
 }
 
-func parseVueUrl(Url string, RootPath string, doc string) {
+func parseVueUrl(Url string, RootPath string, doc string, filename string) {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		Error("%s", err)
+		return
+	}
+
 	ApiReg := regexp.MustCompile(`"(?P<path>/[^ ]*?)"`)
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
@@ -194,12 +179,13 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
 	}
 	ApiResult = removeDuplicatesString(ApiResult)
-	if len(ApiResult) > 0 {
-		fmt.Printf("->[*] [%s] Api Path\n", Url)
-		if len(ApiResult) > 200 {
-			fmt.Println(strings.Join(ApiResult[:200], "\n"))
+	ApiResultLen := len(ApiResult)
+	if ApiResultLen > 0 {
+		file.WriteString("->[*] [" + Url + "] Api Path\n")
+		if ApiResultLen > 200 {
+			file.WriteString(strings.Join(ApiResult[:200], "\n"))
 		} else {
-			fmt.Println(strings.Join(ApiResult, "\n"))
+			file.WriteString(strings.Join(ApiResult, "\n"))
 		}
 	}
 
@@ -219,12 +205,13 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		subdir = append(subdir, normalizeUrl)
 	}
 	subdir = removeDuplicatesString(subdir)
-	if len(subdir) > 0 {
-		fmt.Println("->[*] sub-directory")
-		if len(subdir) > 200 {
-			fmt.Println(strings.Join(subdir[:200], "\n"))
+	subdirLen := len(subdir)
+	if subdirLen > 0 {
+		file.WriteString("->[*] sub-directory")
+		if subdirLen > 200 {
+			file.WriteString(strings.Join(subdir[:200], "\n"))
 		} else {
-			fmt.Println(strings.Join(subdir, "\n"))
+			file.WriteString(strings.Join(subdir, "\n"))
 		}
 	}
 	var wg sync.WaitGroup
@@ -238,18 +225,17 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 	}
 	wg.Wait()
 	if len(result) > 0 {
-		filename := fmt.Sprintf("brute_%s.log", parseHost(RootPath))
-		Success("More at ./%s", filename)
-		os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
+		file.WriteString(strings.Join(result, "\n"))
 	}
 	SensitiveInfoCollect(Url, doc)
 }
 
-func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
+func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
+
 	if uselessUrl(Url, depth) {
 		return nil
 	}
-	myMap[depth] = append(myMap[depth], Url)
+	myMap.Add(Url)
 	req, err := http.NewRequest(http.MethodGet, Url, nil)
 	if err != nil {
 		return err
@@ -266,13 +252,6 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		return err
 	}
 	filename := host.Hostname() + ".log"
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		Error("%s", err)
-		return err
-	}
-	oldStdout := os.Stdout
-	os.Stdout = file
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
@@ -286,7 +265,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 			}
 			bufStr += string(buf[:n])
 		}
-		parseVueUrl(Url, RootPath, bufStr)
+		parseVueUrl(Url, RootPath, bufStr, filename)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
@@ -305,7 +284,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
 			normalizeUrl := Normalize(href, RootPath)
-			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
+			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
 		})
@@ -313,12 +292,11 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
 			normalizeUrl := Normalize(src, RootPath)
-			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
+			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
 		})
 	}
-	os.Stdout = oldStdout
 	return nil
 }
 
@@ -450,13 +428,9 @@ func PrintFinger(Url string, Depth int) {
 
 	DisplayHeader(FirstUrl, http.MethodGet)
 
-	// 构造404
+	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	DisplayHeader(SecondUrl, http.MethodGet)
-
-	// 构造POST
-	ThirdUrl := RootPath
-	DisplayHeader(ThirdUrl, http.MethodPost)
+	DisplayHeader(SecondUrl, http.MethodPost)
 
 	IconUrl, err := FindFaviconURL(RootPath)
 	if err == nil {
@@ -465,7 +439,7 @@ func PrintFinger(Url string, Depth int) {
 		Error("%s", err)
 	}
 	// 爬虫递归爬
-	myMap := make(map[int][]string)
+	myMap := mapset.NewSet()
 	err = Spider(RootPath, Url, Depth, myMap)
 	if err != nil {
 		Error("%s", err)
@@ -474,9 +448,10 @@ func PrintFinger(Url string, Depth int) {
 
 	filename := fmt.Sprintf("%s.log", Host.Hostname())
 	Success("🌲🌲🌲 More info at ./%s", filename)
-	for _, url := range myMap {
-		url := removeDuplicatesString(url)
-		sort.Strings(url)
-		FileWrite(filename, strings.Join(url, "\n")+"\n")
+	var myList []string
+	for item := range myMap.Iter() {
+		myList = append(myList, item.(string))
 	}
+	FileWrite(filename, strings.Join(myList, "\n")+"\n")
+
 }
