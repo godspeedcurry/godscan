@@ -6,6 +6,7 @@ require (
 	github.com/Chain-Zhang/pinyin v0.1.3
 	github.com/Lofanmi/chinese-calendar-golang v0.0.0-20211214151323-ef5cb443e55e
 	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/deckarep/golang-set v1.8.0
 	github.com/fatih/color v1.15.0
 	github.com/gosuri/uiprogress v0.0.1
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6
