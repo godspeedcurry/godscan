@@ -48,8 +48,8 @@ func init() {
 	rootCmd.AddCommand(weakpassCmd)
 
 	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Keywords, "keyword", "k", "", "your keyword list, separate by ','")
-	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Suffix, "suffix", "", "", "your suffix list, default: 01,111,123,321,12345,123456,001,admin,adminn,12345+,654321 separate by ','")
-	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Separator, "sep", "", "", "your separator list, default: @,#,$ separate by ','")
+	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Suffix, "suffix", "", "123,WSX,888,01,1,#", "your suffix list, default: 123,WSX,888 separate by ','")
+	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Separator, "sep", "", "@,#,$", "your separator list, default: @,#,$ separate by ','")
 	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Prefix, "prefix", "", "", "your prefix list, default: null separate by ','")
 
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Full, "full", "", false, "full mode")
@@ -61,10 +61,10 @@ func init() {
 	viper.SetDefault("keyword", "")
 
 	viper.BindPFlag("suffix", weakpassCmd.PersistentFlags().Lookup("suffix"))
-	viper.SetDefault("suffix", "")
+	viper.SetDefault("suffix", "123,WSX,888,01,1,#")
 
 	viper.BindPFlag("sep", weakpassCmd.PersistentFlags().Lookup("sep"))
-	viper.SetDefault("sep", "")
+	viper.SetDefault("sep", "@,#,$")
 
 	viper.BindPFlag("prefix", weakpassCmd.PersistentFlags().Lookup("prefix"))
 	viper.SetDefault("prefix", "")
