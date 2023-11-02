@@ -15,15 +15,15 @@ import (
 var (
 	Client           *http.Client
 	ClientNoRedirect *http.Client
-	dialTimout       = 5 * time.Second
-	keepAlive        = 5 * time.Second
+	dialTimout       = 10 * time.Second
+	keepAlive        = 10 * time.Second
 )
 
 func InitHttp() {
 	//PocInfo.Proxy = "http://127.0.0.1:8080"
 	// err := InitHttpClient(
 	// 	PocInfo.Num, PocInfo.Proxy, time.Duration(PocInfo.Timeout)*time.Second)
-	InitHttpClient(1, "", time.Second*5)
+	InitHttpClient(1, "", dialTimout)
 }
 
 func InitHttpClient(ThreadsNum int, DownProxy string, Timeout time.Duration) error {
