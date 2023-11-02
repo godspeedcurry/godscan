@@ -95,7 +95,7 @@ func FindKeyWord(data string) []string {
 func IsVuePath(Path string) bool {
 	reg := regexp.MustCompile(`(app|index|config|main|chunk)`)
 	res := reg.FindAllString(Path, -1)
-	return len(res) > 0
+	return strings.HasSuffix(Path, ".js") && len(res) > 0
 }
 
 func HighLight(data string, keywords []string, fingers []string, Url string) {
@@ -127,11 +127,11 @@ func parseHost(input string) string {
 	return parsedURL.Hostname()
 }
 
-func uselessUrl(Url string) bool {
-	if Url == "" {
+func uselessUrl(Url string, Depth int) bool {
+	if Depth == 0 || Url == "" || !isValidUrl(Url) {
 		return false
 	}
-	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue"}
+	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue", ".css", ".ico"}
 	for _, ign := range ignore {
 		if strings.Contains(Url, ign) {
 			return true
@@ -159,6 +159,12 @@ func parseDir(fullPath string) []string {
 }
 
 func isValidUrl(Url string) bool {
+	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com"}
+	for _, key := range arr {
+		if strings.Contains(Url, key) {
+			return false
+		}
+	}
 	// 解析URL
 	parsedURL, err := url.Parse(Url)
 	if err != nil {
@@ -176,19 +182,21 @@ func isValidUrl(Url string) bool {
 }
 
 func parseVueUrl(Url string, RootPath string, doc string) {
-	fmt.Printf("->[*] [%s] Api Path\n", Url)
 	ApiReg := regexp.MustCompile(`"(?P<path>/[^ ]*?)"`)
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
 
 	for _, tmp := range ApiResultTuple {
-		if uselessUrl(tmp[1]) {
+		if uselessUrl(tmp[1], 1) {
 			continue
 		}
 		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
 	}
 	ApiResult = removeDuplicatesString(ApiResult)
-	fmt.Println(strings.Join(ApiResult, "\n"))
+	if len(ApiResult) > 0 {
+		fmt.Printf("->[*] [%s] Api Path\n", Url)
+		fmt.Println(strings.Join(ApiResult, "\n"))
+	}
 
 	subdir := []string{}
 	matches := []string{}
@@ -206,9 +214,10 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		subdir = append(subdir, normalizeUrl)
 	}
 	subdir = removeDuplicatesString(subdir)
-	fmt.Println("->[*] sub-directory")
-	fmt.Println(strings.Join(subdir, "\n"))
-
+	if len(subdir) > 0 {
+		fmt.Println("->[*] sub-directory")
+		fmt.Println(strings.Join(subdir, "\n"))
+	}
 	var wg sync.WaitGroup
 	result := []string{}
 	for _, line := range subdir {
@@ -224,15 +233,13 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		Success("More at ./%s", filename)
 		os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
 	}
-	SensitiveInfoCollect(Url, doc)
 }
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
-	if depth == 0 || uselessUrl(Url) {
+	if uselessUrl(Url, depth) {
 		return nil
 	}
 	myMap[depth] = append(myMap[depth], Url)
-
 	req, err := http.NewRequest(http.MethodGet, Url, nil)
 	if err != nil {
 		return err
@@ -243,8 +250,7 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		return err
 	}
 	defer resp.Body.Close()
-
-	host, err := url.Parse(Url)
+	host, err := url.Parse(RootPath)
 	if err != nil {
 		Error("%s", err)
 		return err
@@ -259,13 +265,18 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 	os.Stdout = file
 
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
-	if strings.HasSuffix(Url, ".js") && IsVuePath(Url) {
-		x, err := io.ReadAll(resp.Body)
-		if err != nil {
-			Error("%s", err)
-			return err
+	if IsVuePath(Url) {
+		bufStr := ""
+		buf := make([]byte, 4096)
+		for {
+			n, err := resp.Body.Read(buf)
+			if err != nil {
+				Error("%s", err)
+				break
+			}
+			bufStr += string(buf[:n])
 		}
-		parseVueUrl(Url, RootPath, string(x))
+		parseVueUrl(Url, RootPath, bufStr)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
@@ -275,12 +286,13 @@ func Spider(RootPath string, Url string, depth int, myMap map[int][]string) erro
 		// 敏感信息搜集
 		html, err := doc.Html()
 		if err != nil {
+			Error("%s", err)
 			return err
 		}
 		SensitiveInfoCollect(Url, html)
 
-		// a标签
-		doc.Find("a").Each(func(i int, selector *goquery.Selection) {
+		// a, link 标签
+		doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
 			normalizeUrl := Normalize(href, RootPath)
 			if normalizeUrl != "" && !in(myMap[depth-1], normalizeUrl) {
