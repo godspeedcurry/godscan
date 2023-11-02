@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"path"
 	"strings"
-
-	"github.com/godspeedcurry/godscan/common"
 )
 
 var fingerHashMap = make(map[uint64]bool)
@@ -28,16 +26,14 @@ func CheckFinger(finger string, url string, contentType string, respBody []byte,
 	return ""
 }
 
-func DirBrute(baseUrl string) []string {
+func DirBrute(baseUrl string, dirlist []string) []string {
 	result := []string{}
 	baseURL, err := url.Parse(formatUrl(baseUrl))
 	if err != nil {
 		Error("%s", err)
 		return []string{}
 	}
-	tempDirList := common.DirList
-
-	for _, _path := range tempDirList {
+	for _, _path := range dirlist {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, _path)})
 		finger, contentType, respBody, statusCode := FingerScan(fullURL.String())
 		if statusCode == 200 || statusCode == 500 {

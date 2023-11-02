@@ -143,14 +143,15 @@ func uselessUrl(Url string, Depth int) bool {
 func parseDir(fullPath string) []string {
 	// 去除末尾的斜杠
 	dirs := []string{}
+	cnt := 0
 	// 逐级获取目录
 	for {
 		dir, _ := path.Split(fullPath)
 		// 如果已经到达最顶层目录，则退出循环
-		if dir == "/" {
+		if dir == "/" || cnt >= 2 {
 			break
 		}
-
+		cnt += 1
 		// 更新 fullPath 为父目录路径
 		fullPath = strings.TrimSuffix(dir, "/")
 		dirs = append(dirs, dir)
@@ -176,7 +177,7 @@ func isValidUrl(Url string) bool {
 	}
 	ip := net.ParseIP(parsedURL.Hostname())
 	if ip != nil {
-		return ip.IsPrivate()
+		return !ip.IsPrivate()
 	}
 	return true
 }
@@ -195,7 +196,11 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 	ApiResult = removeDuplicatesString(ApiResult)
 	if len(ApiResult) > 0 {
 		fmt.Printf("->[*] [%s] Api Path\n", Url)
-		fmt.Println(strings.Join(ApiResult, "\n"))
+		if len(ApiResult) > 200 {
+			fmt.Println(strings.Join(ApiResult[:200], "\n"))
+		} else {
+			fmt.Println(strings.Join(ApiResult, "\n"))
+		}
 	}
 
 	subdir := []string{}
@@ -216,7 +221,11 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 	subdir = removeDuplicatesString(subdir)
 	if len(subdir) > 0 {
 		fmt.Println("->[*] sub-directory")
-		fmt.Println(strings.Join(subdir, "\n"))
+		if len(subdir) > 200 {
+			fmt.Println(strings.Join(subdir[:200], "\n"))
+		} else {
+			fmt.Println(strings.Join(subdir, "\n"))
+		}
 	}
 	var wg sync.WaitGroup
 	result := []string{}
@@ -224,7 +233,7 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			result = append(result, DirBrute(url)...)
+			result = append(result, DirBrute(url, []string{".git/HEAD", "swagger-resources"})...)
 		}(line)
 	}
 	wg.Wait()
@@ -233,6 +242,7 @@ func parseVueUrl(Url string, RootPath string, doc string) {
 		Success("More at ./%s", filename)
 		os.WriteFile(filename, []byte(strings.Join(result, "\n")), 0644)
 	}
+	SensitiveInfoCollect(Url, doc)
 }
 
 func Spider(RootPath string, Url string, depth int, myMap map[int][]string) error {
