@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"net"
 	"net/url"
 	"path"
 	"strings"
@@ -33,25 +32,11 @@ func DirBrute(baseUrl string) []string {
 	result := []string{}
 	baseURL, err := url.Parse(formatUrl(baseUrl))
 	if err != nil {
-		fmt.Println(err)
+		Error("%s", err)
 		return []string{}
 	}
 	tempDirList := common.DirList
 
-	ip := net.ParseIP(baseURL.Hostname())
-	if ip == nil {
-		// is a domain
-		parts := strings.Split(baseURL.Hostname(), ".")
-		for i := 0; i < len(parts)-1; i++ {
-			for j := i + 1; j <= len(parts); j++ {
-				substr := strings.Join(parts[i:j], ".")
-				tempDirList = append(tempDirList, substr+".tar.gz", substr+".zip")
-			}
-		}
-	} else {
-		// is a ip
-		tempDirList = append(tempDirList, baseURL.Hostname()+".tar.gz", baseURL.Hostname()+".zip")
-	}
 	for _, _path := range tempDirList {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, _path)})
 		finger, contentType, respBody, statusCode := FingerScan(fullURL.String())
