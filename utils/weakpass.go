@@ -48,9 +48,9 @@ func TranslateToEnglish(Name string) (string, string, string, string) {
 		onlyFirst = onlyFirst + string(x[0])
 		firstUpper = firstUpper + strings.Title(x)
 		if idx == 0 {
-			firstComplete = firstComplete + x
+			firstComplete += x
 		} else {
-			firstComplete = firstComplete + string(x[0])
+			firstComplete += string(x[0])
 		}
 	}
 	return onlyFirst, firstComplete, strings.ReplaceAll(str, " ", ""), firstUpper
@@ -109,12 +109,12 @@ func ReplaceWithTable(input string) string {
 		switch char {
 		case 'a':
 			tmp = strings.ReplaceAll(tmp, string(char), "@")
-		case 's':
-			tmp = strings.ReplaceAll(tmp, string(char), "5")
 		case 'o':
 			tmp = strings.ReplaceAll(tmp, string(char), "0")
 		case 'i':
 			tmp = strings.ReplaceAll(tmp, string(char), "1")
+		case 'l':
+			tmp = strings.ReplaceAll(tmp, string(char), "!")
 		}
 	}
 	return tmp
@@ -122,10 +122,10 @@ func ReplaceWithTable(input string) string {
 func generateVariants(input string) []string {
 	variants := []string{}
 	variants = append(variants, strings.ReplaceAll(input, "a", "@"))
-	// variants = append(variants, strings.ReplaceAll(input, "a", "4"))
 	variants = append(variants, strings.ReplaceAll(input, "s", "5"))
 	variants = append(variants, strings.ReplaceAll(input, "o", "0"))
 	variants = append(variants, strings.ReplaceAll(input, "i", "1"))
+	variants = append(variants, strings.ReplaceAll(input, "l", "!"))
 	variants = append(variants, ReplaceWithTable(input))
 	return variants
 }
@@ -155,9 +155,7 @@ func getKeywordList() []string {
 		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
 	fmt.Println(viper.GetString("keyword"))
-	// fmt.Println(len(KeywordList))
 	KeywordList = append(KeywordList, strings.Split(viper.GetString("keyword"), ",")...)
-
 	KeywordList = removeDuplicatesString(KeywordList)
 	return KeywordList
 }
@@ -202,6 +200,7 @@ func processIdentityCard(keyword string) []string {
 	arr = append(arr, keyword[6:10]+lunar)
 	return arr
 }
+
 func outputListFormat(UniqPasswordList []string) {
 	if viper.GetBool("list") {
 		var quotedStrings []string
@@ -215,6 +214,23 @@ func outputListFormat(UniqPasswordList []string) {
 	}
 
 }
+
+func combination(prefixList []string, keywordList []string, sepList []string, suffixList []string) []string {
+	PasswordList := []string{}
+	for _, pre := range prefixList {
+		for _, keyword := range keywordList {
+			for _, sep := range sepList {
+				for _, suffix := range suffixList {
+					for _, sep1 := range sepList {
+						PasswordList = append(PasswordList, pre+keyword+sep+suffix+sep1)
+					}
+				}
+			}
+		}
+	}
+	return PasswordList
+}
+
 func GenerateWeakPassword() []string {
 	var PasswordList = []string{}
 	var KeywordList = getKeywordList()
@@ -235,7 +251,6 @@ func GenerateWeakPassword() []string {
 		} else if MightBeChineseName(keyword) {
 			onlyFirst, firstComplete, completeName, firstUpper = TranslateToEnglish(keyword)
 			// 也可以作为前后缀
-			// SuffixList = append(SuffixList, completeName)
 			names := []string{onlyFirst, firstComplete, completeName}
 			for _, name := range names {
 				KeywordTmpList = append(KeywordTmpList, name, FirstCharToUpper(name), LastCharToUpper(name), strings.ToUpper(name), HalfCharToUpper(name))
@@ -243,6 +258,10 @@ func GenerateWeakPassword() []string {
 			KeywordTmpList = append(KeywordTmpList, firstUpper)
 			if viper.GetBool("variant") {
 				KeywordTmpList = append(KeywordTmpList, generateVariants(completeName)...)
+				KeywordTmpList = append(KeywordTmpList, generateVariants(onlyFirst+"adm")...)
+				KeywordTmpList = append(KeywordTmpList, generateVariants(onlyFirst+"admin")...)
+				KeywordTmpList = append(KeywordTmpList, generateVariants(FirstCharToUpper(onlyFirst+"adm"))...)
+				KeywordTmpList = append(KeywordTmpList, generateVariants(FirstCharToUpper(onlyFirst+"admin"))...)
 			}
 		} else {
 			KeywordTmpList = append(KeywordTmpList, keyword, FirstCharToUpper(keyword), LastCharToUpper(keyword), strings.ToUpper(keyword))
@@ -251,16 +270,9 @@ func GenerateWeakPassword() []string {
 			}
 		}
 	}
-	for _, pre := range PrefixList {
-		for _, keyword := range KeywordTmpList {
-			for _, sep := range SepList {
-				for _, suffix := range SuffixList {
-					PasswordList = append(PasswordList, pre+keyword+sep+suffix)
-				}
-			}
-		}
-	}
+	// sep keyword sep suffix sep
 
+	PasswordList = append(PasswordList, combination(PrefixList, KeywordTmpList, SepList, SuffixList)...)
 	if idcard != "" && completeName != "" {
 		arr := []string{onlyFirst, firstComplete, completeName, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst), FirstCharToUpper(firstComplete), LastCharToUpper(completeName), strings.ToUpper(completeName)}
 		for _, k := range arr {

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/fatih/color"
+	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/gosuri/uiprogress"
 	"github.com/spf13/cobra"
@@ -59,7 +60,7 @@ func (o *DirbruteOptions) run() {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			result = append(result, utils.DirBrute(url)...)
+			result = append(result, utils.DirBrute(url, common.DirList)...)
 			bar.Incr()
 		}(line)
 	}

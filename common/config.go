@@ -81,23 +81,19 @@ var PrefixTop = []string{
 }
 
 var SeparatorTop = []string{
+	"!",
 	"@",
 	"#",
 	"$",
-	"_",
-	"!",
-	".",
-	"/",
+	"%",
+	"^",
 	"&",
+	"_",
+	".",
 	"+",
 }
 
 var KeywordTop = []string{
-	"password",
-	"pass",
-	"root",
-	"server",
-	"qwer",
 	"admin",
 }
 
