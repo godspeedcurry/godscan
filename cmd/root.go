@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -45,7 +43,7 @@ var rootCmd = &cobra.Command{
 	Use:   "godscan",
 	Short: Banner() + "Let's fight against the world.",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("godscan: try '-h' for more information")
+		cmd.Help()
 	},
 }
 
