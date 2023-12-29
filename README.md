@@ -45,7 +45,7 @@ source /tmp/x
 ./godscan weakpass -k "干饭,干饭集团,干饭有限公司"
 
 # 自定义后缀
-./godscan weakpass -k "张三,110101199003070759,18288888888" -suffix '123,qwe,123456'
+./godscan weakpass -k "张三,110101199003070759,18288888888" --suffix '123,qwe,123456'
 
 # 查看工具默认的后缀
 ./godscan weakpass --show

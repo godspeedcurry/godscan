@@ -453,5 +453,4 @@ func PrintFinger(Url string, Depth int) {
 		myList = append(myList, item.(string))
 	}
 	FileWrite(filename, strings.Join(myList, "\n")+"\n")
-
 }
