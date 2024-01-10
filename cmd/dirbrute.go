@@ -10,7 +10,6 @@ import (
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/gosuri/uiprogress"
-	"github.com/spf13/cobra"
 )
 
 type DirbruteOptions struct {
@@ -21,18 +20,6 @@ var (
 	result          []string
 	targetUrlList   []string
 )
-
-var dirbruteCmd = &cobra.Command{
-	Use:   "dirbrute",
-	Short: "dirbrute on sensitive file",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := dirbruteOptions.validateOptions(); err != nil {
-			fmt.Println("Try 'dirbrute -h' for more information")
-			return
-		}
-		dirbruteOptions.run()
-	},
-}
 
 func (o *DirbruteOptions) validateOptions() error {
 	if GlobalOption.Url == "" && GlobalOption.UrlFile == "" {
@@ -71,5 +58,6 @@ func (o *DirbruteOptions) run() {
 }
 
 func init() {
+	dirbruteCmd := newCommandWithAliases("dirbrute", "dirbrute on sensitive file", []string{"dir"}, &dirbruteOptions)
 	rootCmd.AddCommand(dirbruteCmd)
 }

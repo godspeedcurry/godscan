@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/godspeedcurry/godscan/utils"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -21,20 +20,9 @@ var (
 	spiderOptions SpiderOptions
 )
 
-// spiderCmd represents the spider command
-var spiderCmd = &cobra.Command{
-	Use:   "spider",
-	Short: "analyze website using DFS",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := spiderOptions.validateOptions(); err != nil {
-			fmt.Println("Try 'spider --url www.baidu.com")
-			return
-		}
-		spiderOptions.run()
-	},
-}
-
 func init() {
+
+	spiderCmd := newCommandWithAliases("spider", "analyze website using DFS, quick usage: -u", []string{"sp"}, &spiderOptions)
 	rootCmd.AddCommand(spiderCmd)
 	spiderCmd.PersistentFlags().IntVarP(&spiderOptions.Depth, "depth", "d", 1, "your search depth, default 1")
 	spiderCmd.PersistentFlags().StringVarP(&spiderOptions.ApiPrefix, "api", "", "", "your api prefix")
@@ -61,7 +49,7 @@ func (o *SpiderOptions) run() {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			utils.PrintFinger(url, spiderOptions.Depth)
+			utils.PrintFinger(url, o.Depth)
 		}(line)
 	}
 	wg.Wait()

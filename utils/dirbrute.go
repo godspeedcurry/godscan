@@ -35,7 +35,7 @@ func DirBrute(baseUrl string, dirlist []string) []string {
 	}
 	for _, _path := range dirlist {
 		fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, _path)})
-		finger, contentType, respBody, statusCode := FingerScan(fullURL.String())
+		finger, _, contentType, respBody, statusCode := FingerScan(fullURL.String())
 		if statusCode == 200 || statusCode == 500 {
 			ret := CheckFinger(finger, fullURL.String(), contentType, respBody, statusCode)
 			if ret != "" {

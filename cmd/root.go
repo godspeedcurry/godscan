@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -45,6 +49,27 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
+}
+
+type CommandOptions interface {
+	validateOptions() error
+	run()
+}
+
+func newCommandWithAliases(use, shortDesc string, aliases []string, opts CommandOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:     use,
+		Short:   fmt.Sprintf("%s (Aliases: %s)", shortDesc, strings.Join(aliases, ", ")),
+		Aliases: aliases,
+		Run: func(cmd *cobra.Command, args []string) {
+			if err := opts.validateOptions(); err != nil {
+				cmd.Help()
+				os.Exit(0)
+			}
+			opts.run()
+
+		},
+	}
 }
 
 func Execute() {

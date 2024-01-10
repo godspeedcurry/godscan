@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/godspeedcurry/godscan/utils"
-	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
@@ -26,18 +25,6 @@ var (
 	weakPassOptions WeakPassOptions
 )
 
-var weakpassCmd = &cobra.Command{
-	Use:   "weakpass",
-	Short: "generate weakpass word",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := weakPassOptions.validateOptions(); err != nil {
-			fmt.Println("Try 'weakpass -k \"baidu\"'")
-			return
-		}
-		weakPassOptions.run()
-	},
-}
-
 func (o *WeakPassOptions) validateOptions() error {
 	if weakPassOptions.Keywords == "" && weakPassOptions.Show == false {
 		return fmt.Errorf("please give keywords")
@@ -45,6 +32,7 @@ func (o *WeakPassOptions) validateOptions() error {
 	return nil
 }
 func init() {
+	weakpassCmd := newCommandWithAliases("weakpass", "Start the application", []string{"weak", "wp"}, &weakPassOptions)
 	rootCmd.AddCommand(weakpassCmd)
 
 	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Keywords, "keyword", "k", "", "your keyword list, separate by ','")

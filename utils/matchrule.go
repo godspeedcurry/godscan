@@ -69,21 +69,21 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 	return ""
 }
 
-func FingerScan(url string) (string, string, []byte, int) {
+func FingerScan(url string) (string, string, string, []byte, int) {
 	if !isValidUrl(url) {
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
 	resp, err := Client.Do(req)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 	defer resp.Body.Close()
 	headers := MapToJson(resp.Header)
@@ -93,19 +93,19 @@ func FingerScan(url string) (string, string, []byte, int) {
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 	var cms []string
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 	body := string(bodyBytes)
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return common.NoFinger, "", nil, -1
+		return common.NoFinger, "", "", nil, -1
 	}
 
 	// 查找标题元素并获取内容
@@ -120,9 +120,15 @@ func FingerScan(url string) (string, string, []byte, int) {
 			}
 		}
 	}
+	finger := common.NoFinger
 
 	if len(cms) != 0 {
-		return strings.Join(cms, ","), "", nil, -1
+		finger = strings.Join(cms, ",")
 	}
-	return common.NoFinger, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
+	ServerValue := resp.Header["Server"]
+	retServerValue := ""
+	if len(ServerValue) != 0 {
+		retServerValue = ServerValue[0]
+	}
+	return finger, retServerValue, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
 }
