@@ -110,7 +110,7 @@ func uselessUrl(Url string, Depth int) bool {
 	if Depth == 0 || Url == "" || !isValidUrl(Url) {
 		return false
 	}
-	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue", ".css", ".ico"}
+	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue", ".css", ".ico", ".svg"}
 	for _, ign := range ignore {
 		if strings.Contains(Url, ign) {
 			return true
@@ -421,12 +421,10 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	res, _, _, _ := FingerScan(FirstUrl)
+	res, server, _, _, statusCode := FingerScan(FirstUrl)
 	if res != "" {
-		Info("%s [%s]", Url, res)
+		Info("%s [%s] [%s] [%d]", Url, res, server, statusCode)
 	}
-
-	DisplayHeader(FirstUrl, http.MethodGet)
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
