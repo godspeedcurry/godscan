@@ -108,7 +108,7 @@ func parseHost(input string) string {
 
 func uselessUrl(Url string, Depth int) bool {
 	if Depth == 0 || Url == "" || !isValidUrl(Url) {
-		return false
+		return true
 	}
 	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue", ".css", ".ico", ".svg"}
 	for _, ign := range ignore {
@@ -205,18 +205,18 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		subdir = append(subdir, normalizeUrl)
 	}
 	subdir = removeDuplicatesString(subdir)
-	subdirLen := len(subdir)
-	if subdirLen > 0 {
-		file.WriteString("->[*] sub-directory")
-		if subdirLen > 200 {
-			file.WriteString(strings.Join(subdir[:200], "\n"))
-		} else {
-			file.WriteString(strings.Join(subdir, "\n"))
-		}
-	}
+
+	file.WriteString("->[*] sub-directory")
+	file.WriteString(strings.Join(subdir, "\n"))
+
 	var wg sync.WaitGroup
 	result := []string{}
+	cnt := 0
 	for _, line := range subdir {
+		cnt += 1
+		if cnt >= 50 {
+			continue
+		}
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
@@ -231,7 +231,6 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 }
 
 func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
-
 	if uselessUrl(Url, depth) {
 		return nil
 	}
@@ -292,6 +291,7 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
 			normalizeUrl := Normalize(src, RootPath)
+
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
