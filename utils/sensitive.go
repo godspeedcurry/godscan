@@ -33,6 +33,7 @@ func SecList() string {
 // password === "123"
 // password == "123"
 // password != "123"
+// "123" != password
 
 func calculateEntropy(str string) float64 {
 	charCount := make(map[rune]int)
@@ -87,15 +88,16 @@ func PrintTable(data []SensitiveData) {
 
 func SensitiveInfoCollect(Url string, Content string) {
 	space := `\s{0,5}`
-	quote := "['\"]?"
+	mustQuote := "['\"`]"
+	quote := "['\"`]?"
 	content := `([\w\+\_\-\/\=\$\!]{2,100})`
 	equals := `[=!:]{1,3}`
 	sec := SecList()
 	infoMap := map[string]string{
 		"Chinese Mobile Number": `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`,
 		"Internal IP Address":   `[^0-9]((127\.0\.0\.1)|(10\.\d{1,3}\.\d{1,3}\.\d{1,3})|(172\.((1[6-9])|(2\d)|(3[01]))\.\d{1,3}\.\d{1,3})|(192\.168\.\d{1,3}\.\d{1,3}))`,
-		"security-rule-0":       `(?i)` + `(` + quote + sec + quote + space + equals + space + quote + content + quote + `)`,
-		"security-rule-1":       `(?i)` + `(` + quote + content + quote + space + equals + space + quote + sec + quote + `)`,
+		"security-rule-0":       `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`,
+		"security-rule-1":       `(?i)` + `(` + mustQuote + content + mustQuote + space + equals + space + quote + sec + quote + `)`,
 	}
 
 	for key := range infoMap {
@@ -114,10 +116,10 @@ func SensitiveInfoCollect(Url string, Content string) {
 			}
 			otherDta = removeDuplicatesString(otherDta)
 			if len(otherDta) > 0 {
-				Success("->[*] [%s] [%s]\n%s", Url, key, strings.Join(otherDta, "\n"))
+				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherDta, "\n"))
 			}
 			if len(secData) > 0 {
-				Success("->[*] [%s] [%s]", Url, key)
+				Success("[%s] [%s]", Url, key)
 				PrintTable(DeduplicateByContent(secData))
 			}
 		}
