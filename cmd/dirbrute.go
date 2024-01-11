@@ -58,6 +58,6 @@ func (o *DirbruteOptions) run() {
 }
 
 func init() {
-	dirbruteCmd := newCommandWithAliases("dirbrute", "dirbrute on sensitive file", []string{"dir"}, &dirbruteOptions)
+	dirbruteCmd := newCommandWithAliases("dirbrute", "Dirbrute on sensitive file", []string{"dir", "dirb", "dd"}, &dirbruteOptions)
 	rootCmd.AddCommand(dirbruteCmd)
 }

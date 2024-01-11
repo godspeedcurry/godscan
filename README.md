@@ -12,8 +12,37 @@
   	<img src="https://img.shields.io/github/downloads/godspeedcurry/godscan/total">
   </a>
 </p>
-
 ## Usage
+
+### 主要命令
+
+```
+Usage:
+  godscan [flags]
+  godscan [command]
+
+Available Commands:
+  completion  Generate the autocompletion script for the specified shell
+  dirbrute    Dirbrute on sensitive file (Aliases: dir, dirb, dd)
+  help        Help about any command
+  icon        Calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico (Aliases: ico)
+  spider      analyze website using DFS, quick usage: -u (Aliases: sp, ss)
+  weakpass    Start the application (Aliases: weak, wp, wk, ww)
+
+Flags:
+  -h, --help               help for godscan
+      --host string        singel host
+      --host-file string   host file
+  -v, --loglevel int       level of your log (default 2)
+  -o, --output string      output file to write log and results (default "result.txt")
+      --proxy string       proxy
+      --ua string          set user agent (default "user agent")
+  -u, --url string         singel url
+      --url-file string    url file
+```
+
+
+
 ### 命令自动补全
 ```
 ./godscan completion zsh > /tmp/x
@@ -37,7 +66,7 @@ source /tmp/x
 ./godscan icon -u http://www.example.com/ico.ico
 ```
 
-### 弱口令生成、离线爆破
+### 弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
 会自动识别身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
 ```bash
 ./godscan weakpass -k "张三,110101199003070759,18288888888"
@@ -56,14 +85,14 @@ source /tmp/x
 ./godscan weakpass -k '百度,baidu.com,password,pass,root,server,qwer,admin' --prefix '@,!,",123' --suffix '!,1234,123,321' --sep '_,!,.,/,&,+' > 1.txt
 
 # -l 获取python格式的list 如["11","222"]
-# mac下拷贝至剪贴板，其余系统可自行探索哈
+# mac下拷贝至剪贴板，其余系统可自行探索
 ./godscan weakpass -k "张三,110101199003070759,18288888888" | pbcopy
 ```
 
 ### 爬虫递归探测URL、指纹和敏感信息
 ```bash
 ./godscan weakpass -u 'http://www.exmaple.com' 
-# -d 1 可以指定爬虫的深度
+# -d 1 可以指定爬虫的深度 默认为2
 ```
 
 
@@ -95,7 +124,7 @@ source /tmp/x
   - [x] 新增可直接根据图标地址计算hash的功能
 
 ### 功能二：弱口令生成器
-- [x] 在fscan的基础上新增从若干个报告中获取到的弱口令
+- [x] 在fscan的基础上新增从实际渗透测试中获取到的弱口令
 - [x] 根据给定的keyword list 生成 逗号分隔
 
 
@@ -107,13 +136,9 @@ source /tmp/x
 
 
 ## 功能三：敏感信息搜集
-* https://gh0st.cn/HaE/
+参考： https://gh0st.cn/HaE/
 这里面有很多现成的规则 挑了一下重点
-- [x] JSON-WEB-Token
 - [x] 国内手机号
-- [x] 邮箱
-- [x] hmtl注释
-- [x] ueditor swagger 等
 - [x] OSS accessKey accessId
 - [x] link 识别  
 
@@ -129,22 +154,12 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o g
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o godscan_darwin_arm64
 ```
 
-## 更新说明
-* 2023-09-13 新增js中提取api路径的功能
-* 2023-08-11 新增目录单线程爆破的功能，并会根据域名爆破一些备份文件
-* 2023-07-03 新增直接对icon计算hash的功能
-* 2023-07-02 新增批量url关键路径扫描的功能
-* 2022-08-01 新增部分真实场景中得到的弱口令 新增弱口令后缀，如123,qwe等，丰富生成后的弱口令
-* 2022-07-04 修复没有子路径的bug, 移除packr 改用原生的embed库进行静态资源的打包
-* 2022-06-10 更新了正则 对输出的表格进行了优化
-* 2022-06-09 修复了大小写导致不高亮的问题
-* 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
 
 ## 功能截图
 * icon_hash计算、关键字识别
 ![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.jpg)
 
-* cms高亮
+* 弱口令生成
 ![image](https://github.com/godspeedcurry/godscan/blob/main/images/img2.png)
 
 * 敏感信息识别
@@ -157,12 +172,28 @@ git tag -a v1.xx
 git push -u origin v1.xx
 # delete
 git tag -d v1.xx
-git push origin :refs/tags/v1.1.10
+git push origin :refs/tags/v1.xx
 ```
 
----
-## 未来目标
 
-### 端口扫描+协议识别 TODO
-* https://github.com/4dogs-cn/TXPortMap
-* https://github.com/redtoolskobe/scaninfo
+
+## 更新说明
+
+* 2024-01-11 修改从JS中寻找弱口令的正则，使用熵算法计算密码复杂度,使用表格显示
+* 2023-09-13 新增js中提取api路径的功能
+* 2023-08-11 新增目录单线程爆破的功能，并会根据域名爆破一些备份文件
+* 2023-07-03 新增直接对icon计算hash的功能
+* 2023-07-02 新增批量url关键路径扫描的功能
+* 2022-08-01 新增部分真实场景中得到的弱口令 新增弱口令后缀，如123,qwe等，丰富生成后的弱口令
+* 2022-07-04 修复没有子路径的bug, 移除packr 改用原生的embed库进行静态资源的打包
+* 2022-06-10 更新了正则 对输出的表格进行了优化
+* 2022-06-09 修复了大小写导致不高亮的问题
+* 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
+
+
+
+
+
+## 免责声明
+
+本工具仅面向合法授权的企业安全建设行为，如您需要测试本工具的可用性，请自行搭建靶机环境。 为避免被恶意使用，本项目所有收录的poc均为漏洞的理论判断，不存在漏洞利用过程，不会对目标发起真实攻击和漏洞利用。 在使用本工具进行检测时，您应确保该行为符合当地的法律法规，并且已经取得了足够的授权。请勿对非授权目标进行扫描。 如您在使用本工具的过程中存在任何非法行为，您需自行承担相应后果，我们将不承担任何法律及连带责任。
