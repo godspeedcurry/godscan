@@ -22,7 +22,7 @@ var (
 
 func init() {
 
-	spiderCmd := newCommandWithAliases("spider", "analyze website using DFS, quick usage: -u", []string{"sp"}, &spiderOptions)
+	spiderCmd := newCommandWithAliases("spider", "analyze website using DFS, quick usage: -u", []string{"sp", "ss"}, &spiderOptions)
 	rootCmd.AddCommand(spiderCmd)
 	spiderCmd.PersistentFlags().IntVarP(&spiderOptions.Depth, "depth", "d", 2, "your search depth, default 1")
 	spiderCmd.PersistentFlags().StringVarP(&spiderOptions.ApiPrefix, "api", "", "", "your api prefix")
