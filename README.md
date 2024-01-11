@@ -12,6 +12,7 @@
   	<img src="https://img.shields.io/github/downloads/godspeedcurry/godscan/total">
   </a>
 </p>
+
 ## Usage
 
 ### 主要命令
