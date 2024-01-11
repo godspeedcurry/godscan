@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/godspeedcurry/godscan/utils"
-	"github.com/spf13/cobra"
 )
 
 type IconOptions struct {
@@ -18,19 +17,9 @@ var (
 )
 
 // iconCmd represents the icon command
-var iconCmd = &cobra.Command{
-	Use:   "icon",
-	Short: "calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico",
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := iconOptions.validateOptions(); err != nil {
-			fmt.Println("Try 'icon --url http://example.com/favicon.ico'")
-			return
-		}
-		iconOptions.run()
-	},
-}
 
 func init() {
+	iconCmd := newCommandWithAliases("icon", "Calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico", []string{"ico"}, &iconOptions)
 	rootCmd.AddCommand(iconCmd)
 }
 

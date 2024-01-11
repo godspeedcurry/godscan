@@ -32,7 +32,7 @@ func (o *WeakPassOptions) validateOptions() error {
 	return nil
 }
 func init() {
-	weakpassCmd := newCommandWithAliases("weakpass", "Start the application", []string{"weak", "wp"}, &weakPassOptions)
+	weakpassCmd := newCommandWithAliases("weakpass", "Start the application", []string{"weak", "wp", "wk", "ww"}, &weakPassOptions)
 	rootCmd.AddCommand(weakpassCmd)
 
 	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Keywords, "keyword", "k", "", "your keyword list, separate by ','")
