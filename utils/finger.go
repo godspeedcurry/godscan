@@ -58,6 +58,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 		Error("%s", err)
 		return "", "", "", err
 	}
+
 	title := doc.Find("title").Text()
 	if err != nil {
 		Error("%s", err)
