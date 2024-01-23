@@ -12,6 +12,7 @@ import (
 	"path"
 	"sync"
 
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/viper"
 
 	"net/http"
@@ -210,23 +211,25 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	file.WriteString(strings.Join(subdir, "\n"))
 
 	var wg sync.WaitGroup
-	result := []string{}
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
+
 	cnt := 0
 	for _, line := range subdir {
-		cnt += 1
-		if cnt >= 50 {
-			continue
+		for _, dir := range []string{".git/HEAD", "swagger-resources"} {
+			cnt += 1
+			if cnt >= 50 {
+				continue
+			}
+			wg.Add(1)
+			go func(url string, dir string) {
+				defer wg.Done()
+				table.Append(DirBrute(url, dir))
+			}(line, dir)
 		}
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			result = append(result, DirBrute(url, []string{".git/HEAD", "swagger-resources"})...)
-		}(line)
 	}
 	wg.Wait()
-	if len(result) > 0 {
-		file.WriteString(strings.Join(result, "\n"))
-	}
+	table.Render()
 	SensitiveInfoCollect(Url, doc)
 }
 
@@ -421,9 +424,9 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	res, server, _, _, statusCode := FingerScan(FirstUrl)
+	res, server, title, _, _, statusCode := FingerScan(FirstUrl)
 	if res != "" {
-		Info("%s [%s] [%s] [%d]", Url, res, server, statusCode)
+		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)
 	}
 
 	// 构造404 + POST

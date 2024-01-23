@@ -27,7 +27,7 @@ Available Commands:
   dirbrute    Dirbrute on sensitive file (Aliases: dir, dirb, dd)
   help        Help about any command
   icon        Calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico (Aliases: ico)
-  spider      analyze website using DFS, quick usage: -u (Aliases: sp, ss)
+  spider      Analyze website using DFS, quick usage: -u (Aliases: sp, ss)
   weakpass    Start the application (Aliases: weak, wp, wk, ww)
 
 Flags:
@@ -180,7 +180,7 @@ git push origin :refs/tags/v1.xx
 
 ## 更新说明
 
-* 2024-01-11 修改从JS中寻找弱口令的正则，使用熵算法计算密码复杂度,使用表格显示
+* 2024-01-11 修改从JS中寻找弱口令的正则，使用香农熵算法计算密码复杂度,使用表格显示
 * 2023-09-13 新增js中提取api路径的功能
 * 2023-08-11 新增目录单线程爆破的功能，并会根据域名爆破一些备份文件
 * 2023-07-03 新增直接对icon计算hash的功能
