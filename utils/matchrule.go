@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bytes"
 	_ "embed"
 	"encoding/json"
 	"io"
@@ -69,21 +70,21 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 	return ""
 }
 
-func FingerScan(url string) (string, string, string, []byte, int) {
+func FingerScan(url string) (string, string, string, string, []byte, int) {
 	if !isValidUrl(url) {
-		return common.NoFinger, "", "", nil, -1
+		return common.NoFinger, "", "", "", nil, -1
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", "", nil, -1
+		return common.NoFinger, "", "", "", nil, -1
 	}
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
 	resp, err := Client.Do(req)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", "", nil, -1
+		return common.NoFinger, "", "", "", nil, -1
 	}
 	defer resp.Body.Close()
 	headers := MapToJson(resp.Header)
@@ -93,28 +94,24 @@ func FingerScan(url string) (string, string, string, []byte, int) {
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", "", nil, -1
+		return common.NoFinger, "", "", "", nil, -1
 	}
 	var cms []string
-	bodyBytes, err := io.ReadAll(resp.Body)
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	doc, err := goquery.NewDocumentFromReader(bytes.NewBuffer(bodyBytes))
+
 	if err != nil {
 		Fatal("%s", err)
-		return common.NoFinger, "", "", nil, -1
-	}
-	body := string(bodyBytes)
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return common.NoFinger, "", "", nil, -1
+		return common.NoFinger, "", "", "", nil, -1
 	}
 
 	// 查找标题元素并获取内容
-	title := doc.Find("title").Text()
+	title := strings.TrimSpace(doc.Find("title").Text())
 
 	for _, fp := range config.Fingerprint {
 		matcher, found := methodMatchers[fp.Method]
 		if found {
-			locator := chooseLocator(headers, body, title, fp)
+			locator := chooseLocator(headers, string(bodyBytes), title, fp)
 			if matcher(locator, fp.Keyword) {
 				cms = append(cms, fp.Cms)
 			}
@@ -130,5 +127,5 @@ func FingerScan(url string) (string, string, string, []byte, int) {
 	if len(ServerValue) != 0 {
 		retServerValue = ServerValue[0]
 	}
-	return finger, retServerValue, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
+	return finger, retServerValue, title, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
 }

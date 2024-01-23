@@ -3,13 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
-	"github.com/fatih/color"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
-	"github.com/gosuri/uiprogress"
+	"github.com/olekukonko/tablewriter"
 )
 
 type DirbruteOptions struct {
@@ -40,20 +39,27 @@ func (o *DirbruteOptions) run() {
 	utils.Info("Total: %d url(s)", len(targetUrlList))
 
 	var wg sync.WaitGroup
-	uiprogress.Start()
-	bar := uiprogress.AddBar(len(targetUrlList)).AppendCompleted().PrependElapsed()
+	bar := pb.StartNew(len(targetUrlList) * len(common.DirList))
+
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
 
 	for _, line := range targetUrlList {
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			result = append(result, utils.DirBrute(url, common.DirList)...)
-			bar.Incr()
-		}(line)
+		for _, dir := range common.DirList {
+			wg.Add(1)
+			go func(url string, dir string) {
+				defer wg.Done()
+				ret := utils.DirBrute(url, dir)
+				if len(ret) != 0 {
+					table.Append(ret)
+				}
+				bar.Increment()
+			}(line, dir)
+		}
 	}
 	wg.Wait()
-	uiprogress.Stop()
-	utils.Success(color.GreenString("\n" + strings.Join(result, "\n")))
+	bar.Finish()
+	table.Render()
 
 }
 

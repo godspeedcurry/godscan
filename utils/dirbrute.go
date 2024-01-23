@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"fmt"
 	"net/url"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -17,32 +17,27 @@ func formatUrl(raw string) string {
 	return strings.TrimSpace(raw)
 }
 
-func CheckFinger(finger string, url string, contentType string, respBody []byte, statusCode int) string {
+func CheckFinger(finger string, title string, url string, contentType string, respBody []byte, statusCode int) []string {
 	hash := SimHash(respBody)
 	if !fingerHashMap[hash] {
 		fingerHashMap[hash] = true
-		return fmt.Sprintf("[%d] %d {%s} {%s} %s", statusCode, len(respBody), finger, contentType, url)
+		return []string{url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody))}
 	}
-	return ""
+	return []string{}
 }
 
-func DirBrute(baseUrl string, dirlist []string) []string {
+func DirBrute(baseUrl string, dir string) []string {
 	result := []string{}
 	baseURL, err := url.Parse(formatUrl(baseUrl))
 	if err != nil {
 		Error("%s", err)
 		return []string{}
 	}
-	for _, _path := range dirlist {
-		fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, _path)})
-		finger, _, contentType, respBody, statusCode := FingerScan(fullURL.String())
-		if statusCode == 200 || statusCode == 500 {
-			ret := CheckFinger(finger, fullURL.String(), contentType, respBody, statusCode)
-			if ret != "" {
-				Info(fullURL.String() + " " + ret)
-				result = append(result, ret)
-			}
-		}
+	fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, dir)})
+	finger, _, title, contentType, respBody, statusCode := FingerScan(fullURL.String())
+	if statusCode == 200 || statusCode == 500 {
+		result = CheckFinger(finger, title, fullURL.String(), contentType, respBody, statusCode)
 	}
+
 	return result
 }
