@@ -170,14 +170,12 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		return
 	}
 
-	ApiReg := regexp.MustCompile(`"(?P<path>/[^ ]*?)"`)
+	ApiReg := regexp.MustCompile(`"(?P<path>/[\w/\-_=@\?\:]*?)"`)
+
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
 
 	for _, tmp := range ApiResultTuple {
-		if uselessUrl(tmp[1], 1) {
-			continue
-		}
 		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
 	}
 	ApiResult = removeDuplicatesString(ApiResult)
@@ -185,9 +183,9 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	if ApiResultLen > 0 {
 		file.WriteString("->[*] [" + Url + "] Api Path\n")
 		if ApiResultLen > 200 {
-			file.WriteString(strings.Join(ApiResult[:200], "\n"))
+			file.WriteString(strings.Join(ApiResult[:200], "\n") + "\n")
 		} else {
-			file.WriteString(strings.Join(ApiResult, "\n"))
+			file.WriteString(strings.Join(ApiResult, "\n") + "\n")
 		}
 	}
 
@@ -208,8 +206,8 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	}
 	subdir = removeDuplicatesString(subdir)
 
-	file.WriteString("->[*] sub-directory")
-	file.WriteString(strings.Join(subdir, "\n"))
+	file.WriteString("->[*] sub-directory\n")
+	file.WriteString(strings.Join(subdir, "\n") + "\n")
 
 	var wg sync.WaitGroup
 	table := tablewriter.NewWriter(os.Stdout)
@@ -262,8 +260,8 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 		buf := make([]byte, 4096)
 		for {
 			n, err := resp.Body.Read(buf)
-			if err != nil {
-				Error("%s", err)
+			if err == io.EOF {
+				bufStr += string(buf[:n])
 				break
 			}
 			bufStr += string(buf[:n])
@@ -425,6 +423,7 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
+
 	res, server, title, _, _, statusCode := FingerScan(FirstUrl)
 	if res != "" {
 		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)

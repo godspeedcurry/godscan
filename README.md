@@ -92,11 +92,9 @@ source /tmp/x
 
 ### 爬虫递归探测URL、指纹和敏感信息
 ```bash
-./godscan weakpass -u 'http://www.exmaple.com' 
+./godscan spider -u 'http://www.exmaple.com' 
 # -d 1 可以指定爬虫的深度 默认为2
 ```
-
-
 
 ### 爬取js中的api地址，用于未授权测试
 ```bash
