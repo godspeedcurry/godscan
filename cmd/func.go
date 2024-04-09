@@ -1,6 +1,8 @@
 package cmd
 
-import "github.com/godspeedcurry/godscan/utils"
+import (
+	"github.com/godspeedcurry/godscan/utils"
+)
 
 func GetTargetList() []string {
 	targetUrlList := []string{}

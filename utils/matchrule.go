@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/spf13/viper"
 	"golang.org/x/net/html/charset"
@@ -101,7 +100,11 @@ func FingerScan(url string) (string, string, string, string, []byte, int) {
 	var cms []string
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	_, contentType, _ := charset.DetermineEncoding(bodyBytes, resp.Header.Get("Content-Type"))
-	reader, _ := charset.NewReader(bytes.NewBuffer(bodyBytes), contentType)
+	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), contentType)
+	if err != nil {
+		Fatal("%s", err)
+		return common.NoFinger, "", "", "", nil, -1
+	}
 	doc, err := goquery.NewDocumentFromReader(reader)
 
 	if err != nil {
@@ -124,7 +127,7 @@ func FingerScan(url string) (string, string, string, string, []byte, int) {
 	finger := common.NoFinger
 
 	if len(cms) != 0 {
-		finger = color.GreenString(strings.Join(cms, ","))
+		finger = strings.Join(cms, ",")
 	}
 	ServerValue := resp.Header["Server"]
 	retServerValue := ""
