@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/viper"
@@ -29,6 +30,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/twmb/murmur3"
 )
+
+var sensitiveUrl = make(map[string]bool)
 
 func Mmh3Hash32(raw []byte) string {
 	var h32 hash.Hash32 = murmur3.New32()
@@ -100,14 +103,6 @@ func HighLight(data string, keywords []string, fingers []string, Url string) {
 	}
 }
 
-func parseHost(input string) string {
-	parsedURL, err := url.Parse(input)
-	if err != nil {
-		return ""
-	}
-	return parsedURL.Hostname()
-}
-
 func uselessUrl(Url string, Depth int) bool {
 	if Depth == 0 || Url == "" || !isValidUrl(Url) {
 		return true
@@ -164,7 +159,7 @@ func isValidUrl(Url string) bool {
 }
 
 func parseVueUrl(Url string, RootPath string, doc string, filename string) {
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	file, err := os.OpenFile(filename+".sensi", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		Error("%s", err)
 		return
@@ -210,7 +205,10 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	file.WriteString(strings.Join(subdir, "\n") + "\n")
 
 	var wg sync.WaitGroup
-	table := tablewriter.NewWriter(os.Stdout)
+	multiWriter := io.MultiWriter(os.Stdout, file)
+	table := tablewriter.NewWriter(multiWriter)
+
+	// 创建表格
 	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
 
 	cnt := 0
@@ -223,13 +221,19 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 			wg.Add(1)
 			go func(url string, dir string) {
 				defer wg.Done()
-				table.Append(DirBrute(url, dir))
+				AddDataToTable(table, DirBrute(url, dir))
 			}(line, dir)
 		}
 	}
 	wg.Wait()
-	table.Render()
-	SensitiveInfoCollect(Url, doc)
+	if table.NumLines() >= 1 {
+		table.Render()
+	}
+	if !sensitiveUrl[Url] {
+		sensitiveUrl[Url] = true
+		SensitiveInfoCollect(Url, doc)
+	}
+
 }
 
 func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
@@ -252,8 +256,7 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 		Error("%s", err)
 		return err
 	}
-	filename := host.Hostname() + ".log"
-
+	filename := fmt.Sprintf("%s/%s.log", time.Now().Format("2006-01-02"), host.Hostname())
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
 		bufStr := ""
@@ -279,7 +282,10 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 			Error("%s", err)
 			return err
 		}
-		SensitiveInfoCollect(Url, html)
+		if !sensitiveUrl[Url] {
+			sensitiveUrl[Url] = true
+			SensitiveInfoCollect(Url, html)
+		}
 
 		// a, link 标签
 		doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
@@ -447,7 +453,7 @@ func PrintFinger(Url string, Depth int) {
 		return
 	}
 
-	filename := fmt.Sprintf("%s.log", Host.Hostname())
+	filename := fmt.Sprintf("%s/%s.log", time.Now().Format("2006-01-02"), Host.Hostname())
 	Success("🌲🌲🌲 More info at ./%s", filename)
 	var myList []string
 	for item := range myMap.Iter() {

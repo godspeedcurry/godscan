@@ -1,15 +1,19 @@
 package utils
 
 import (
+	"encoding/csv"
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/mfonda/simhash"
+	"github.com/olekukonko/tablewriter"
 )
 
 const (
@@ -197,11 +201,57 @@ func FilRead(filename string) []string {
 	return removeDuplicatesString(lines)
 }
 
+var fileMutex sync.Mutex
+
 func FileWrite(filename string, format string, args ...interface{}) {
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
+
+	dir := filepath.Dir(filename)
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		Fatal("%s", err)
+		return
+	}
+
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		Fatal("%s", err)
 		return
 	}
 	file.WriteString(fmt.Sprintf(format, args...))
+}
+
+func AddDataToTable(table *tablewriter.Table, data []string) {
+
+	if len(data) > 0 {
+		table.Append(data)
+	}
+}
+
+func WriteToCsv(filename string, data []string) {
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
+	header := []string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"}
+	fileInfo, err := file.Stat()
+	writer := csv.NewWriter(file)
+
+	if err != nil {
+		panic(err)
+	}
+	if fileInfo.Size() == 0 {
+		if err := writer.Write(header); err != nil {
+			panic(err) // 处理写入错误
+		}
+	}
+
+	err = writer.Write(data)
+	if err != nil {
+		panic(err)
+	}
+	writer.Flush()
 }
