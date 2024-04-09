@@ -3,11 +3,13 @@ package utils
 import (
 	"fmt"
 	"html"
+	"io"
 	"math"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -68,12 +70,25 @@ func DeduplicateByContent(data []SensitiveData) []SensitiveData {
 	return uniqueData
 }
 
-func PrintTable(data []SensitiveData) {
+func PrintTable(Url string, key string, data []SensitiveData) {
+	Success("[%s] [%s]", Url, key)
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].Entropy > data[j].Entropy
 	})
 
-	table := tablewriter.NewWriter(os.Stdout)
+	filename := fmt.Sprintf("%s/entropy.log", time.Now().Format("2006-01-02"))
+	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		fmt.Println("Failed to open file:", err)
+		return
+	}
+	defer file.Close()
+
+	FileWrite(filename, "[%s] [%s]\n", Url, key)
+
+	multiWriter := io.MultiWriter(os.Stdout, file)
+	table := tablewriter.NewWriter(multiWriter)
+
 	table.SetHeader([]string{"Content", "Entropy"})
 
 	for _, d := range data {
@@ -119,8 +134,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherDta, "\n"))
 			}
 			if len(secData) > 0 {
-				Success("[%s] [%s]", Url, key)
-				PrintTable(DeduplicateByContent(secData))
+				PrintTable(Url, key, DeduplicateByContent(secData))
 			}
 		}
 	}
