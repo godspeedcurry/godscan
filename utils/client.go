@@ -36,7 +36,7 @@ func InitHttpClient(ThreadsNum int, DownProxy string, Timeout time.Duration) err
 	tr := &http.Transport{
 		DialContext:         dialer.DialContext,
 		MaxConnsPerHost:     5,
-		MaxIdleConns:        0,
+		MaxIdleConns:        ThreadsNum,
 		MaxIdleConnsPerHost: ThreadsNum * 2,
 		IdleConnTimeout:     keepAlive,
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
