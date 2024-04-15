@@ -31,7 +31,7 @@ import (
 	"github.com/twmb/murmur3"
 )
 
-var sensitiveUrl = make(map[string]bool)
+var sensitiveUrl sync.Map
 
 func Mmh3Hash32(raw []byte) string {
 	var h32 hash.Hash32 = murmur3.New32()
@@ -136,7 +136,7 @@ func parseDir(fullPath string) []string {
 }
 
 func isValidUrl(Url string) bool {
-	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com"}
+	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "baidu.com", "cnzz.com", "github.com"}
 	for _, key := range arr {
 		if strings.Contains(Url, key) {
 			return false
@@ -212,8 +212,9 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
 
 	cnt := 0
+
 	for _, line := range subdir {
-		for _, dir := range []string{".git/HEAD", "swagger-resources"} {
+		for _, dir := range []string{".git/config", "swagger-resources", "v2/api-docs"} {
 			cnt += 1
 			if cnt >= 50 {
 				continue
@@ -229,8 +230,8 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	if table.NumLines() >= 1 {
 		table.Render()
 	}
-	if !sensitiveUrl[Url] {
-		sensitiveUrl[Url] = true
+	if _, ok := sensitiveUrl.Load(Url); !ok {
+		sensitiveUrl.Store(Url, true)
 		SensitiveInfoCollect(Url, doc)
 	}
 
@@ -282,8 +283,8 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 			Error("%s", err)
 			return err
 		}
-		if !sensitiveUrl[Url] {
-			sensitiveUrl[Url] = true
+		if _, ok := sensitiveUrl.Load(Url); !ok {
+			sensitiveUrl.Store(Url, true)
 			SensitiveInfoCollect(Url, html)
 		}
 

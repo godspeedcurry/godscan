@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -76,7 +75,7 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 		return data[i].Entropy > data[j].Entropy
 	})
 
-	filename := fmt.Sprintf("%s/entropy.log", time.Now().Format("2006-01-02"))
+	filename := "entropy.log"
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		fmt.Println("Failed to open file:", err)
@@ -98,7 +97,6 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 	if table.NumLines() >= 1 {
 		table.Render()
 	}
-
 }
 
 func SensitiveInfoCollect(Url string, Content string) {
@@ -106,32 +104,37 @@ func SensitiveInfoCollect(Url string, Content string) {
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
 	content := `([\w\+\_\-\/\=\$\!]{2,100})`
-	equals := `[=!:]{1,3}`
+	// x := '123456', x = '123456', x == '123456' x === '123456'  x !== '123456' x != '123456'
+	equals := `(:=|=|==|===|!==|!=|:)`
+	// '123456' == x '123456' === x  '123456' !== x  '123456' != x
+	equalss := `(==|===|!==|!=)`
 	sec := SecList()
 	infoMap := map[string]string{
 		"Chinese Mobile Number": `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`,
-		"Internal IP Address":   `[^0-9]((127\.0\.0\.1)|(10\.\d{1,3}\.\d{1,3}\.\d{1,3})|(172\.((1[6-9])|(2\d)|(3[01]))\.\d{1,3}\.\d{1,3})|(192\.168\.\d{1,3}\.\d{1,3}))`,
-		"security-rule-0":       `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`,
-		"security-rule-1":       `(?i)` + `(` + mustQuote + content + mustQuote + space + equals + space + quote + sec + quote + `)`,
+		"Internal IP Address":   `[^0-9]((127\.0\.0\.1)|(10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`,
+		// 内容在右边
+		"security-rule-0": `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`,
+		// 内容在左边
+		"security-rule-1": `(?i)` + `(` + mustQuote + content + mustQuote + space + equalss + space + quote + sec + quote + `)`,
 	}
 
 	for key := range infoMap {
 		reg := regexp.MustCompile(infoMap[key])
 		res := reg.FindAllStringSubmatch(html.UnescapeString(Content), -1)
 		secData := []SensitiveData{}
-		otherDta := []string{}
+		otherData := []string{}
 		if len(res) > 0 {
 			for _, tmp := range res {
-				if len(tmp) >= 3 {
-					entropy := calculateEntropy(tmp[2])
+				if len(tmp) >= 4 {
+					entropy := calculateEntropy(tmp[3])
 					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
 				} else {
-					otherDta = append(otherDta, tmp[1])
+					otherData = append(otherData, tmp[1])
 				}
 			}
-			otherDta = removeDuplicatesString(otherDta)
-			if len(otherDta) > 0 {
-				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherDta, "\n"))
+			otherData = removeDuplicatesString(otherData)
+			if len(otherData) > 0 {
+				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			}
 			if len(secData) > 0 {
 				PrintTable(Url, key, DeduplicateByContent(secData))

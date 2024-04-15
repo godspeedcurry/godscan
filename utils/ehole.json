@@ -60260,19 +60260,11 @@
             ]
         },
         {
-            "cms": "Docker_Daemon",
+            "cms": "swagger",
             "method": "keyword",
-            "location": "header",
+            "location": "body",
             "keyword": [
-                "Content-Length:19"
-            ]
-        },
-        {
-            "cms": "Docker_Daemon",
-            "method": "keyword",
-            "location": "header",
-            "keyword": [
-                "text/plain"
+                "swagger", "description"
             ]
         },
         {
@@ -83675,6 +83667,22 @@
                 "Jumpserver堡垒机"
             ]
         },
+		{
+            "cms": "Jumpserver堡垒机",
+            "method": "keyword",
+            "location": "header",
+            "keyword": [
+                "Jumpserver堡垒机"
+            ]
+        },
+		{
+            "cms": "Jumpserver堡垒机",
+            "method": "keyword",
+            "location": "header",
+            "keyword": [
+                "/static/css/jumpserver.css"
+            ]
+        },
         {
             "cms": "DM建站系统",
             "method": "keyword",
@@ -87537,6 +87545,14 @@
             "location": "body",
             "keyword": [
                 "We're sorry but doesn't work properly without JavaScript enabled. Please enable it to continue"
+            ]
+        },
+		{
+            "cms": "swagger",
+            "method": "keyword",
+            "location": "body",
+            "keyword": [
+                "swaggerVersion"
             ]
         }
     ]

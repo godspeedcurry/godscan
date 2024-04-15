@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"github.com/godspeedcurry/godscan/common"
 )
 
 var fingerHashMap = make(map[uint64]bool)
@@ -44,10 +45,13 @@ func DirBrute(baseUrl string, dir string) []string {
 	}
 	if len(result) > 0 {
 		WriteToCsv("dirbrute.csv", result)
+		Success("🌲🌲🌲 Log at ./dirbrute.csv")
 	}
 
 	if len(result) > 0 {
-		result[2] = color.GreenString(result[2])
+		if result[2] != common.NoFinger {
+			result[2] = color.GreenString(result[2])
+		}
 	}
 	return result
 }
