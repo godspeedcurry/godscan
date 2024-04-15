@@ -22,17 +22,23 @@ func get_current_time() string {
 	return time.Now().Format("15:04:05")
 }
 
-func log_print(level int, detail string) {
+func log_record(level int, detail string) {
 	if level > viper.GetInt("loglevel") {
 		return
 	}
 	FileWrite("result.log", detail+"\n")
+}
+
+func log_print(level int, detail string) {
+	if level > viper.GetInt("loglevel") {
+		return
+	}
 	fmt.Println(detail)
 }
 
 func LogBeautify(x string, colorAttr color.Attribute, y string, level int) {
 	log_print(level, fmt.Sprintf("[%s] [%s] %s", get_current_time(), color.New(colorAttr).Sprintf("%s", x), y))
-
+	log_record(level, fmt.Sprintf("[%s] [%s] %s", get_current_time(), x, y))
 }
 
 func Debug(format string, args ...interface{}) {
