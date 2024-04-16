@@ -1,17 +1,34 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/fatih/color"
+	"github.com/google/go-github/v57/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var version = "v1.1.16"
 
+func checkForUpdate(currentVersion string) {
+	ctx := context.Background()
+	client := github.NewClient(nil)
+	release, _, err := client.Repositories.GetLatestRelease(ctx, "godspeedcurry", "godscan")
+	if err != nil {
+		fmt.Println("Error checking for updates:", err)
+		return
+	}
+
+	if release.TagName != nil && *release.TagName != currentVersion {
+		fmt.Println(color.RedString("Update available: %s. Please download the latest version from %s", *release.TagName, *release.HTMLURL))
+	}
+}
 func Banner() string {
+	checkForUpdate(version)
 	banner := `
 ██████╗   ██████╗ ██████╗ ███████╗ ██████╗ █████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗████╗  ██║
