@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/godspeedcurry/godscan/common"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/viper"
 
@@ -99,7 +100,7 @@ func HighLight(data string, keywords []string, fingers []string, Url string) {
 		}
 	}
 	if output {
-		fmt.Println(Url + "\n" + data + "\n")
+		fmt.Println(Url + "\n" + data)
 	}
 }
 
@@ -107,7 +108,7 @@ func uselessUrl(Url string, Depth int) bool {
 	if Depth == 0 || Url == "" || !isValidUrl(Url) {
 		return true
 	}
-	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", "chunk-vendors", ".vue", ".css", ".ico", ".svg"}
+	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", ".vue", ".css", ".ico", ".svg"}
 	for _, ign := range ignore {
 		if strings.Contains(Url, ign) {
 			return true
@@ -116,21 +117,21 @@ func uselessUrl(Url string, Depth int) bool {
 	return false
 }
 
-func parseDir(fullPath string) []string {
-	// 去除末尾的斜杠
+func parseDir(fullPath string, MaxDepth int) []string {
+	// 去除末尾的斜杠, 最多两层
 	dirs := []string{}
-	cnt := 0
 	// 逐级获取目录
 	for {
 		dir, _ := path.Split(fullPath)
 		// 如果已经到达最顶层目录，则退出循环
-		if dir == "/" || cnt >= 2 {
+		if dir == "/" {
 			break
 		}
-		cnt += 1
 		// 更新 fullPath 为父目录路径
 		fullPath = strings.TrimSuffix(dir, "/")
-		dirs = append(dirs, dir)
+		if strings.Count(dir, "/") <= (MaxDepth + 1) {
+			dirs = append(dirs, dir)
+		}
 	}
 	return dirs
 }
@@ -165,7 +166,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		return
 	}
 
-	ApiReg := regexp.MustCompile(`"(?P<path>/[\w/\-_=@\?\:]*?)"`)
+	ApiReg := regexp.MustCompile(`"(?P<path>/[\w/\-_=@\?\:]+?)"`)
 
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
@@ -177,10 +178,24 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	ApiResultLen := len(ApiResult)
 	if ApiResultLen > 0 {
 		file.WriteString("->[*] [" + Url + "] Api Path\n")
-		if ApiResultLen > 200 {
-			file.WriteString(strings.Join(ApiResult[:200], "\n") + "\n")
+		Success("->[*] [" + Url + "] Api Path")
+		if ApiResultLen > 50 {
+			var tmpResult1 = strings.Join(ApiResult[:50], "\n")
+			Success(tmpResult1)
+			file.WriteString(tmpResult1 + "\n")
 		} else {
-			file.WriteString(strings.Join(ApiResult, "\n") + "\n")
+			var tmpResult2 = strings.Join(ApiResult, "\n")
+			for _, key := range common.ImportantApi {
+				if strings.Contains(tmpResult2, key) {
+					Fatal("Import Api found " + key)
+					if key == "/api/blade-user" {
+						Fatal("Might related to SpringBlade CVE-2021-44910")
+						FileWrite("cve.log", "[%s] Might related to SpringBlade CVE-2021-44910", Url)
+					}
+				}
+			}
+			Success(tmpResult2)
+			file.WriteString(tmpResult2 + "\n")
 		}
 	}
 
@@ -188,7 +203,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	matches := []string{}
 
 	for _, apiPath := range ApiResult {
-		matches = append(matches, parseDir(apiPath)...)
+		matches = append(matches, parseDir(apiPath, 2)...)
 	}
 
 	matches = removeDuplicatesString(matches)
@@ -214,7 +229,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	cnt := 0
 
 	for _, line := range subdir {
-		for _, dir := range []string{".git/config", "swagger-resources", "v2/api-docs"} {
+		for _, dir := range []string{".git/config", "swagger-resources", "v2/api-docs", ""} {
 			cnt += 1
 			if cnt >= 50 {
 				continue
