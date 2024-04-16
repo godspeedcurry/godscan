@@ -49,58 +49,68 @@ Flags:
 ./godscan completion zsh > /tmp/x
 source /tmp/x
 ```
-### 目录扫描
+### 基础功能一：目录扫描
+#### 单一目录扫描
+* `dirbrute`可简写为`dir`,`dirb`,`dd`
 ```bash
-./godscan dirbrute -u http://www.example.com
+./godscan dirbrute --url http://www.example.com
 ```
-1. 目录扫描数量较少，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
-2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜
+1. 目录扫描数量较少，约50个，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
+2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜(删掉了，实际出现的太少)
 3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
 
-### 批量目录扫描+指纹识别(协程)
+#### 批量目录扫描+指纹识别(基于golang协程)
 ```bash
 ./godscan dirbrute --url-file url.txt
 ```
 
-### 根据图标地址计算图标hash
+### 基础功能二：根据图标地址计算图标hash
+* 该hash为fofa的hash
 ```bash
-./godscan icon -u http://www.example.com/ico.ico
+./godscan icon --url http://www.example.com/ico.ico
 ```
 
-### 弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
-会自动识别身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
+### 增强功能一：弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
+* 数量级较大，在百万甚至千万级别
+* 会自动输入的身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
+* `weakpass`可简写为`weak`, `wp`, `wk`, `ww`
 ```bash
 ./godscan weakpass -k "张三,110101199003070759,18288888888"
 # 中文会被转成英文，以一定格式生成弱口令，如干饭集团，需要自己去找一下他在网站中经常提到的一些叫法
 ./godscan weakpass -k "干饭,干饭集团,干饭有限公司"
 
+# 自定义前缀
+./godscan weakpass -k "张三,110101199003070759,18288888888" --prefix '_'
+
+# 自动以分隔符
+./godscan weakpass -k "张三,110101199003070759,18288888888" --sep '@,_'
+
 # 自定义后缀
 ./godscan weakpass -k "张三,110101199003070759,18288888888" --suffix '123,qwe,123456'
 
+# 连起来
+./godscan weakpass -k '百度,baidu.com,password,pass,root,server,qwer,admin' --prefix '@,!,",123' --suffix '!,1234,123,321' --sep '_,!,.,/,&,+' > 1.txt
+
+
 # 查看工具默认的后缀
 ./godscan weakpass --show
-# 更为复杂的前后缀，适合本地跑hashcat,本方法还会对字符串作变异，如o->0,i->1,a->4等等
+# 更为复杂的前后缀，适合本地跑hashcat爆破,本方法还会对字符串作变异，如o->0,i->1,a->4等等
 ./godscan weakpass -k '百度' --full > 1.txt  
-
-# 自定义后缀
-./godscan weakpass -k '百度,baidu.com,password,pass,root,server,qwer,admin' --prefix '@,!,",123' --suffix '!,1234,123,321' --sep '_,!,.,/,&,+' > 1.txt
 
 # -l 获取python格式的list 如["11","222"]
 # mac下拷贝至剪贴板，其余系统可自行探索
 ./godscan weakpass -k "张三,110101199003070759,18288888888" | pbcopy
 ```
 
-### 爬虫递归探测URL、指纹和敏感信息
-```bash
-./godscan spider -u 'http://www.exmaple.com' 
-# -d 1 可以指定爬虫的深度 默认为2
-```
 
-### 爬取js中的api地址，用于未授权测试
+### 增强功能二：使用爬虫，爬取各类地址并尝试获取重要信息 ⭐️⭐️⭐️⭐️
+* 目前会寻找url地址、密码、各类token
+* `spider`命令可简写为`sp`、`ss`
 ```bash
-./godscan spider -u http://example.com -d 2
-# 假如知道前缀，可以得到一些路径，便于burp中爆破，这些路径可能需要GET、POST等类型去做测试 
-./godscan spider -u http://example.com -d 2 --api "/api/v1"
+./godscan spider --url http://example.com
+# -d 1 可以指定爬虫的深度 默认为2
+# 从文件批量爬取
+./godscan spider --url-file url.txt
 ```
 
 
@@ -156,7 +166,7 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 
 ## 功能截图
 * icon_hash计算、关键字识别
-![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.jpg)
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.png)
 
 * 弱口令生成
 ![image](https://github.com/godspeedcurry/godscan/blob/main/images/img2.png)
@@ -164,11 +174,14 @@ CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o g
 * 敏感信息识别
 ![image](https://github.com/godspeedcurry/godscan/blob/main/images/img3.png)
 
+
 ## 开发
 ```
+# develop && auto release
 git add . && git commit -m "fix bug" && git push -u origin main
 git tag -a v1.xx
 git push -u origin v1.xx
+
 # delete
 git tag -d v1.xx
 git push origin :refs/tags/v1.xx
