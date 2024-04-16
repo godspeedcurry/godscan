@@ -26,7 +26,7 @@ var (
 )
 
 func (o *WeakPassOptions) validateOptions() error {
-	if weakPassOptions.Keywords == "" && weakPassOptions.Show == false {
+	if weakPassOptions.Keywords == "" && !weakPassOptions.Show {
 		return fmt.Errorf("please give keywords")
 	}
 	return nil
