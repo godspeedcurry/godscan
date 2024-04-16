@@ -64,10 +64,6 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	}
 
 	title := doc.Find("title").Text()
-	if err != nil {
-		Error("%s", err)
-		return "", "", "", err
-	}
 	ServerValue := resp.Header["Server"]
 	Status := resp.Status
 	retServerValue := ""
@@ -418,7 +414,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 	})
 
 	if faviconURL == "" {
-		return "", errors.New("Favicon URL not found, might used javascript, please find it manually and use `icon -u` to calculate it")
+		return "", errors.New("favicon url not found, might used javascript, please find it manually and use `godscan icon -u` to calculate it")
 	}
 
 	return faviconURL, nil
