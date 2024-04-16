@@ -21,6 +21,8 @@ require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
+	github.com/google/go-github/v57 v57.0.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
