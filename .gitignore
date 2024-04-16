@@ -11,3 +11,4 @@ dist/
 202*/
 *.csv
 *.js
+.DS_Store
