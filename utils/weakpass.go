@@ -154,7 +154,6 @@ func getKeywordList() []string {
 	if viper.GetBool("full") {
 		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
-	fmt.Println(viper.GetString("keyword"))
 	KeywordList = append(KeywordList, strings.Split(viper.GetString("keyword"), ",")...)
 	KeywordList = removeDuplicatesString(KeywordList)
 	return KeywordList
