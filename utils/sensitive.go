@@ -137,8 +137,13 @@ func SensitiveInfoCollect(Url string, Content string) {
 		if len(res) > 0 {
 			for _, tmp := range res {
 				if len(tmp) >= 4 {
-					entropy := calculateEntropy(tmp[3])
-					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
+					if key == "security-rule-0" {
+						entropy := calculateEntropy(tmp[3])
+						secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
+					} else {
+						entropy := calculateEntropy(tmp[2])
+						secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
+					}
 				} else {
 					if !UrlFilter(tmp[1]) {
 						otherData = append(otherData, tmp[1])

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"net/http"
 	"net/url"
 	"path"
 	"strconv"
@@ -39,7 +40,7 @@ func DirBrute(baseUrl string, dir string) []string {
 		return []string{}
 	}
 	fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, dir)})
-	finger, _, title, contentType, respBody, statusCode := FingerScan(fullURL.String())
+	finger, _, title, contentType, respBody, statusCode := FingerScan(fullURL.String(), http.MethodGet)
 	if statusCode == 200 || statusCode == 500 {
 		result = CheckFinger(finger, title, fullURL.String(), contentType, respBody, statusCode)
 	}
