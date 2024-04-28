@@ -69,7 +69,7 @@ var SuffixTop = []string{
 	"98", "9876", "98765", "987654", "369", "147258",
 	"admin", "adminn",
 	"12345+",
-	"12#$", "WSX", "QAZ", "EDC",
+	"12#$", "123!@#", "WSX", "QAZ", "EDC",
 	"2wsx", "1qaz", "3edc", "1q2w3e4r", "qwert",
 	"#@!", "!@#$", "!@#",
 	"ABC", "abc", "qwer",
@@ -80,8 +80,9 @@ var SuffixTop = []string{
 var PrefixTop = []string{
 	"@",
 	"!",
-	"123",
 	"_",
+	"$",
+	"`",
 }
 
 var SeparatorTop = []string{

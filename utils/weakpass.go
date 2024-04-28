@@ -220,9 +220,7 @@ func combination(prefixList []string, keywordList []string, sepList []string, su
 		for _, keyword := range keywordList {
 			for _, sep := range sepList {
 				for _, suffix := range suffixList {
-					for _, sep1 := range sepList {
-						PasswordList = append(PasswordList, pre+keyword+sep+suffix+sep1)
-					}
+					PasswordList = append(PasswordList, pre+keyword+sep+suffix)
 				}
 			}
 		}
