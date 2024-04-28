@@ -129,6 +129,8 @@ source /tmp/x
 - [x] finger.txt来源
   * [Ehole](https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json)
   * [nemasis](https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf)
+  * [chunsou](https://github.com/Funsiooo/chunsou)
+  * [tide](https://github.com/TideSec/TideFinger)
 - [x] 图标哈希
   - [x] 新增可直接根据图标地址计算hash的功能
 

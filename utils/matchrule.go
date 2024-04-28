@@ -71,7 +71,7 @@ func chooseLocator(headers string, body string, title string, fp Fingerprint) st
 	return ""
 }
 
-func FingerScan(url string) (string, string, string, string, []byte, int) {
+func FingerScan(url string, method string) (string, string, string, string, []byte, int) {
 	if !isValidUrl(url) {
 		return common.NoFinger, "", "", "", nil, -1
 	}
