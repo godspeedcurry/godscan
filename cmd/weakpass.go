@@ -5,7 +5,9 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/spf13/viper"
 )
@@ -36,23 +38,23 @@ func init() {
 	rootCmd.AddCommand(weakpassCmd)
 
 	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Keywords, "keyword", "k", "", "your keyword list, separate by ','")
-	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Suffix, "suffix", "", "123,WSX,888,01,1,#", "your suffix list, default: 123,WSX,888 separate by ','")
-	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Separator, "sep", "", "@,#,$", "your separator list, default: @,#,$ separate by ','")
-	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Prefix, "prefix", "", "", "your prefix list, default: null separate by ','")
+	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Suffix, "suffix", "", strings.Join(common.SuffixTop, ","), "your suffix list, separate by ','")
+	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Separator, "sep", "", "@,_", "your separator list, default: @,_ separate by ','")
+	weakpassCmd.PersistentFlags().StringVarP(&weakPassOptions.Prefix, "prefix", "", "!,_", "your prefix list, default: null separate by ','")
 
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Full, "full", "", false, "full mode")
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.ListFormat, "list", "l", false, "python list output")
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Variant, "variant", "", false, "if variant, eg: i -> 1")
-	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Show, "show", "", false, "if show default args")
+	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Show, "show", "", false, "show the entire list")
 
 	viper.BindPFlag("keyword", weakpassCmd.PersistentFlags().Lookup("keyword"))
 	viper.SetDefault("keyword", "")
 
 	viper.BindPFlag("suffix", weakpassCmd.PersistentFlags().Lookup("suffix"))
-	viper.SetDefault("suffix", "123,WSX,888,01,1,#")
+	viper.SetDefault("suffix", strings.Join(common.SuffixTop, ","))
 
 	viper.BindPFlag("sep", weakpassCmd.PersistentFlags().Lookup("sep"))
-	viper.SetDefault("sep", "@,#,$")
+	viper.SetDefault("sep", "@,_")
 
 	viper.BindPFlag("prefix", weakpassCmd.PersistentFlags().Lookup("prefix"))
 	viper.SetDefault("prefix", "")
