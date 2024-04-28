@@ -133,7 +133,7 @@ func parseDir(fullPath string, MaxDepth int) []string {
 }
 
 func isValidUrl(Url string) bool {
-	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "baidu.com", "cnzz.com", "github.com"}
+	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com"}
 	for _, key := range arr {
 		if strings.Contains(Url, key) {
 			return false
@@ -442,14 +442,17 @@ func PrintFinger(Url string, Depth int) {
 	// 首页
 	FirstUrl := RootPath + Host.Path
 
-	res, server, title, _, _, statusCode := FingerScan(FirstUrl)
+	res, server, title, _, _, statusCode := FingerScan(FirstUrl, http.MethodGet)
 	if res != "" {
 		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)
 	}
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	DisplayHeader(SecondUrl, http.MethodPost)
+	res, server, title, _, _, statusCode = FingerScan(SecondUrl, http.MethodPost)
+	if res != "" {
+		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)
+	}
 
 	IconUrl, err := FindFaviconURL(RootPath)
 	if err == nil {
