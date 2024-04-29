@@ -4,10 +4,12 @@ go 1.20
 
 require (
 	github.com/Chain-Zhang/pinyin v0.1.3
+	github.com/Knetic/govaluate v3.0.0+incompatible
 	github.com/Lofanmi/chinese-calendar-golang v0.0.0-20211214151323-ef5cb443e55e
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/cheggaaa/pb/v3 v3.1.4
 	github.com/deckarep/golang-set v1.8.0
+	github.com/dlclark/regexp2 v1.11.0
 	github.com/fatih/color v1.15.0
 	github.com/google/go-github/v57 v57.0.0
 	github.com/mfonda/simhash v0.0.0-20151007195837-79f94a1100d6

@@ -451,7 +451,7 @@ func PrintFinger(Url string, Depth int) {
 	SecondUrl := RootPath + "/xxxxxx"
 	res, server, title, _, _, statusCode = FingerScan(SecondUrl, http.MethodPost)
 	if res != "" {
-		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)
+		Info("%s [%s] [%s] [%s] [%d]", SecondUrl, res, server, title, statusCode)
 	}
 
 	IconUrl, err := FindFaviconURL(RootPath)
