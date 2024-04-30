@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	regexp2 "github.com/dlclark/regexp2"
+
 	"github.com/spf13/viper"
 )
 
@@ -87,17 +89,19 @@ type Match struct {
 	Pattern     string
 	VersionInfo string
 
-	PatternCompiled *regexp.Regexp
+	PatternCompiled *regexp2.Regexp
 }
 
 // 对获取到的 Banner 进行匹配
-func (m *Match) MatchPattern(response []byte) (matched bool) {
+func (m *Match) MatchPattern(response []byte) bool {
 	responseStr := string([]rune(string(response)))
-	foundItems := m.PatternCompiled.FindStringSubmatch(responseStr)
+	foundItems, err := m.PatternCompiled.FindStringMatch(responseStr)
+	if err != nil {
+		return false
+	}
 	// 匹配结果大于 0 表示规则与 response 匹配成功
-	if len(foundItems) > 0 {
-		matched = true
-		return
+	if foundItems != nil && len(foundItems.String()) > 0 {
+		return true
 	}
 	return false
 }
@@ -106,13 +110,16 @@ func (m *Match) ParseVersionInfo(response []byte) Extras {
 	var extras = Extras{}
 
 	responseStr := string([]rune(string(response)))
-	foundItems := m.PatternCompiled.FindStringSubmatch(responseStr)
+	foundItems, err := m.PatternCompiled.FindStringMatch(responseStr)
+	if err != nil {
+		Error("%s", err)
+	}
 
 	versionInfo := m.VersionInfo
-	foundItems = foundItems[1:]
-	for index, value := range foundItems {
+	foundItemsList := foundItems.Groups()[1:]
+	for index, value := range foundItemsList {
 		dollarName := "$" + strconv.Itoa(index+1)
-		versionInfo = strings.Replace(versionInfo, dollarName, value, -1)
+		versionInfo = strings.Replace(versionInfo, dollarName, value.String(), -1)
 	}
 
 	v := versionInfo
@@ -231,7 +238,7 @@ func isStructCode(b []byte) bool {
 }
 
 func isReChar(n int64) bool {
-	reChars := `.*?+{}()^$|\`
+	reChars := `.*?+{}()^$|\[]`
 	for _, char := range reChars {
 		if n == int64(char) {
 			return true
@@ -388,9 +395,9 @@ func (p *Probe) getMatch(data string) (match Match, err error) {
 
 	patternUnescaped, _ := DecodePattern(pattern)
 	patternUnescapedStr := string([]rune(string(patternUnescaped)))
-	patternCompiled, ok := regexp.Compile(patternUnescapedStr)
+	patternCompiled, ok := regexp2.Compile(patternUnescapedStr, regexp2.None)
 	if ok != nil {
-		Error("Parse match data failed, data: %s", data)
+		Error("Parse match data failed, data: %s %s", data, patternUnescapedStr)
 		return match, ok
 	}
 
@@ -413,7 +420,7 @@ func (p *Probe) getSoftMatch(data string) (softMatch Match, err error) {
 	pattern, versionInfo := textSplited[0], strings.Join(textSplited[1:], "")
 	patternUnescaped, _ := DecodePattern(pattern)
 	patternUnescapedStr := string([]rune(string(patternUnescaped)))
-	patternCompiled, ok := regexp.Compile(patternUnescapedStr)
+	patternCompiled, ok := regexp2.Compile(patternUnescapedStr, regexp2.None)
 	if ok != nil {
 		Error("Parse softmatch data failed, data: %s", data)
 		return softMatch, ok
@@ -766,34 +773,33 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 
 			softFound := false
 			var softMatch Match
+			if probe.Matchs != nil {
+				for _, match := range *probe.Matchs {
+					matched := match.MatchPattern(response)
+					if matched && !match.IsSoft {
+						extras := match.ParseVersionInfo(response)
+						result.Service.Target = target
+						result.Service.Details.ProbeName = probe.Name
+						result.Service.Details.ProbeData = probe.Data
+						result.Service.Details.MatchMatched = match.Pattern
 
-			for _, match := range *probe.Matchs {
-				matched := match.MatchPattern(response)
-				if matched && !match.IsSoft {
-					extras := match.ParseVersionInfo(response)
+						result.Service.Protocol = strings.ToLower(probe.Protocol)
+						result.Service.Name = match.Service
 
-					result.Service.Target = target
+						result.Banner = string(response)
+						result.BannerBytes = response
+						result.Service.Extras = extras
 
-					result.Service.Details.ProbeName = probe.Name
-					result.Service.Details.ProbeData = probe.Data
-					result.Service.Details.MatchMatched = match.Pattern
+						result.Timestamp = int32(time.Now().Unix())
 
-					result.Service.Protocol = strings.ToLower(probe.Protocol)
-					result.Service.Name = match.Service
-
-					result.Banner = string(response)
-					result.BannerBytes = response
-					result.Service.Extras = extras
-
-					result.Timestamp = int32(time.Now().Unix())
-
-					return result, nil
-				} else
-				// soft 匹配，记录结果
-				if matched && match.IsSoft && !softFound {
-					Info("Soft matched: %s, pattern: %s", match.Service, match.Pattern)
-					softFound = true
-					softMatch = match
+						return result, nil
+					} else
+					// soft 匹配，记录结果
+					if matched && match.IsSoft && !softFound {
+						Info("Soft matched: %s, pattern: %s", match.Service, match.Pattern)
+						softFound = true
+						softMatch = match
+					}
 				}
 			}
 
