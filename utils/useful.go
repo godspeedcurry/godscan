@@ -130,6 +130,16 @@ func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 			}
 		}
 		return result, nil
+	case []int:
+		result := make([]int, 0, len(originals.([]int)))
+		for _, item := range slice {
+			key := fmt.Sprint(item)
+			if _, ok := temp[key]; !ok {
+				temp[key] = struct{}{}
+				result = append(result, item)
+			}
+		}
+		return result, nil
 	default:
 		err := Errorf("Unknown type: %T", slice)
 		return nil, err
