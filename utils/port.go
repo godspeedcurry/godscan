@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cheggaaa/pb/v3"
+
 	"github.com/malfunkt/iprange"
 )
 
@@ -53,8 +55,8 @@ func parsePorts(portsStr string) ([]int, error) {
 			ports = append(ports, port)
 		}
 	}
-
-	return ports, nil
+	uniquePorts, _ := RemoveDuplicateElement(ports)
+	return uniquePorts.([]int), nil
 }
 
 func ipLessThanOrEqual(a, b net.IP) bool {
@@ -139,11 +141,14 @@ func PortScan(IpRange string, PortRange string) {
 		Error("%s", err)
 		return
 	}
+	// return
 	ports_list, err := parsePorts(PortRange)
 	if err != nil {
 		Error("%s", err)
 		return
 	}
+
+	bar := pb.StartNew(len(ports_list) * len(ips))
 
 	var allOpen []ProtocolInfo
 
@@ -171,6 +176,7 @@ func PortScan(IpRange string, PortRange string) {
 			if resPortInfo.Port > 0 {
 				openSlice = append(openSlice, resPortInfo)
 			}
+			bar.Increment()
 		}
 
 		// 关闭 chan
@@ -181,6 +187,7 @@ func PortScan(IpRange string, PortRange string) {
 		allOpen = append(allOpen, openSlice...)
 
 	}
+	bar.Finish()
 	for _, open := range allOpen {
 		Success("%s:%-8d Open", open.Ip, open.Port)
 	}

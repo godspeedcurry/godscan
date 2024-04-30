@@ -105,7 +105,7 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 				input = strings.Replace(input, fmt.Sprintf("(%s)", match.Groups()[1].String()), resultStr, 1)
 			} else if match.Groups()[2].String() != "" { // 匹配到键值对表达式
 				key, value := match.Groups()[3].String(), match.Groups()[4].String()
-				if context[key] == value {
+				if strings.Contains(context[key], value) {
 					input = strings.Replace(input, match.Groups()[2].String(), "true", 1)
 				} else {
 					input = strings.Replace(input, match.Groups()[2].String(), "false", 1)

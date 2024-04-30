@@ -5,7 +5,9 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
+	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/spf13/viper"
 )
@@ -35,7 +37,7 @@ func init() {
 	rootCmd.AddCommand(ipCmd)
 
 	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRange, "host", "i", "", "your ip list")
-	ipCmd.PersistentFlags().StringVarP(&portOptions.PortRange, "port", "p", "80", "your port list")
+	ipCmd.PersistentFlags().StringVarP(&portOptions.PortRange, "port", "p", strings.Join(common.DefaultPorts, ","), "your port list")
 
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanSendTimeout, "scan-send-timeout", "s", 5, "Set connection send timeout in seconds")
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanReadTimeout, "scan-read-timeout", "r", 5, "Set connection read timeout in seconds")
