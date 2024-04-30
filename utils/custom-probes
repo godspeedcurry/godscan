@@ -1,0 +1,10 @@
+
+Probe TCP myhttp q|GET / HTTP/1.1\r\n\r\n|
+match http m|^HTTP| p/HTTP Protocol/
+
+
+Probe TCP myjdwp q|JDWP-Handshake|
+totalwaitms 6000
+tcpwrappedms 3000
+match jdwp m|^JDWP-Handshake$| p/Java Debug Wire Protocol/
+

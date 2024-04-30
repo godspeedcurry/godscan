@@ -16,8 +16,6 @@ type DirbruteOptions struct {
 
 var (
 	dirbruteOptions DirbruteOptions
-	result          []string
-	targetUrlList   []string
 )
 
 func (o *DirbruteOptions) validateOptions() error {
