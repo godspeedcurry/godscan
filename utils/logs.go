@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	LevelDebug = iota
-	LevelInfo
+	LevelInfo = iota
 	LevelSuccess
 	LevelFailed
 	LevelWarning
 	LevelError
 	LevelFatal
+	LevelDebug
 )
 
 func get_current_time() string {

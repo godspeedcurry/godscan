@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log"
 	"net"
-	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -22,9 +21,6 @@ import (
 var config Config
 
 var (
-	inFile  *os.File
-	outFile *os.File
-
 	inTargetChan  chan Target
 	outResultChan chan Result
 )
@@ -760,12 +756,12 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 	for _, probe := range *probes {
 		var response []byte
 
-		Warning("Try Probe(" + probe.Name + ")" + ", Data(" + probe.Data + ")")
+		Debug("Try Probe(" + probe.Name + ")" + ", Data(" + probe.Data + ")")
 		response, _ = grabResponse(target, probe.DecodedData, config)
 
 		// 成功获取 Banner 即开始匹配规则，无规则匹配则直接返回
 		if len(response) > 0 {
-			Info("Get response " + strconv.Itoa(len(response)) + " bytes from destination with Probe(" + probe.Name + ")")
+			Debug("Get response " + strconv.Itoa(len(response)) + " bytes from destination with Probe(" + probe.Name + ")")
 			found := false
 
 			softFound := false
@@ -790,8 +786,6 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 					result.Service.Extras = extras
 
 					result.Timestamp = int32(time.Now().Unix())
-
-					found = true
 
 					return result, nil
 				} else
@@ -828,7 +822,6 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 						result.Timestamp = int32(time.Now().Unix())
 
 						found = true
-
 						return result, nil
 					} else
 					// soft 匹配，记录结果
@@ -970,11 +963,11 @@ func (w *Worker) Start(v *VScan, wg *sync.WaitGroup) {
 	}()
 }
 
-func ScanWithIpAndPort(Ip string, Port int, Protocol string) {
+func ScanWithIpAndPort(addr []ProtocolInfo) {
 	ConfigInit()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	// 初始化 VScan 实例，并加载两个默认 nmap-service-probes 文件，解析 Probe 列表
+	// 初始化 VScan 实例，并加载默认 nmap-service-probes 文件解析 Probe 列表
 	v := VScan{}
 	v.Init()
 
@@ -982,10 +975,7 @@ func ScanWithIpAndPort(Ip string, Port int, Protocol string) {
 	inTargetChan = make(chan Target, config.Routines*5)
 	outResultChan = make(chan Result, config.Routines*2)
 
-	defer inFile.Close()
-	defer outFile.Close()
-
-	// 最大协程并发量为参数 routines
+	// 最大协程并发量为参数 config.Routines
 	wgWorkers := sync.WaitGroup{}
 	wgWorkers.Add(int(config.Routines))
 
@@ -1003,14 +993,12 @@ func ScanWithIpAndPort(Ip string, Port int, Protocol string) {
 			result, ok := <-outResultChan
 			if ok {
 				// 对获取到的 Result 进行判断，如果含有 Error 信息则进行筛选输出
-				// encodeJSON, err := json.Marshal(result)
-				// fmt.Println(err)
-				// fmt.Println(string(encodeJSON))
 				banner := result.Banner
 				if len(banner) > 128 {
 					banner = banner[:128]
 				}
-				Success("[%s://%s:%d] \n>>>>>>banner<<<<<<\n%s", result.Name, result.Target.IP, result.Target.Port, hex.Dump([]byte(banner)))
+				Success("%s://%s:%d", result.Name, result.Target.IP, result.Target.Port)
+				Warning("%s", hex.Dump([]byte(banner)))
 			} else {
 				break
 			}
@@ -1018,16 +1006,18 @@ func ScanWithIpAndPort(Ip string, Port int, Protocol string) {
 		wg.Done()
 	}(&wgOutput)
 
-	target := Target{
-		IP:       Ip,
-		Port:     Port,
-		Protocol: Protocol,
+	for _, a := range addr {
+		target := Target{
+			IP:       a.Ip,
+			Port:     a.Port,
+			Protocol: "tcp",
+		}
+		inTargetChan <- target
 	}
-
-	inTargetChan <- target
-
 	close(inTargetChan)
 	wgWorkers.Wait()
+	Debug("All workers exited")
 	close(outResultChan)
+	Debug("Output goroutine finished")
 	wgOutput.Wait()
 }
