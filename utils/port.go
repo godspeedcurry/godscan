@@ -16,6 +16,10 @@ type ProtocolInfo struct {
 	Ip   string
 	Port int
 }
+type ServiceInfo struct {
+	Addr   string
+	Banner string
+}
 
 func parsePorts(portsStr string) ([]int, error) {
 	var ports []int
@@ -135,6 +139,32 @@ func handleWorker(ip string, ports chan int, results chan ProtocolInfo) {
 	}
 }
 
+// func ServiceDetect(all []ProtocolInfo) {
+// 	var wg sync.WaitGroup
+// 	results := []ServiceInfo{} // 创建一个足够大的缓冲区
+
+// 	for _, open := range all {
+// 		wg.Add(1)
+// 		go func(ip string, port int) {
+// 			defer wg.Done()
+// 			addr, banner := ScanWithIpAndPort(ip, port, "tcp")
+// 			fmt.Println(addr)
+// 			fmt.Println(banner)
+// 			serviceInfo := ServiceInfo{
+// 				Addr:   addr,
+// 				Banner: banner,
+// 			}
+// 			results = append(results, serviceInfo)
+// 		}(open.Ip, open.Port)
+// 	}
+// 	wg.Wait()
+
+// 	// 读取结果
+// 	for _, res := range results {
+// 		Success("[%s] \n>>>>>>banner<<<<<<\n%s", res.Addr, hex.Dump([]byte(res.Banner)))
+// 	}
+// }
+
 func PortScan(IpRange string, PortRange string) {
 	ips, err := convertIPListToPool(strings.Split(IpRange, ","))
 	if err != nil {
@@ -152,7 +182,7 @@ func PortScan(IpRange string, PortRange string) {
 
 	var allOpen []ProtocolInfo
 
-	for _, ipNet := range ips {
+	for _, ip := range ips {
 		ports := make(chan int, 50)
 		results := make(chan ProtocolInfo)
 		var openSlice []ProtocolInfo
@@ -167,7 +197,7 @@ func PortScan(IpRange string, PortRange string) {
 		// 任务消费者-处理任务  (每一个端口号都分配一个 goroutinue ，进行扫描)
 		// 结果生产者-每次得到结果 再写入 结果 chan 中
 		for i := 0; i < cap(ports); i++ {
-			go handleWorker(ipNet.String(), ports, results)
+			go handleWorker(ip.String(), ports, results)
 		}
 
 		// 结果消费者-等待收集结果 (main中的 goroutinue 不断从 chan 中阻塞式读取数据)
@@ -191,7 +221,6 @@ func PortScan(IpRange string, PortRange string) {
 	for _, open := range allOpen {
 		Success("%s:%-8d Open", open.Ip, open.Port)
 	}
-	for _, open := range allOpen {
-		ScanWithIpAndPort(open.Ip, open.Port, "tcp")
-	}
+
+	ScanWithIpAndPort(allOpen)
 }

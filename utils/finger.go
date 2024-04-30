@@ -155,6 +155,18 @@ func isValidUrl(Url string) bool {
 	return true
 }
 
+func ImportantApiJudge(ApiResult string, Url string) {
+	for _, key := range common.ImportantApi {
+		if strings.Contains(ApiResult, key) {
+			Fatal("Import Api found " + key)
+			if key == "/api/blade-user" {
+				Fatal("Might related to SpringBlade CVE-2021-44910")
+				FileWrite("cve.log", "[%s] Might related to SpringBlade CVE-2021-44910", Url)
+			}
+		}
+	}
+}
+
 func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	file, err := os.OpenFile(filename+".sensi", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -181,15 +193,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 			file.WriteString(tmpResult1 + "\n")
 		} else {
 			var tmpResult2 = strings.Join(ApiResult, "\n")
-			for _, key := range common.ImportantApi {
-				if strings.Contains(tmpResult2, key) {
-					Fatal("Import Api found " + key)
-					if key == "/api/blade-user" {
-						Fatal("Might related to SpringBlade CVE-2021-44910")
-						FileWrite("cve.log", "[%s] Might related to SpringBlade CVE-2021-44910", Url)
-					}
-				}
-			}
+			ImportantApiJudge(tmpResult2, Url)
 			Success(tmpResult2)
 			file.WriteString(tmpResult2 + "\n")
 		}
