@@ -69,6 +69,16 @@ source /tmp/x
 ```bash
 ./godscan icon --url http://www.example.com/ico.ico
 ```
+### 基础功能三：端口扫描
+```bash
+./godscan port -i '121.5.230.115/28' -p '12312-12334,6379,22'  
+```
+* 使用nmap的探针规则进行探测,基于golang版本的nmap探针工具[vscan_go](https://github.com/RickGray/vscan-go)修改而来
+* 加入了自定义规则，针对性识别JDWP和HTTP协议，目前市面上的扫描器不针对性实现的话无法扫到JDWP
+```
+Probe TCP myhttp q|GET / HTTP/1.1\r\n\r\n|
+match http m|^HTTP| p/HTTP Protocol/
+```
 
 ### 增强功能一：弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
 * 数量级较大，在百万甚至千万级别
