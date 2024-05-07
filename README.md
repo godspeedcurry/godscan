@@ -92,7 +92,7 @@ match http m|^HTTP| p/HTTP Protocol/
 # 自定义前缀
 ./godscan weakpass -k "张三,110101199003070759,18288888888" --prefix '_'
 
-# 自动以分隔符
+# 自定义分隔符
 ./godscan weakpass -k "张三,110101199003070759,18288888888" --sep '@,_'
 
 # 自定义后缀
