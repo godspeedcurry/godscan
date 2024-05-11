@@ -215,9 +215,11 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		subdir = append(subdir, normalizeUrl)
 	}
 	subdir = removeDuplicatesString(subdir)
+	if len(subdir) > 0 {
+		file.WriteString("->[*] sub-directory\n")
+		file.WriteString(strings.Join(subdir, "\n") + "\n")
 
-	file.WriteString("->[*] sub-directory\n")
-	file.WriteString(strings.Join(subdir, "\n") + "\n")
+	}
 
 	var wg sync.WaitGroup
 	multiWriter := io.MultiWriter(os.Stdout, file)
@@ -275,6 +277,7 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 	filename := fmt.Sprintf("%s/%s.log", time.Now().Format("2006-01-02"), host.Hostname())
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
+		fmt.Println(Url)
 		bufStr := ""
 		buf := make([]byte, 4096)
 		for {
@@ -434,10 +437,11 @@ func isAbsoluteURL(urlStr string) bool {
 }
 
 func PrintFinger(Url string, Depth int) {
-	if !strings.HasPrefix(Url, "http") {
-		Url = "http://" + Url
+	Host, err := url.Parse(Url)
+	if err != nil {
+		Error("%s", err)
+		return
 	}
-	Host, _ := url.Parse(Url)
 	RootPath := Host.Scheme + "://" + Host.Hostname()
 	if Host.Port() != "" {
 		RootPath = RootPath + ":" + Host.Port()
@@ -446,16 +450,25 @@ func PrintFinger(Url string, Depth int) {
 	// 首页
 	FirstUrl := RootPath + Host.Path
 
-	res, server, title, _, _, statusCode := FingerScan(FirstUrl, http.MethodGet)
-	if res != "" {
-		Info("%s [%s] [%s] [%s] [%d]", Url, res, server, title, statusCode)
+	finger, server, title, contentType, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet)
+
+	if statusCode != -1 {
+		result := CheckFinger(finger, title, Url, contentType, respBody, statusCode)
+		if len(result) > 0 {
+			WriteToCsv("finger.csv", result)
+		}
+		Info("%s [%s] [%s] [%s] [%d]", Url, finger, server, title, statusCode)
 	}
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	res, server, title, _, _, statusCode = FingerScan(SecondUrl, http.MethodPost)
-	if res != "" {
-		Info("%s [%s] [%s] [%s] [%d]", SecondUrl, res, server, title, statusCode)
+	finger, server, title, contentType, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost)
+	if statusCode != -1 {
+		result := CheckFinger(finger, title, Url, contentType, respBody, statusCode)
+		if len(result) > 0 {
+			WriteToCsv("finger.csv", result)
+		}
+		Info("%s [%s] [%s] [%s] [%d]", SecondUrl, finger, server, title, statusCode)
 	}
 
 	IconUrl, err := FindFaviconURL(RootPath)

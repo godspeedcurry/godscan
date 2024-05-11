@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 
 	"github.com/fatih/color"
@@ -18,18 +17,6 @@ func formatUrl(raw string) string {
 		raw = "http://" + raw
 	}
 	return strings.TrimSpace(raw)
-}
-
-func CheckFinger(finger string, title string, url string, contentType string, respBody []byte, statusCode int) []string {
-	if len(title) > 50 {
-		title = title[:50] + "..."
-	}
-	hash := SimHash(respBody)
-	if !fingerHashMap[hash] {
-		fingerHashMap[hash] = true
-		return []string{url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody))}
-	}
-	return []string{}
 }
 
 func DirBrute(baseUrl string, dir string) []string {
@@ -46,7 +33,6 @@ func DirBrute(baseUrl string, dir string) []string {
 	}
 	if len(result) > 0 {
 		WriteToCsv("dirbrute.csv", result)
-		Success("🌲🌲🌲 Log at ./dirbrute.csv")
 	}
 
 	if len(result) > 0 {

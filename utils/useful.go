@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -181,6 +182,18 @@ func SimHash(input []byte) uint64 {
 	return simhash.Simhash(simhash.NewWordFeatureSet(input))
 }
 
+func UrlFormated(lines []string) []string {
+	ret := []string{}
+	for _, key := range lines {
+		if strings.HasPrefix(key, "http") {
+			ret = append(ret, key)
+			continue
+		}
+		ret = append(ret, "http://"+key)
+		ret = append(ret, "https://"+key)
+	}
+	return removeDuplicatesString(ret)
+}
 func FilRead(filename string) []string {
 	data, err := os.ReadFile(filename)
 	if err != nil {
@@ -188,7 +201,8 @@ func FilRead(filename string) []string {
 		return []string{}
 	}
 	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
-	return removeDuplicatesString(lines)
+	lines = removeDuplicatesString(lines)
+	return UrlFormated(lines)
 }
 
 var fileMutex sync.Mutex
@@ -217,6 +231,18 @@ func AddDataToTable(table *tablewriter.Table, data []string) {
 	if len(data) > 0 {
 		table.Append(data)
 	}
+}
+
+func CheckFinger(finger string, title string, url string, contentType string, respBody []byte, statusCode int) []string {
+	if len(title) > 50 {
+		title = title[:50] + "..."
+	}
+	hash := SimHash(respBody)
+	if !fingerHashMap[hash] {
+		fingerHashMap[hash] = true
+		return []string{url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody))}
+	}
+	return []string{}
 }
 
 func WriteToCsv(filename string, data []string) {
