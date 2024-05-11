@@ -35,7 +35,7 @@ func (o *DirbruteOptions) run() {
 	utils.InitHttp()
 	targetUrlList := GetTargetList()
 	utils.Info("Total: %d url(s)", len(targetUrlList))
-
+	utils.Success("🌲🌲🌲 Log at ./dirbrute.csv")
 	var wg sync.WaitGroup
 	bar := pb.StartNew(len(targetUrlList) * len(common.DirList))
 
