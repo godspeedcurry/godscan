@@ -9,7 +9,7 @@ func GetTargetList() []string {
 	if GlobalOption.Url != "" {
 		targetUrlList = append(targetUrlList, GlobalOption.Url)
 	} else {
-		targetUrlList = append(targetUrlList, utils.FilRead(GlobalOption.UrlFile)...)
+		targetUrlList = append(targetUrlList, utils.FilReadUrl(GlobalOption.UrlFile)...)
 	}
 	return targetUrlList
 }

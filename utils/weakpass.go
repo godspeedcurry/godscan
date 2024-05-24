@@ -145,7 +145,7 @@ func getSuffixList() []string {
 		}
 	}
 	SuffixList = append(SuffixList, strings.Split(viper.GetString("suffix"), ",")...)
-	SuffixList = removeDuplicatesString(SuffixList)
+	SuffixList = RemoveDuplicatesString(SuffixList)
 	return SuffixList
 }
 
@@ -155,7 +155,7 @@ func getKeywordList() []string {
 		KeywordList = append(KeywordList, common.KeywordTop...)
 	}
 	KeywordList = append(KeywordList, strings.Split(viper.GetString("keyword"), ",")...)
-	KeywordList = removeDuplicatesString(KeywordList)
+	KeywordList = RemoveDuplicatesString(KeywordList)
 	return KeywordList
 }
 
@@ -165,7 +165,7 @@ func getSepList() []string {
 		SepList = append(SepList, common.SeparatorTop...)
 	}
 	SepList = append(SepList, strings.Split(viper.GetString("sep"), ",")...)
-	SepList = removeDuplicatesString(SepList)
+	SepList = RemoveDuplicatesString(SepList)
 	return SepList
 }
 
@@ -175,7 +175,7 @@ func getPrefixList() []string {
 		PrefixList = append(PrefixList, common.PrefixTop...)
 	}
 	PrefixList = append(PrefixList, strings.Split(viper.GetString("prefix"), ",")...)
-	PrefixList = removeDuplicatesString(PrefixList)
+	PrefixList = RemoveDuplicatesString(PrefixList)
 	return PrefixList
 }
 

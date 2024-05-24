@@ -12,6 +12,7 @@ import (
 )
 
 type DirbruteOptions struct {
+	DirFile string
 }
 
 var (
@@ -34,10 +35,16 @@ func (o *DirbruteOptions) validateOptions() error {
 func (o *DirbruteOptions) run() {
 	utils.InitHttp()
 	targetUrlList := GetTargetList()
+
+	targetDirList := common.DirList
+	if o.DirFile != "" {
+		targetDirList = utils.FileReadLine(o.DirFile)
+	}
 	utils.Info("Total: %d url(s)", len(targetUrlList))
+	utils.Info("Total: %d payload(s) in dir dict", len(targetDirList))
 	utils.Success("🌲🌲🌲 Log at ./dirbrute.csv")
 	var wg sync.WaitGroup
-	bar := pb.StartNew(len(targetUrlList) * len(common.DirList))
+	bar := pb.StartNew(len(targetUrlList) * len(targetDirList))
 
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetAutoWrapText(false)
@@ -45,7 +52,7 @@ func (o *DirbruteOptions) run() {
 	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
 
 	for _, line := range targetUrlList {
-		for _, dir := range common.DirList {
+		for _, dir := range targetDirList {
 			wg.Add(1)
 			go func(url string, dir string) {
 				defer wg.Done()
@@ -65,5 +72,7 @@ func (o *DirbruteOptions) run() {
 
 func init() {
 	dirbruteCmd := newCommandWithAliases("dirbrute", "Dirbrute on sensitive file", []string{"dir", "dirb", "dd"}, &dirbruteOptions)
+	dirbruteCmd.PersistentFlags().StringVarP(&dirbruteOptions.DirFile, "dir-file", "", "", "your directory dict")
+
 	rootCmd.AddCommand(dirbruteCmd)
 }
