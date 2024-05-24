@@ -197,7 +197,7 @@ func FingerScan(url string, method string) (string, string, string, string, []by
 		}
 	}
 	finger := common.NoFinger
-	cms = removeDuplicatesString(cms)
+	cms = RemoveDuplicatesString(cms)
 	if len(cms) != 0 {
 		finger = strings.Join(cms, ",")
 	}

@@ -153,7 +153,7 @@ func ShowInfo() {
 	fmt.Println("--sep '" + strings.Join(common.SeparatorTop, ",") + "'")
 	fmt.Println("-k '" + strings.Join(common.KeywordTop, ",") + "'")
 }
-func removeDuplicatesString(arr []string) []string {
+func RemoveDuplicatesString(arr []string) []string {
 	// 创建一个空的map，用于存储唯一的元素
 	uniqueMap := make(map[string]bool)
 	result := []string{}
@@ -192,16 +192,21 @@ func UrlFormated(lines []string) []string {
 		ret = append(ret, "http://"+key)
 		ret = append(ret, "https://"+key)
 	}
-	return removeDuplicatesString(ret)
+	return RemoveDuplicatesString(ret)
 }
-func FilRead(filename string) []string {
+
+func FileReadLine(filename string) []string {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println(err.Error())
 		return []string{}
 	}
 	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
-	lines = removeDuplicatesString(lines)
+	return RemoveDuplicatesString(lines)
+}
+
+func FilReadUrl(filename string) []string {
+	lines := FileReadLine(filename)
 	return UrlFormated(lines)
 }
 
