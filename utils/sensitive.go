@@ -113,7 +113,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 	space := `\s{0,5}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
-	content := `([\w\.\!\@\#\$\%\^\&\*\~\-\+]{2,100})`
+	content := `([\w\.\!\@\#\$\%\^\&\*\~\-\+]{2,500})`
 	// x := '123456', x = '123456', x == '123456' x === '123456'  x !== '123456' x != '123456'
 	equals := `(:=|=|==|===|!==|!=|:)`
 	// '123456' == x '123456' === x  '123456' !== x  '123456' != x
@@ -122,7 +122,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 	infoMap := map[string]string{
 		"Chinese Mobile Number": `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`,
 		"Internal IP Address":   `[^0-9]((127\.0\.0\.1)|(10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`,
-		"Url":                   `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,100}(?::\d+)?(?:[/?][\w_\-\&\#/\.%]*)?)`,
+		"Url":                   `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/\.%]*)?)`,
 		// 内容在右边
 		"security-rule-0": `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`,
 		// 内容在左边
@@ -150,7 +150,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 					}
 				}
 			}
-			otherData = removeDuplicatesString(otherData)
+			otherData = RemoveDuplicatesString(otherData)
 			if len(otherData) > 0 && len(otherData) < 20 {
 				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			} else {

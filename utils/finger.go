@@ -74,9 +74,9 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 }
 
 func IsVuePath(Path string) bool {
-	reg := regexp.MustCompile(`(app|index|config|main|chunk)`)
-	res := reg.FindAllString(Path, -1)
-	return strings.HasSuffix(Path, ".js") && len(res) > 0
+	// reg := regexp.MustCompile(`(app|index|config|main|chunk)`)
+	// res := reg.FindAllString(Path, -1)
+	return strings.HasSuffix(Path, ".js") && !strings.HasSuffix(Path, ".min.js")
 }
 
 func HighLight(data string, keywords []string, fingers []string, Url string) {
@@ -182,7 +182,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	for _, tmp := range ApiResultTuple {
 		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
 	}
-	ApiResult = removeDuplicatesString(ApiResult)
+	ApiResult = RemoveDuplicatesString(ApiResult)
 	ApiResultLen := len(ApiResult)
 	if ApiResultLen > 0 {
 		file.WriteString("->[*] [" + Url + "] Api Path\n")
@@ -206,7 +206,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		matches = append(matches, parseDir(apiPath, 2)...)
 	}
 
-	matches = removeDuplicatesString(matches)
+	matches = RemoveDuplicatesString(matches)
 	for _, match := range matches {
 		normalizeUrl := Normalize(match, RootPath)
 		if !isValidUrl(normalizeUrl) {
@@ -214,7 +214,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		}
 		subdir = append(subdir, normalizeUrl)
 	}
-	subdir = removeDuplicatesString(subdir)
+	subdir = RemoveDuplicatesString(subdir)
 	if len(subdir) > 0 {
 		file.WriteString("->[*] sub-directory\n")
 		file.WriteString(strings.Join(subdir, "\n") + "\n")
