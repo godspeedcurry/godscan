@@ -139,39 +139,13 @@ func handleWorker(ip string, ports chan int, results chan ProtocolInfo) {
 	}
 }
 
-// func ServiceDetect(all []ProtocolInfo) {
-// 	var wg sync.WaitGroup
-// 	results := []ServiceInfo{} // 创建一个足够大的缓冲区
-
-// 	for _, open := range all {
-// 		wg.Add(1)
-// 		go func(ip string, port int) {
-// 			defer wg.Done()
-// 			addr, banner := ScanWithIpAndPort(ip, port, "tcp")
-// 			fmt.Println(addr)
-// 			fmt.Println(banner)
-// 			serviceInfo := ServiceInfo{
-// 				Addr:   addr,
-// 				Banner: banner,
-// 			}
-// 			results = append(results, serviceInfo)
-// 		}(open.Ip, open.Port)
-// 	}
-// 	wg.Wait()
-
-// 	// 读取结果
-// 	for _, res := range results {
-// 		Success("[%s] \n>>>>>>banner<<<<<<\n%s", res.Addr, hex.Dump([]byte(res.Banner)))
-// 	}
-// }
-
 func PortScan(IpRange string, PortRange string) {
 	ips, err := convertIPListToPool(strings.Split(IpRange, ","))
 	if err != nil {
 		Error("%s", err)
 		return
 	}
-	// return
+
 	ports_list, err := parsePorts(PortRange)
 	if err != nil {
 		Error("%s", err)
@@ -183,7 +157,7 @@ func PortScan(IpRange string, PortRange string) {
 	var allOpen []ProtocolInfo
 
 	for _, ip := range ips {
-		ports := make(chan int, 50)
+		ports := make(chan int, 300)
 		results := make(chan ProtocolInfo)
 		var openSlice []ProtocolInfo
 
