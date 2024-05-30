@@ -133,7 +133,7 @@ func parseDir(fullPath string, MaxDepth int) []string {
 }
 
 func isValidUrl(Url string) bool {
-	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com"}
+	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com", "apache.org", "gitlab.com", "centos.org"}
 	for _, key := range arr {
 		if strings.Contains(Url, key) {
 			return false
