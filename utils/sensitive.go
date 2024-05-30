@@ -119,15 +119,15 @@ func SensitiveInfoCollect(Url string, Content string) {
 	// '123456' == x '123456' === x  '123456' !== x  '123456' != x
 	equalss := `(==|===|!==|!=)`
 	sec := SecList()
-	infoMap := map[string]string{
-		"Chinese Mobile Number": `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`,
-		"Internal IP Address":   `[^0-9]((127\.0\.0\.1)|(10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`,
-		"Url":                   `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/\.%]*)?)`,
-		// 内容在右边
-		"security-rule-0": `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`,
-		// 内容在左边
-		"security-rule-1": `(?i)` + `(` + mustQuote + content + mustQuote + space + equalss + space + quote + sec + quote + `)`,
-	}
+
+	infoMap := make(map[string]string)
+	infoMap["Chinese Mobile Number"] = `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`
+	infoMap["Internal IP Address"] = `[^0-9]((10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`
+	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/\.%]*)?)`
+	// 内容在右边
+	infoMap["security-rule-0"] = `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`
+	// 内容在左边
+	infoMap["security-rule-1"] = `(?i)` + `(` + mustQuote + content + mustQuote + space + equalss + space + quote + sec + quote + `)`
 
 	for key := range infoMap {
 		reg := regexp.MustCompile(infoMap[key])
@@ -136,14 +136,12 @@ func SensitiveInfoCollect(Url string, Content string) {
 		otherData := []string{}
 		if len(res) > 0 {
 			for _, tmp := range res {
-				if len(tmp) >= 4 {
-					if key == "security-rule-0" {
-						entropy := calculateEntropy(tmp[3])
-						secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
-					} else {
-						entropy := calculateEntropy(tmp[2])
-						secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
-					}
+				if key == "security-rule-0" {
+					entropy := calculateEntropy(tmp[3])
+					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
+				} else if key == "security-rule-1" {
+					entropy := calculateEntropy(tmp[2])
+					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
 				} else {
 					if !UrlFilter(tmp[1]) {
 						otherData = append(otherData, tmp[1])
@@ -153,7 +151,7 @@ func SensitiveInfoCollect(Url string, Content string) {
 			otherData = RemoveDuplicatesString(otherData)
 			if len(otherData) > 0 && len(otherData) < 20 {
 				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
-			} else {
+			} else if len(otherData) != 0 {
 				Success("🌲🌲🌲 More info at ./result.log, found %d urls", len(otherData))
 				FileWrite("result.log", "[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			}
