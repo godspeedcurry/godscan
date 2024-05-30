@@ -160,9 +160,6 @@ func RemoveDuplicatesString(arr []string) []string {
 
 	// 遍历数组中的每个元素
 	for _, ele := range arr {
-		if ele == "" {
-			continue
-		}
 		// 将元素添加到map中，键为元素的值，值为true
 		if !uniqueMap[ele] {
 			uniqueMap[ele] = true

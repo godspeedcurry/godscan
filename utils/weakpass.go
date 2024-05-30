@@ -268,7 +268,6 @@ func GenerateWeakPassword() []string {
 		}
 	}
 	// sep keyword sep suffix sep
-
 	PasswordList = append(PasswordList, combination(PrefixList, KeywordTmpList, SepList, SuffixList)...)
 	if idcard != "" && completeName != "" {
 		arr := []string{onlyFirst, firstComplete, completeName, FirstCharToUpper(onlyFirst), LastCharToUpper(onlyFirst), strings.ToUpper(onlyFirst), FirstCharToUpper(firstComplete), LastCharToUpper(completeName), strings.ToUpper(completeName)}
