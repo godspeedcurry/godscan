@@ -110,10 +110,10 @@ func UrlFilter(Url string) bool {
 	return false
 }
 func SensitiveInfoCollect(Url string, Content string) {
-	space := `\s{0,5}`
+	space := `[\s]{0,30}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
-	content := `([\w\.\!\@\#\$\%\^\&\*\~\-\+]{2,500})`
+	content := `([\w\.\!\@\#\$\%\^\&\*\~\-\+ \=]{2,500})`
 	// x := '123456', x = '123456', x == '123456' x === '123456'  x !== '123456' x != '123456'
 	equals := `(:=|=|==|===|!==|!=|:)`
 	// '123456' == x '123456' === x  '123456' !== x  '123456' != x
