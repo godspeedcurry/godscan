@@ -118,7 +118,7 @@ match http m|^HTTP| p/HTTP Protocol/
 * `spider`命令可简写为`sp`、`ss`
 ```bash
 ./godscan spider --url http://example.com
-# -d 1 可以指定爬虫的深度 默认为2
+# -d 1 可以指定爬虫的深度 默认为2 可以适当提高深度至3 
 # 从文件批量爬取
 ./godscan spider --url-file url.txt
 ```
