@@ -104,12 +104,6 @@ func uselessUrl(Url string, Depth int) bool {
 	if Depth == 0 || Url == "" || !isValidUrl(Url) {
 		return true
 	}
-	ignore := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", ".vue", ".css", ".ico", ".svg"}
-	for _, ign := range ignore {
-		if strings.Contains(Url, ign) {
-			return true
-		}
-	}
 	return false
 }
 
@@ -139,6 +133,13 @@ func isValidUrl(Url string) bool {
 			return false
 		}
 	}
+	suffix := []string{".min.js", ".png", ".jpeg", ".jpg", ".gif", ".bmp", ".vue", ".css", ".ico", ".svg"}
+	for _, ign := range suffix {
+		if strings.Contains(Url, ign) {
+			return false
+		}
+	}
+
 	// 解析URL
 	parsedURL, err := url.Parse(Url)
 	if err != nil {
@@ -218,7 +219,6 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	if len(subdir) > 0 {
 		file.WriteString("->[*] sub-directory\n")
 		file.WriteString(strings.Join(subdir, "\n") + "\n")
-
 	}
 
 	var wg sync.WaitGroup
@@ -277,7 +277,6 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 	filename := fmt.Sprintf("%s/%s.log", time.Now().Format("2006-01-02"), host.Hostname())
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(Url) {
-		fmt.Println(Url)
 		bufStr := ""
 		buf := make([]byte, 4096)
 		for {
@@ -309,6 +308,9 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 		// a, link 标签
 		doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
 			href, _ := selector.Attr("href")
+			if href == "" {
+				return
+			}
 			normalizeUrl := Normalize(href, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
@@ -317,9 +319,12 @@ func Spider(RootPath string, Url string, depth int, myMap mapset.Set) error {
 		// iframe, script 标签
 		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
 			src, _ := selector.Attr("src")
+			if src == "" {
+				return
+			}
 			normalizeUrl := Normalize(src, RootPath)
-
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
+
 				Spider(RootPath, normalizeUrl, depth-1, myMap)
 			}
 		})
