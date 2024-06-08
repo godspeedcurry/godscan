@@ -149,9 +149,11 @@ func isValidUrl(Url string) bool {
 	if !parsedURL.IsAbs() || parsedURL.Hostname() == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
 		return false
 	}
-	ip := net.ParseIP(parsedURL.Hostname())
-	if ip != nil {
-		return !ip.IsPrivate()
+	if !viper.GetBool("private-ip") {
+		ip := net.ParseIP(parsedURL.Hostname())
+		if ip != nil {
+			return !ip.IsPrivate()
+		}
 	}
 	return true
 }
