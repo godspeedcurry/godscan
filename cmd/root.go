@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.20"
+var version = "v1.1.21"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
@@ -28,7 +28,7 @@ func checkForUpdate(currentVersion string) {
 	}
 }
 func Banner() string {
-	checkForUpdate(version)
+	// checkForUpdate(version)
 	banner := `
 ██████╗   ██████╗ ██████╗ ███████╗ ██████╗ █████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗████╗  ██║
@@ -52,7 +52,8 @@ type GlobalOptions struct {
 	OutputFile string
 	Proxy      string
 
-	DefaultUA string
+	DefaultUA     string
+	ScanPrivateIp bool
 }
 
 var (
@@ -103,6 +104,8 @@ func Execute() {
 
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.DefaultUA, "ua", "", "user agent", "set user agent")
 
+	rootCmd.PersistentFlags().BoolVarP(&GlobalOption.ScanPrivateIp, "private-ip", "", false, "scan private ip")
+
 	viper.BindPFlag("loglevel", rootCmd.PersistentFlags().Lookup("loglevel"))
 	viper.SetDefault("loglevel", 2)
 
@@ -111,6 +114,9 @@ func Execute() {
 
 	viper.BindPFlag("proxy", rootCmd.PersistentFlags().Lookup("proxy"))
 	viper.SetDefault("proxy", "")
+
+	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
+	viper.SetDefault("private-ip", false)
 
 	cobra.CheckErr(rootCmd.Execute())
 }

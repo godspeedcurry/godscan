@@ -122,7 +122,7 @@ match http m|^HTTP| p/HTTP Protocol/
 # 从文件批量爬取
 ./godscan spider --url-file url.txt
 ```
-
+注意：godscan默认不扫内网IP，来减少卡顿，如果要扫内网IP,使用`--private-ip`参数即可
 
 ## 功能详细介绍
 ### web应用指纹识别 
