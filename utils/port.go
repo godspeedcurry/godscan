@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cheggaaa/pb/v3"
+	"github.com/spf13/viper"
 
 	"github.com/malfunkt/iprange"
 )
@@ -151,13 +152,16 @@ func PortScan(IpRange string, PortRange string) {
 		Error("%s", err)
 		return
 	}
+	Info("Total IP(s): %d", len(ips))
+	Info("Total Port(s): %d", len(ports_list))
+	Info("Total Threads(s): %d", viper.GetInt("Threads"))
 
 	bar := pb.StartNew(len(ports_list) * len(ips))
 
 	var allOpen []ProtocolInfo
 
 	for _, ip := range ips {
-		ports := make(chan int, 300)
+		ports := make(chan int, viper.GetInt("Threads"))
 		results := make(chan ProtocolInfo)
 		var openSlice []ProtocolInfo
 
