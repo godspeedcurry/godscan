@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"crypto/md5"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -23,6 +24,7 @@ import (
 	"strings"
 
 	b64 "encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 
 	"github.com/PuerkitoBio/goquery"
@@ -177,7 +179,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		return
 	}
 
-	ApiReg := regexp.MustCompile(`"(?P<path>/[\w/\-_=@\?\:]+?)"`)
+	ApiReg := regexp.MustCompile(`"(?P<path>/[\w/\-\|_=@\?\:]+?)"`)
 
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
@@ -372,7 +374,13 @@ func IconDetect(Url string) (string, error) {
 	defer resp.Body.Close()
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	ico := Mmh3Hash32(StandBase64(bodyBytes))
-	Info("icon_url=\"%s\" icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
+
+	hash := md5.Sum(bodyBytes)
+	hunterIco := hex.EncodeToString(hash[:])
+
+	Info("icon_url=\"%s\" [fofa]   icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
+	Info("icon_url=\"%s\" [hunter] web.icon==\"%s\" %d", Url, hunterIco, resp.StatusCode)
+
 	var icon_hash_map map[string]interface{}
 	json.Unmarshal([]byte(icon_json), &icon_hash_map)
 	tmp := icon_hash_map[ico]
@@ -493,10 +501,13 @@ func PrintFinger(Url string, Depth int) {
 	}
 
 	filename := fmt.Sprintf("%s/%s.log", time.Now().Format("2006-01-02"), Host.Hostname())
-	Success("🌲🌲🌲 More info at ./%s", filename)
+
 	var myList []string
 	for item := range myMap.Iter() {
 		myList = append(myList, item.(string))
+	}
+	if len(myList) > 0 {
+		Success("🌲🌲🌲 More info at ./%s", filename)
 	}
 	FileWrite(filename, strings.Join(myList, "\n")+"\n")
 }

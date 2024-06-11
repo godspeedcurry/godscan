@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.21"
+var version = "v1.1.22"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
@@ -28,7 +28,7 @@ func checkForUpdate(currentVersion string) {
 	}
 }
 func Banner() string {
-	// checkForUpdate(version)
+	checkForUpdate(version)
 	banner := `
 ██████╗   ██████╗ ██████╗ ███████╗ ██████╗ █████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗████╗  ██║
