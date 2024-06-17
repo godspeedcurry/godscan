@@ -3,9 +3,12 @@ package utils
 import (
 	"encoding/csv"
 	"fmt"
+	"html"
 	"math/rand"
+	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -232,20 +235,74 @@ func FileWrite(filename string, format string, args ...interface{}) {
 }
 
 func AddDataToTable(table *tablewriter.Table, data []string) {
-
 	if len(data) > 0 {
 		table.Append(data)
 	}
 }
 
-func CheckFinger(finger string, title string, url string, contentType string, respBody []byte, statusCode int) []string {
+func extractText(htmlContent string) string {
+	// 移除所有的脚本和样式内容
+	re := regexp.MustCompile(`(?s)<(script|style)[^>]*>.*?</(script|style)>`)
+	htmlContent = re.ReplaceAllString(htmlContent, "")
+
+	// 移除所有的HTML标签
+	re = regexp.MustCompile(`(?s)<[^>]*>`)
+	text := re.ReplaceAllString(htmlContent, "")
+
+	// 解码HTML实体
+	text = html.UnescapeString(text)
+
+	// 去除多余的空白字符
+	text = strings.TrimSpace(text)
+	text = regexp.MustCompile(`\s+`).ReplaceAllString(text, " ")
+
+	return text
+}
+
+func getSelectedElements(content string) string {
+	content = extractText(content)
+	fmt.Println(content)
+	var re = regexp.MustCompile(`[0-9a-zA-Z_\-:\.\@]{4,15}`)
+	arr := re.FindAllString(content, -1)
+	for _, x := range arr {
+		fmt.Println(x)
+	}
+	n := len(arr)
+	if n == 0 {
+		return ""
+	}
+	var selected []string
+
+	// 获取0元素
+	selected = append(selected, arr[0])
+	// 获取1/4元素
+	selected = append(selected, arr[n>>2])
+	// 获取中位数元素
+	selected = append(selected, arr[n>>1])
+	// 获取3/4元素
+	selected = append(selected, arr[(n>>2)*3])
+	// 获取last元素
+	selected = append(selected, arr[n-1])
+
+	// 确保元素唯一
+	uniqueSelected := RemoveDuplicatesString(selected)
+	return strings.Join(uniqueSelected, " ")
+}
+
+func CheckFinger(finger string, title string, Url string, contentType string, respBody []byte, statusCode int) []string {
 	if len(title) > 50 {
 		title = title[:50] + "..."
 	}
 	hash := SimHash(respBody)
-	if !fingerHashMap[hash] {
-		fingerHashMap[hash] = true
-		return []string{url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody))}
+
+	host, err := url.Parse(Url)
+	if err != nil {
+		Error("Error parse url %s", Url)
+	}
+	host_port := host.Host
+	if _, ok := fingerHashMap[IpHash{host_port, hash}]; !ok {
+		fingerHashMap[IpHash{host_port, hash}] = true
+		return []string{Url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody)), strconv.FormatUint(hash, 16), getSelectedElements(string(respBody))}
 	}
 	return []string{}
 }
@@ -257,7 +314,7 @@ func WriteToCsv(filename string, data []string) {
 	}
 	defer file.Close()
 
-	header := []string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"}
+	header := []string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length", "SimHash", "Keyword"}
 	fileInfo, err := file.Stat()
 	writer := csv.NewWriter(file)
 
