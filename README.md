@@ -23,10 +23,12 @@ Usage:
   godscan [command]
 
 Available Commands:
+  clean       clean logs (Aliases: cc)
   completion  Generate the autocompletion script for the specified shell
   dirbrute    Dirbrute on sensitive file (Aliases: dir, dirb, dd)
   help        Help about any command
   icon        Calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico (Aliases: ico)
+  port        port scanner (Aliases: pp)
   spider      Analyze website using DFS, quick usage: -u (Aliases: sp, ss)
   weakpass    Start the application (Aliases: weak, wp, wk, ww)
 
@@ -36,6 +38,7 @@ Flags:
       --host-file string   host file
   -v, --loglevel int       level of your log (default 2)
   -o, --output string      output file to write log and results (default "result.txt")
+      --private-ip         scan private ip
       --proxy string       proxy
       --ua string          set user agent (default "user agent")
   -u, --url string         singel url
@@ -58,6 +61,8 @@ source /tmp/x
 1. 目录扫描数量较少，约50个，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
 2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜(删掉了，实际出现的太少)
 3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
+4. 基于相似哈希算法计算页面哈希，用于资产量较大的情况分辨重点资产
+5. 基于高德猜想——四等分点算法提权`0,1/4,1/2,3/4,1`处的关键字 辅助识别页面内容 NLP暂时不考虑 还没找到golang下很成熟的主题识别框架
 
 #### 批量目录扫描+指纹识别(基于golang协程)
 ```bash
@@ -71,7 +76,7 @@ source /tmp/x
 ```
 ### 基础功能三：端口扫描
 ```bash
-./godscan port -i '121.5.230.115/28' -p '12312-12334,6379,22'  
+./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'  
 ```
 * 使用nmap的探针规则进行探测,基于golang版本的nmap探针工具[vscan_go](https://github.com/RickGray/vscan-go)修改而来
 * 加入了自定义规则，针对性识别JDWP和HTTP协议，目前市面上的扫描器不针对性实现的话无法扫到JDWP

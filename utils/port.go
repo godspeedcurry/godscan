@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cheggaaa/pb/v3"
@@ -127,15 +128,17 @@ func convertIPListToPool(ipList []string) ([]net.IP, error) {
 	return ipPool, nil
 }
 
-func handleWorker(ip string, ports chan int, results chan ProtocolInfo) {
-	for p := range ports {
-		address := fmt.Sprintf("%s:%d", ip, p)
+func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for task := range tasks {
+		address := fmt.Sprintf("%s:%d", task.Ip, task.Port)
 		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 		if err != nil {
-			results <- ProtocolInfo{Ip: ip, Port: -p}
+			results <- ProtocolInfo{Ip: task.Ip, Port: -task.Port}
 			continue
 		}
-		results <- ProtocolInfo{Ip: ip, Port: p}
+		results <- ProtocolInfo{Ip: task.Ip, Port: task.Port}
 		conn.Close()
 	}
 }
@@ -158,47 +161,40 @@ func PortScan(IpRange string, PortRange string) {
 
 	bar := pb.StartNew(len(ports_list) * len(ips))
 
-	var allOpen []ProtocolInfo
+	taskChan := make(chan ProtocolInfo, viper.GetInt("Threads"))
+	results := make(chan ProtocolInfo)
 
-	for _, ip := range ips {
-		ports := make(chan int, viper.GetInt("Threads"))
-		results := make(chan ProtocolInfo)
-		var openSlice []ProtocolInfo
+	var wg sync.WaitGroup
 
-		// 任务生产者-分发任务 (新起一个 goroutinue ，进行分发数据)
-		go func(arr []int) {
-			for i := 0; i < len(arr); i++ {
-				ports <- arr[i]
+	for i := 0; i < viper.GetInt("Threads"); i++ {
+		wg.Add(1)
+		go handleWorker(taskChan, results, &wg)
+	}
+
+	// 任务生产者-分发任务 (新起一个 goroutinue ，进行分发数据)
+	go func(arr []net.IP) {
+		for _, ip := range arr {
+			for _, port := range ports_list {
+				taskChan <- ProtocolInfo{Ip: ip.String(), Port: port}
 			}
-		}(ports_list)
-
-		// 任务消费者-处理任务  (每一个端口号都分配一个 goroutinue ，进行扫描)
-		// 结果生产者-每次得到结果 再写入 结果 chan 中
-		for i := 0; i < cap(ports); i++ {
-			go handleWorker(ip.String(), ports, results)
 		}
+		close(taskChan)
+	}(ips)
 
-		// 结果消费者-等待收集结果 (main中的 goroutinue 不断从 chan 中阻塞式读取数据)
-		for i := 0; i < len(ports_list); i++ {
-			resPortInfo := <-results
-			if resPortInfo.Port > 0 {
-				openSlice = append(openSlice, resPortInfo)
-			}
-			bar.Increment()
-		}
-
-		// 关闭 chan
-		close(ports)
+	go func() {
+		wg.Wait()
 		close(results)
-
-		// 输出
-		allOpen = append(allOpen, openSlice...)
-
+	}()
+	var allOpen []ProtocolInfo
+	for resPortInfo := range results {
+		if resPortInfo.Port > 0 {
+			allOpen = append(allOpen, ProtocolInfo{Ip: resPortInfo.Ip, Port: resPortInfo.Port})
+			Success("Open: %s:%d", resPortInfo.Ip, resPortInfo.Port)
+		}
+		bar.Increment()
 	}
+
 	bar.Finish()
-	for _, open := range allOpen {
-		Success("%s:%-8d Open", open.Ip, open.Port)
-	}
 
 	ScanWithIpAndPort(allOpen)
 }

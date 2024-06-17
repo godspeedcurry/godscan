@@ -191,7 +191,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	ApiResultLen := len(ApiResult)
 	if ApiResultLen > 0 {
 		file.WriteString("->[*] [" + Url + "] Api Path\n")
-		Success("->[*] [" + Url + "] Api Path")
+		Success("[" + Url + "] Api Path")
 		if ApiResultLen > 50 {
 			var tmpResult1 = strings.Join(ApiResult[:50], "\n")
 			Success(tmpResult1)
