@@ -10,7 +10,12 @@ import (
 	"github.com/godspeedcurry/godscan/common"
 )
 
-var fingerHashMap = make(map[uint64]bool)
+type IpHash struct {
+	Ip   string
+	Hash uint64
+}
+
+var fingerHashMap = make(map[IpHash]bool)
 
 func formatUrl(raw string) string {
 	if !strings.HasPrefix(raw, "http") {
