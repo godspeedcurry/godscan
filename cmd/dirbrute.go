@@ -49,7 +49,7 @@ func (o *DirbruteOptions) run() {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetAutoWrapText(false)
 
-	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
+	table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length", "SimHash", "Keyword"})
 
 	for _, line := range targetUrlList {
 		for _, dir := range targetDirList {
