@@ -261,7 +261,6 @@ func extractText(htmlContent string) string {
 
 func getSelectedElements(content string) string {
 	content = extractText(content)
-	fmt.Println(content)
 	var re = regexp.MustCompile(`[0-9a-zA-Z_\-:\.\@]{4,15}`)
 	arr := re.FindAllString(content, -1)
 	n := len(arr)
