@@ -264,9 +264,6 @@ func getSelectedElements(content string) string {
 	fmt.Println(content)
 	var re = regexp.MustCompile(`[0-9a-zA-Z_\-:\.\@]{4,15}`)
 	arr := re.FindAllString(content, -1)
-	for _, x := range arr {
-		fmt.Println(x)
-	}
 	n := len(arr)
 	if n == 0 {
 		return ""
