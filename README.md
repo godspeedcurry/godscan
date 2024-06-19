@@ -70,7 +70,8 @@ source /tmp/x
 ```
 
 ### 基础功能二：根据图标地址计算图标hash
-* 该hash为fofa的hash
+* 该hash为fofa的hash 本质是murmur3哈希
+* 新增了hunter的hash 本质是md5
 ```bash
 ./godscan icon --url http://www.example.com/ico.ico
 ```
@@ -135,7 +136,7 @@ match http m|^HTTP| p/HTTP Protocol/
 - [x] 构造404 报错 得到中间件的详情
 - [x] POST请求构造报错 
 - [x] 爬虫 递归访问
-- [x] 正则提取注释 注释里往往有版本 github仓库等信息
+- [x] 正则提取注释 注释里往往有版本 github仓库等信息(删了 误报太多)
 - [x] 版本识别并高亮
 - [x] 对注释里的内容匹配到关键字并高亮
 - [x] 识别接口 主要从js里提取
@@ -151,7 +152,7 @@ match http m|^HTTP| p/HTTP Protocol/
 
 ### 功能二：弱口令生成器
 - [x] 在fscan的基础上新增从实际渗透测试中获取到的弱口令
-- [x] 根据给定的keyword list 生成 逗号分隔
+- [x] 根据给定的关键词生成大量弱口令
 
 
 人工筛选时，可关注
