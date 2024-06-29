@@ -163,6 +163,9 @@ func RemoveDuplicatesString(arr []string) []string {
 
 	// 遍历数组中的每个元素
 	for _, ele := range arr {
+		if strings.HasPrefix(ele, "====") {
+			continue
+		}
 		// 将元素添加到map中，键为元素的值，值为true
 		if !uniqueMap[ele] {
 			uniqueMap[ele] = true
@@ -201,7 +204,7 @@ func UrlFormated(lines []string) []string {
 func FileReadLine(filename string) []string {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		fmt.Println(err.Error())
+		Error("Error read file %s", filename)
 		return []string{}
 	}
 	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")

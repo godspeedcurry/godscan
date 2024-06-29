@@ -90,6 +90,16 @@ func newCommandWithAliases(use, shortDesc string, aliases []string, opts Command
 	}
 }
 
+func SetProxyFromEnv() string {
+	proxyEnvVars := []string{"HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "ALL_PROXY", "all_proxy"}
+	for _, envVar := range proxyEnvVars {
+		if val := os.Getenv(envVar); val != "" {
+			return val
+		}
+	}
+	return ""
+}
+
 func Execute() {
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "singel url")
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "", "", "url file")
@@ -113,7 +123,7 @@ func Execute() {
 	viper.SetDefault("DefaultUA", "Mozilla/5.0 (Windows NT 11.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.5773.219 Safari/537.36 Edg/109.0.1711.53")
 
 	viper.BindPFlag("proxy", rootCmd.PersistentFlags().Lookup("proxy"))
-	viper.SetDefault("proxy", "")
+	viper.SetDefault("proxy", SetProxyFromEnv())
 
 	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
 	viper.SetDefault("private-ip", false)
