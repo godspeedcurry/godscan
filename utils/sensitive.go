@@ -100,7 +100,7 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 }
 func UrlFilter(Url string) bool {
 	ignoreList := []string{
-		"w3.org", ".woff", ".png", "apache.org", "gstatic.com", "google.com", "microsoft.com", ".gif", ".svg",
+		"w3.org", ".woff", ".png", "apache.org", "gstatic.com", "google.com", "microsoft.com", ".gif", ".svg", "github.com",
 	}
 	for _, ignore := range ignoreList {
 		if strings.Contains(Url, ignore) {

@@ -20,14 +20,10 @@ var (
 )
 
 func InitHttp() {
-	//PocInfo.Proxy = "http://127.0.0.1:8080"
-	// err := InitHttpClient(
-	// 	PocInfo.Num, PocInfo.Proxy, time.Duration(PocInfo.Timeout)*time.Second)
 	InitHttpClient(1, "", dialTimout)
 }
 
 func InitHttpClient(ThreadsNum int, DownProxy string, Timeout time.Duration) error {
-	// type DialContext = func(ctx context.Context, network, addr string) (net.Conn, error)
 	dialer := &net.Dialer{
 		Timeout:   dialTimout,
 		KeepAlive: keepAlive,
