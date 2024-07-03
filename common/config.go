@@ -74,7 +74,7 @@ var WebPorts = []string{
 	"9443", "9998-9999",
 }
 
-//go:embed ports_20000.txt
+//go:embed ports_20000
 var customProbes string
 
 var AllPorts = customProbes

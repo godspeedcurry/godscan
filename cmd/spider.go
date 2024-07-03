@@ -42,11 +42,7 @@ func (o *SpiderOptions) validateOptions() error {
 func (o *SpiderOptions) run() {
 	utils.InitHttp()
 	targetUrlList := GetTargetList()
-	if viper.GetString("proxy") != "" {
-		utils.Info("Total: %d url(s) Proxy: %s", len(targetUrlList), viper.GetString("proxy"))
-	} else {
-		utils.Info("Total: %d url(s) Proxy: null", len(targetUrlList))
-	}
+	utils.Info("Total: %d url(s)", len(targetUrlList))
 
 	var wg sync.WaitGroup
 	for _, line := range targetUrlList {
