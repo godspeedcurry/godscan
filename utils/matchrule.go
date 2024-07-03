@@ -127,45 +127,60 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 	return result.(bool), nil
 }
 
-func FingerScan(url string, method string) (string, string, string, string, []byte, int) {
+func FingerScan(url string, method string, followRedirect bool) (string, string, string, string, string, []byte, int) {
 	if !isValidUrl(url) {
-		return common.NoFinger, "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		Fatal("%s", err)
-		return common.NoFinger, "", "", "", nil, -1
+		Fatal("%s %s xxx", url, err)
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
+	if !followRedirect {
+		Client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		}
+	}
+
 	resp, err := Client.Do(req)
 	if err != nil {
-		Fatal("%s", err)
-		return common.NoFinger, "", "", "", nil, -1
+		Fatal("%s %s create request failed", url, err)
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	defer resp.Body.Close()
+	ServerValue := resp.Header["Server"]
+	retServerValue := ""
+	if len(ServerValue) != 0 {
+		retServerValue = ServerValue[0]
+	}
+
+	if resp.StatusCode == 301 || resp.StatusCode == 302 {
+		return common.NoFinger, retServerValue, "", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
+	}
 	headers := MapToJson(resp.Header)
 
 	var config Packjson
 
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
-		Fatal("%s", err)
-		return common.NoFinger, "", "", "", nil, -1
+		Fatal("%s %s unmarshal failed", url, err)
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	var cms []string
 	bodyBytes, _ := io.ReadAll(resp.Body)
 	_, contentType, _ := charset.DetermineEncoding(bodyBytes, resp.Header.Get("Content-Type"))
 	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), contentType)
 	if err != nil {
-		Fatal("%s", err)
-		return common.NoFinger, "", "", "", nil, -1
+		Fatal("%s %s %s", url, err, contentType)
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	doc, err := goquery.NewDocumentFromReader(reader)
 
 	if err != nil {
-		Fatal("%s", err)
-		return common.NoFinger, "", "", "", nil, -1
+		Fatal("%s %s", url, err)
+		return common.NoFinger, "", "", "", "", nil, -1
 	}
 
 	// 查找标题元素并获取内容
@@ -201,10 +216,6 @@ func FingerScan(url string, method string) (string, string, string, string, []by
 	if len(cms) != 0 {
 		finger = strings.Join(cms, ",")
 	}
-	ServerValue := resp.Header["Server"]
-	retServerValue := ""
-	if len(ServerValue) != 0 {
-		retServerValue = ServerValue[0]
-	}
-	return finger, retServerValue, title, resp.Header.Get("Content-Type"), bodyBytes, resp.StatusCode
+
+	return finger, retServerValue, title, resp.Header.Get("Content-Type"), resp.Header.Get("Location"), []byte(bodyBytes), resp.StatusCode
 }
