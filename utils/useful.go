@@ -288,20 +288,26 @@ func getSelectedElements(content string) string {
 	return strings.Join(uniqueSelected, " ")
 }
 
-func CheckFinger(finger string, title string, Url string, contentType string, respBody []byte, statusCode int) []string {
+func CheckFinger(finger string, title string, Url string, contentType string, location string, respBody []byte, statusCode int) []string {
 	if len(title) > 50 {
 		title = title[:50] + "..."
 	}
-	hash := SimHash(respBody)
+	hash := uint64(0)
+	if location != "" {
+		hash = SimHash([]byte(location))
+	} else {
+		hash = SimHash(respBody)
+	}
 
 	host, err := url.Parse(Url)
 	if err != nil {
 		Error("Error parse url %s", Url)
+		return []string{}
 	}
 	host_port := host.Host
 	if _, ok := fingerHashMap[IpHash{host_port, hash}]; !ok {
 		fingerHashMap[IpHash{host_port, hash}] = true
-		return []string{Url, title, finger, contentType, strconv.Itoa(statusCode), strconv.Itoa(len(respBody)), strconv.FormatUint(hash, 16), getSelectedElements(string(respBody))}
+		return []string{Url, title, finger, contentType, strconv.Itoa(statusCode), location, strconv.Itoa(len(respBody)), strconv.FormatUint(hash, 16), getSelectedElements(string(respBody))}
 	}
 	return []string{}
 }
@@ -313,7 +319,7 @@ func WriteToCsv(filename string, data []string) {
 	}
 	defer file.Close()
 
-	header := []string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length", "SimHash", "Keyword"}
+	header := common.TableHeader
 	fileInfo, err := file.Stat()
 	writer := csv.NewWriter(file)
 

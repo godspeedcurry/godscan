@@ -16,6 +16,7 @@ type PortOptions struct {
 	IpRange         string
 	IpRangeFile     string
 	PortRange       string
+	TopPorts        int
 	useAllProbes    bool
 	nullProbeOnly   bool
 	scanSendTimeout int
@@ -42,6 +43,7 @@ func init() {
 	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRangeFile, "host-file", "I", "", "your ip list file")
 
 	ipCmd.PersistentFlags().StringVarP(&portOptions.PortRange, "port", "p", strings.Join(common.DefaultPorts, ","), "your port list")
+	ipCmd.PersistentFlags().IntVarP(&portOptions.TopPorts, "top", "", 0, "top ports to scan, default is 500")
 
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanSendTimeout, "scan-send-timeout", "s", 5, "Set connection send timeout in seconds")
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanReadTimeout, "scan-read-timeout", "r", 5, "Set connection read timeout in seconds")
@@ -60,6 +62,9 @@ func init() {
 
 	viper.BindPFlag("port", ipCmd.PersistentFlags().Lookup("port"))
 	viper.SetDefault("port", "")
+
+	viper.BindPFlag("top", ipCmd.PersistentFlags().Lookup("top"))
+	viper.SetDefault("top", 0)
 
 	viper.BindPFlag("scan-rarity", ipCmd.PersistentFlags().Lookup("scan-rarity"))
 	viper.SetDefault("scan-rarity", 5)
@@ -82,8 +87,19 @@ func (o *PortOptions) run() {
 		ips := utils.FileReadLine(portOptions.IpRangeFile)
 		portOptions.IpRange = strings.Join(ips, ",")
 	} else if portOptions.IpRange == "" {
-		utils.Error("Please provide ip range or ip range file")
+		utils.Info("Please provide ip range or ip range file")
 		return
 	}
-	utils.PortScan(portOptions.IpRange, portOptions.PortRange)
+	if portOptions.TopPorts != 0 {
+		if portOptions.TopPorts > 20000 {
+			utils.Info("We do not have more than top 20000 ports, please choose a smaller number, or just scan all ports use `-p 0-65535`")
+			return
+		} else {
+			utils.PortScan(portOptions.IpRange, strings.Join(strings.Split(common.AllPorts, ",")[0:portOptions.TopPorts], ","))
+		}
+
+	} else {
+		utils.PortScan(portOptions.IpRange, portOptions.PortRange)
+	}
+
 }

@@ -146,7 +146,7 @@ func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync
 func PortScan(IpRange string, PortRange string) {
 	ips, err := convertIPListToPool(strings.Split(IpRange, ","))
 	if err != nil {
-		Error("%s", err)
+		Info("%s", err)
 		return
 	}
 

@@ -100,7 +100,7 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 }
 func UrlFilter(Url string) bool {
 	ignoreList := []string{
-		"w3.org", ".woff", ".png", "apache.org", "gstatic.com", "google.com", "microsoft.com", ".gif", ".svg", "github.com",
+		"w3.org", "apache.org", "gstatic.com", "google.com", "microsoft.com", "github.com", ".png", ".gif", ".woff",
 	}
 	for _, ignore := range ignoreList {
 		if strings.Contains(Url, ignore) {
@@ -109,7 +109,7 @@ func UrlFilter(Url string) bool {
 	}
 	return false
 }
-func SensitiveInfoCollect(Url string, Content string) {
+func SensitiveInfoCollect(Url string, Content string, filename string) {
 	space := `[\s]{0,30}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
@@ -123,7 +123,8 @@ func SensitiveInfoCollect(Url string, Content string) {
 	infoMap := make(map[string]string)
 	infoMap["Chinese Mobile Number"] = `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`
 	infoMap["Internal IP Address"] = `[^0-9]((10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`
-	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/\.%]*)?)`
+	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/%.]*)?)`
+	// infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:([/\w\-]*)))`
 	// 内容在右边
 	infoMap["security-rule-0"] = `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`
 	// 内容在左边
@@ -143,17 +144,15 @@ func SensitiveInfoCollect(Url string, Content string) {
 					entropy := calculateEntropy(tmp[2])
 					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
 				} else {
-					if !UrlFilter(tmp[1]) {
-						otherData = append(otherData, tmp[1])
-					}
+					otherData = append(otherData, tmp[0])
 				}
 			}
 			otherData = RemoveDuplicatesString(otherData)
 			if len(otherData) > 0 && len(otherData) < 20 {
 				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			} else if len(otherData) != 0 {
-				Success("🌲🌲🌲 More info at ./result.log, found %d urls", len(otherData))
-				FileWrite("result.log", "[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
+				Success("🌲🌲🌲 More info at ./%s, found %d urls", filename+".urls", len(otherData))
+				FileWrite(filename+".urls", "[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			}
 			if len(secData) > 0 {
 				PrintTable(Url, key, DeduplicateByContent(secData))

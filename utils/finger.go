@@ -173,7 +173,8 @@ func ImportantApiJudge(ApiResult string, Url string) {
 }
 
 func parseVueUrl(Url string, RootPath string, doc string, filename string) {
-	ApiReg := regexp.MustCompile(`["'](?P<path>/[\w/\-\|_=@\?\:]+?)["']`)
+	quote := "['\"`]"
+	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:]+?)` + quote)
 
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
@@ -251,7 +252,7 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, doc)
+			SensitiveInfoCollect(Url, doc, filename)
 		}
 	}
 
@@ -300,7 +301,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, html)
+			SensitiveInfoCollect(Url, html, filename)
 		}
 
 		// a, link 标签
@@ -322,7 +323,6 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 			}
 			normalizeUrl := Normalize(src, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-
 				Spider(RootPath, normalizeUrl, depth-1, filename, myMap)
 			}
 		})
@@ -472,10 +472,10 @@ func PrintFinger(Url string, Depth int) {
 	// 首页
 	FirstUrl := RootPath + Host.Path
 
-	finger, server, title, contentType, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet)
+	finger, server, title, contentType, _, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
 
 	if statusCode != -1 {
-		result := CheckFinger(finger, title, Url, contentType, respBody, statusCode)
+		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
 		}
@@ -484,9 +484,9 @@ func PrintFinger(Url string, Depth int) {
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	finger, server, title, contentType, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost)
+	finger, server, title, contentType, _, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost, true)
 	if statusCode != -1 {
-		result := CheckFinger(finger, title, Url, contentType, respBody, statusCode)
+		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
 		}

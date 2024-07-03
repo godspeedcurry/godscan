@@ -828,6 +828,7 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 						result.Timestamp = int32(time.Now().Unix())
 
 						found = true
+						Warning("Probe found=%t", found)
 						return result, nil
 					} else
 					// soft 匹配，记录结果
