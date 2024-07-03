@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/godspeedcurry/godscan/common"
@@ -16,7 +17,7 @@ type PortOptions struct {
 	IpRange         string
 	IpRangeFile     string
 	PortRange       string
-	TopPorts        int
+	TopPorts        string
 	useAllProbes    bool
 	nullProbeOnly   bool
 	scanSendTimeout int
@@ -43,7 +44,7 @@ func init() {
 	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRangeFile, "host-file", "I", "", "your ip list file")
 
 	ipCmd.PersistentFlags().StringVarP(&portOptions.PortRange, "port", "p", strings.Join(common.DefaultPorts, ","), "your port list")
-	ipCmd.PersistentFlags().IntVarP(&portOptions.TopPorts, "top", "", 0, "top ports to scan, default is 500")
+	ipCmd.PersistentFlags().StringVarP(&portOptions.TopPorts, "top", "", "", "top ports to scan, default is empty")
 
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanSendTimeout, "scan-send-timeout", "s", 5, "Set connection send timeout in seconds")
 	ipCmd.PersistentFlags().IntVarP(&portOptions.scanReadTimeout, "scan-read-timeout", "r", 5, "Set connection read timeout in seconds")
@@ -90,12 +91,32 @@ func (o *PortOptions) run() {
 		utils.Info("Please provide ip range or ip range file")
 		return
 	}
-	if portOptions.TopPorts != 0 {
-		if portOptions.TopPorts > 20000 {
+	if portOptions.TopPorts != "" {
+		if strings.Contains(portOptions.TopPorts, "-") {
+			TopRangeBounds := strings.Split(portOptions.TopPorts, "-")
+			if len(TopRangeBounds) != 2 {
+				return
+			}
+
+			startPort, err := strconv.Atoi(strings.TrimSpace(TopRangeBounds[0]))
+			if err != nil {
+				return
+			}
+
+			endPort, err := strconv.Atoi(strings.TrimSpace(TopRangeBounds[1]))
+			if err != nil {
+				return
+			}
+			if startPort > endPort || endPort > 20000 {
+				utils.Info("We do not have more than top 20000 ports, please choose a smaller number, or just scan all ports use `-p 0-65535`")
+				return
+			}
+			utils.PortScan(portOptions.IpRange, strings.Join(strings.Split(common.AllPorts, ",")[startPort:endPort], ","))
+		} else if startPort, err := strconv.Atoi(portOptions.TopPorts); err != nil || startPort > 20000 {
 			utils.Info("We do not have more than top 20000 ports, please choose a smaller number, or just scan all ports use `-p 0-65535`")
 			return
 		} else {
-			utils.PortScan(portOptions.IpRange, strings.Join(strings.Split(common.AllPorts, ",")[0:portOptions.TopPorts], ","))
+			utils.PortScan(portOptions.IpRange, strings.Join(strings.Split(common.AllPorts, ",")[0:startPort], ","))
 		}
 
 	} else {
