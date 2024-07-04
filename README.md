@@ -77,7 +77,16 @@ source /tmp/x
 ```
 ### 基础功能三：端口扫描
 ```bash
-./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'  
+# 默认top 500
+./godscan port -i '1.2.3.4/28'
+# 自定义端口
+./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'
+# 指定top端口 数字范围在20000以内
+./godscan port -i '1.2.3.4/28' --top 1000
+# 第top100~第top200端口
+./godscan port -i '1.2.3.4/28' --top 100-200
+# 第top1000~第top2000端口
+./godscan port -i '1.2.3.4/28' --top 1000-2000
 ```
 * 使用nmap的探针规则进行探测,基于golang版本的nmap探针工具[vscan_go](https://github.com/RickGray/vscan-go)修改而来
 * 加入了自定义规则，针对性识别JDWP和HTTP协议，目前市面上的扫描器不针对性实现的话无法扫到JDWP
