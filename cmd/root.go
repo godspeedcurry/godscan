@@ -3,13 +3,14 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/google/go-github/v57/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"os"
-	"strings"
 )
 
 var version = "v1.1.25"
@@ -126,9 +127,9 @@ func Execute() {
 	viper.SetDefault("proxy", SetProxyFromEnv())
 
 	if viper.GetString("proxy") != "" {
-		utils.Info("Proxy is %s", viper.GetString("proxy"))
+		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is %s\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"), viper.GetString("proxy"))
 	} else {
-		utils.Info("Proxy is null")
+		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is null\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"))
 	}
 	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
 	viper.SetDefault("private-ip", false)
