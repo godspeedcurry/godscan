@@ -3,16 +3,16 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"strings"
-    "github.com/godspeedcurry/godscan/utils"
 	"github.com/fatih/color"
+	"github.com/godspeedcurry/godscan/utils"
 	"github.com/google/go-github/v57/github"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"os"
+	"strings"
 )
 
-var version = "v1.1.24"
+var version = "v1.1.25"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
