@@ -208,6 +208,11 @@ git push origin :refs/tags/v1.xx
 
 
 ## 更新说明
+* 2024-07-01 新增全球端口top20000列表，`-p`参数保持不变
+  * `--top 500`
+  * `--top 500-1000`
+  * `--top 2000-3000`
+  * `-p 1-65535`
 * 2024-06-29 
   * 支持从环境变量(http_proxy,https_proxy,all_proxy)读代理，支持http、socks5
   * 新增单目标api去重结果(`.api.unique`)
