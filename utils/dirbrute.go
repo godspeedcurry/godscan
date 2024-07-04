@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"sync"
 
 	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
@@ -15,7 +16,8 @@ type IpHash struct {
 	Hash uint64
 }
 
-var fingerHashMap = make(map[IpHash]bool)
+// var fingerHashMap = make(map[IpHash]bool)
+var fingerHashMap sync.Map
 
 func formatUrl(raw string) string {
 	if !strings.HasPrefix(raw, "http") {
@@ -33,7 +35,7 @@ func DirBrute(baseUrl string, dir string) []string {
 	}
 	fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, dir)})
 	finger, _, title, contentType, location, respBody, statusCode := FingerScan(fullURL.String(), http.MethodGet, false)
-	if statusCode == 200 || statusCode == 500 || statusCode == 302 || statusCode == 301 {
+	if statusCode == 200 || statusCode == 500 || statusCode == 302 {
 		result = CheckFinger(finger, title, fullURL.String(), contentType, location, respBody, statusCode)
 	}
 	if len(result) > 0 {

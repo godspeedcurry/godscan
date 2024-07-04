@@ -18,7 +18,7 @@ const (
 	LevelDebug
 )
 
-func get_current_time() string {
+func GetCurrentTime() string {
 	return time.Now().Format("15:04:05")
 }
 
@@ -37,8 +37,8 @@ func log_print(level int, detail string) {
 }
 
 func LogBeautify(x string, colorAttr color.Attribute, y string, level int) {
-	log_print(level, fmt.Sprintf("[%s] [%s] %s", get_current_time(), color.New(colorAttr).Sprintf("%s", x), y))
-	log_record(level, fmt.Sprintf("[%s] [%s] %s", get_current_time(), x, y))
+	log_print(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), color.New(colorAttr).Sprintf("%s", x), y))
+	log_record(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), x, y))
 }
 
 func Debug(format string, args ...interface{}) {
