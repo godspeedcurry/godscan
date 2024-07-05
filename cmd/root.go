@@ -111,7 +111,7 @@ func Execute() {
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.HostFile, "host-file", "", "", "host file")
 
 	rootCmd.PersistentFlags().IntVarP(&GlobalOption.LogLevel, "loglevel", "v", 2, "level of your log")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputFile, "output", "o", "result.txt", "output file to write log and results")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputFile, "output", "o", "result.log", "output file to write log and results")
 
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.DefaultUA, "ua", "", "user agent", "set user agent")
 
@@ -125,6 +125,9 @@ func Execute() {
 
 	viper.BindPFlag("proxy", rootCmd.PersistentFlags().Lookup("proxy"))
 	viper.SetDefault("proxy", SetProxyFromEnv())
+
+	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
+	viper.SetDefault("output", "result.log")
 
 	if viper.GetString("proxy") != "" {
 		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is %s\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"), viper.GetString("proxy"))
