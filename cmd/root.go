@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.25"
+var version = "v1.1.26"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
