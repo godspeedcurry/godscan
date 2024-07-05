@@ -307,7 +307,7 @@ func CheckFinger(finger string, title string, Url string, contentType string, lo
 	host_port := host.Host
 	if _, ok := fingerHashMap.Load(IpHash{host_port, hash}); !ok {
 		fingerHashMap.Store(IpHash{host_port, hash}, true)
-		return []string{Url, title, finger, contentType, strconv.Itoa(statusCode), location, strconv.Itoa(len(respBody)), strconv.FormatUint(hash, 16), getSelectedElements(string(respBody))}
+		return []string{Url, title, finger, contentType, strconv.Itoa(statusCode), location, strconv.Itoa(len(respBody)), getSelectedElements(string(respBody)), strconv.FormatUint(hash, 36)}
 	}
 	return []string{}
 }
