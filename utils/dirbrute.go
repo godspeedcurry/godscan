@@ -46,6 +46,9 @@ func DirBrute(baseUrl string, dir string) []string {
 		if result[2] != common.NoFinger {
 			result[2] = color.GreenString(result[2])
 		}
+		if strings.Contains(result[5], "nacos") {
+			result[5] = color.GreenString(result[5])
+		}
 	}
 	return result
 }
