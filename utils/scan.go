@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"regexp"
@@ -991,10 +992,12 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 		worker := Worker{inTargetChan, outResultChan, &config}
 		worker.Start(&v, &wgWorkers)
 	}
-
+	ServiceInfoResults := []string{}
 	// 实时结果输出协程
 	wgOutput := sync.WaitGroup{}
 	wgOutput.Add(1)
+	var mu sync.Mutex
+
 	go func(wg *sync.WaitGroup) {
 		for {
 			result, ok := <-outResultChan
@@ -1004,7 +1007,11 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 				if len(banner) > 128 {
 					banner = banner[:128]
 				}
-				Success("%s://%s:%d", result.Name, result.Target.IP, result.Target.Port)
+				ServiceInfoResult := fmt.Sprintf("%s://%s:%d", result.Name, result.Target.IP, result.Target.Port)
+				mu.Lock()
+				ServiceInfoResults = append(ServiceInfoResults, ServiceInfoResult)
+				mu.Unlock()
+				Success("%s", ServiceInfoResult)
 				Warning("%s", hex.Dump([]byte(banner)))
 			} else {
 				break
@@ -1027,4 +1034,9 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	close(outResultChan)
 	Debug("Output goroutine finished")
 	wgOutput.Wait()
+
+	sort.Strings(ServiceInfoResults)
+	Success("🌲🌲🌲 Log at ./service.txt")
+	FileWrite("service.txt", strings.Join(ServiceInfoResults, "\n"))
+
 }
