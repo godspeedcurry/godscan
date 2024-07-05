@@ -26,7 +26,7 @@ func log_record(level int, detail string) {
 	if level > viper.GetInt("loglevel") {
 		return
 	}
-	FileWrite("result.log", detail+"\n")
+	FileWrite(viper.GetString("output"), detail+"\n")
 }
 
 func log_print(level int, detail string) {

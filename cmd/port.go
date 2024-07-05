@@ -53,7 +53,7 @@ func init() {
 	ipCmd.PersistentFlags().BoolVarP(&portOptions.useAllProbes, "all-probe", "a", false, "Use all probes to probe service")
 	ipCmd.PersistentFlags().BoolVarP(&portOptions.nullProbeOnly, "null-probe-only", "n", false, "Use all probes to probe service")
 
-	ipCmd.PersistentFlags().IntVarP(&portOptions.Threads, "threads", "t", 1000, "Number of threads to use, default is 1000")
+	ipCmd.PersistentFlags().IntVarP(&portOptions.Threads, "threads", "t", 1000, "Number of threads to use")
 
 	viper.BindPFlag("host", ipCmd.PersistentFlags().Lookup("host"))
 	viper.SetDefault("host", "")
