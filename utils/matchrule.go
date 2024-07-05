@@ -117,10 +117,12 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 	// 使用 govaluate 解析最终表达式
 	expr, err := govaluate.NewEvaluableExpression(input)
 	if err != nil {
+		Error("%s %s", err, input)
 		return false, err
 	}
 	result, err := expr.Evaluate(nil) // nil因为我们已经将所有东西预处理为true/false
 	if err != nil {
+		Error("%s %s", err, input)
 		return false, err
 	}
 
@@ -205,6 +207,7 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 			res, err := preprocessAndEvaluate(fp.Keyword[0], context)
 			if err != nil {
 				Error("%s %s", err, fp.Keyword[0])
+				continue
 			}
 			if res {
 				cms = append(cms, fp.Cms)
