@@ -96,9 +96,11 @@ match http m|^HTTP| p/HTTP Protocol/
 ```
 
 ### 增强功能一：弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
-* 数量级较大，在百万甚至千万级别
+* 默认基础模式，基础数量在数千级，可配合网络端在线使用或配合本地`hashcat`离线使用
+* `--full`模式，生成数量在万级，建议只配合本地`hashcat`离线使用
 * 会自动识别输入的身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
 * `weakpass`可简写为`weak`, `wp`, `wk`, `ww`
+* 新加入生日对应的阴历
 ```bash
 ./godscan weakpass -k "张三,110101199003070759,18288888888"
 # 中文会被转成英文，以一定格式生成弱口令，如干饭集团，需要自己去找一下他在网站中经常提到的一些叫法
@@ -134,7 +136,7 @@ match http m|^HTTP| p/HTTP Protocol/
 ```bash
 ./godscan spider --url http://example.com
 # -d 1 可以指定爬虫的深度 默认为2 可以适当提高深度至3 
-# 从文件批量爬取
+# 从文件批量爬取 适合针对API型资产 url不建议太多
 ./godscan spider --url-file url.txt
 ```
 注意：godscan默认不扫内网IP，来减少卡顿，如果要扫内网IP,使用`--private-ip`参数即可
