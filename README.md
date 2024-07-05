@@ -37,7 +37,7 @@ Flags:
       --host string        singel host
       --host-file string   host file
   -v, --loglevel int       level of your log (default 2)
-  -o, --output string      output file to write log and results (default "result.txt")
+  -o, --output string      output file to write log and results (default "result.log")
       --private-ip         scan private ip
       --proxy string       proxy
       --ua string          set user agent (default "user agent")
