@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Knetic/govaluate"
 	regexp2 "github.com/dlclark/regexp2"
@@ -114,6 +115,11 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 		}
 	}
 
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return false, nil
+	}
+
 	// 使用 govaluate 解析最终表达式
 	expr, err := govaluate.NewEvaluableExpression(input)
 	if err != nil {
@@ -170,12 +176,22 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 		Fatal("%s %s unmarshal failed", url, err)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
+	ContentLengthStr := resp.Header.Get("Content-Length")
+	ServerContentType := resp.Header.Get("Content-Type")
+	ContentLength, err := strconv.Atoi(ContentLengthStr)
+	if err != nil {
+		Fatal("%s %s %s", url, err, ContentLengthStr)
+		return common.NoFinger, "", "", "", "", nil, -1
+	}
+	if ContentLength > 1024*1024*10 { // 10M
+		return "Large Data", retServerValue, "Large Data size = [" + ContentLengthStr + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
+	}
 	var cms []string
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	_, contentType, _ := charset.DetermineEncoding(bodyBytes, resp.Header.Get("Content-Type"))
-	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), contentType)
+	_, DetermineContentType, _ := charset.DetermineEncoding(bodyBytes, ServerContentType)
+	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), DetermineContentType)
 	if err != nil {
-		Fatal("%s %s %s", url, err, contentType)
+		Fatal("%s %s %s", url, err, DetermineContentType)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	doc, err := goquery.NewDocumentFromReader(reader)

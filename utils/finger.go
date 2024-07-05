@@ -255,7 +255,6 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 			SensitiveInfoCollect(Url, doc, filename)
 		}
 	}
-
 }
 
 func Spider(RootPath string, Url string, depth int, filename string, myMap mapset.Set) error {
