@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cheggaaa/pb/v3"
 	regexp2 "github.com/dlclark/regexp2"
 
 	"github.com/spf13/viper"
@@ -972,9 +973,10 @@ func (w *Worker) Start(v *VScan, wg *sync.WaitGroup) {
 }
 
 func ScanWithIpAndPort(addr []ProtocolInfo) {
+	Info("Total addr(s): %d", len(addr))
 	ConfigInit()
 	runtime.GOMAXPROCS(runtime.NumCPU())
-
+	bar := pb.StartNew(len(addr))
 	// 初始化 VScan 实例，并加载默认 nmap-service-probes 文件解析 Probe 列表
 	v := VScan{}
 	v.Init()
@@ -1007,6 +1009,7 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 				if len(banner) > 128 {
 					banner = banner[:128]
 				}
+				bar.Increment()
 				ServiceInfoResult := fmt.Sprintf("%s://%s:%d", result.Name, result.Target.IP, result.Target.Port)
 				mu.Lock()
 				ServiceInfoResults = append(ServiceInfoResults, ServiceInfoResult)
