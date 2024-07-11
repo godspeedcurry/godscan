@@ -52,6 +52,10 @@ Flags:
 ./godscan completion zsh > /tmp/x
 source /tmp/x
 ```
+### 日志清理
+```
+./godscan clean
+```
 ### 基础功能一：目录扫描
 #### 单一目录扫描
 * `dirbrute`可简写为`dir`,`dirb`,`dd`
@@ -63,6 +67,7 @@ source /tmp/x
 3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
 4. 基于相似哈希算法计算页面哈希，用于资产量较大的情况分辨重点资产
 5. 基于高德猜想——四等分点算法提取`0,1/4,1/2,3/4,1`处的关键字 辅助识别页面内容 NLP暂时不考虑 还没找到golang下很成熟的主题识别框架
+6. 默认不跟随重定向，可使用`-L`跟随重定向
 
 #### 批量目录扫描+指纹识别(基于golang协程)
 ```bash
@@ -148,8 +153,8 @@ match http m|^HTTP| p/HTTP Protocol/
 - [x] POST请求构造报错 
 - [x] 爬虫 递归访问
 - [x] 正则提取注释 注释里往往有版本 github仓库等信息(删了 误报太多)
-- [x] 版本识别并高亮
-- [x] 对注释里的内容匹配到关键字并高亮
+- [x] 版本识别并高亮（删了 误报太多）
+- [x] 对注释里的内容匹配到关键字并高亮(删了 误报太多)
 - [x] 识别接口 主要从js里提取
 - [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
 - [x] vue.js 前端 识别`(app|index|main|config).xxxx.js` 并使用正则提取里面的path

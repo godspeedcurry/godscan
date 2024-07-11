@@ -12,8 +12,9 @@ import (
 )
 
 type DirbruteOptions struct {
-	DirFile string
-	Threads int
+	DirFile        string
+	Threads        int
+	FollowRedirect bool
 }
 
 var (
@@ -93,8 +94,12 @@ func init() {
 
 	dirbruteCmd.PersistentFlags().IntVarP(&dirbruteOptions.Threads, "threads", "t", 30, "Number of goroutine to use")
 
+	dirbruteCmd.PersistentFlags().BoolVarP(&dirbruteOptions.FollowRedirect, "redirect", "L", false, "allow redirect")
 	viper.BindPFlag("dirbrute-threads", dirbruteCmd.PersistentFlags().Lookup("threads"))
 	viper.SetDefault("dirbrute-threads", 30)
+
+	viper.BindPFlag("redirect", dirbruteCmd.PersistentFlags().Lookup("redirect"))
+	viper.SetDefault("redirect", false)
 
 	rootCmd.AddCommand(dirbruteCmd)
 }

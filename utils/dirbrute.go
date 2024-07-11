@@ -9,6 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/spf13/viper"
 )
 
 type IpHash struct {
@@ -34,7 +35,7 @@ func DirBrute(baseUrl string, dir string) []string {
 		return []string{}
 	}
 	fullURL := baseURL.ResolveReference(&url.URL{Path: path.Join(baseURL.Path, dir)})
-	finger, _, title, contentType, location, respBody, statusCode := FingerScan(fullURL.String(), http.MethodGet, false)
+	finger, _, title, contentType, location, respBody, statusCode := FingerScan(fullURL.String(), http.MethodGet, viper.GetBool("redirect"))
 	if statusCode == 200 || statusCode == 500 || statusCode == 302 {
 		result = CheckFinger(finger, title, fullURL.String(), contentType, location, respBody, statusCode)
 	}

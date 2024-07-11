@@ -174,7 +174,7 @@ func ImportantApiJudge(ApiResult string, Url string) {
 
 func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	quote := "['\"`]"
-	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:]+?)` + quote)
+	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
 
 	ApiResultTuple := ApiReg.FindAllStringSubmatch(strings.ReplaceAll(doc, "\\", ""), -1)
 	ApiResult := []string{}
@@ -272,9 +272,13 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 		return err
 	}
 	defer resp.Body.Close()
-
+	u, err := url.Parse(Url)
+	if err != nil {
+		Error("%s", Url)
+		return err
+	}
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
-	if IsVuePath(Url) {
+	if IsVuePath(u.Path) {
 		bufStr := ""
 		buf := make([]byte, 4096)
 		for {
@@ -418,7 +422,9 @@ func FindFaviconURL(urlStr string) (string, error) {
 			href, exists := s.Attr("href")
 			if exists {
 				// 检查是否是绝对路径
-				if isAbsoluteURL(href) {
+				if strings.HasPrefix(href, "//") {
+					faviconURL = baseURL.Scheme + ":" + href
+				} else if isAbsoluteURL(href) {
 					faviconURL = href
 				} else {
 					// 解析相对路径并构建完整URL
