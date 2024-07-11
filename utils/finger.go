@@ -187,16 +187,16 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 
 	if ApiResultLen > 0 {
 		FileWrite(filename+".api.raw", "==== "+Url+" ====\n")
-		Success("[" + Url + "] Api Path")
+		Success("[%s] Api Path Found %d.", Url, ApiResultLen)
+		var totalResult = strings.Join(ApiResult, "\n")
 		if ApiResultLen > 50 {
-			var tmpResult1 = strings.Join(ApiResult[:50], "\n")
-			Success(tmpResult1)
-			FileWrite(filename+".api.raw", tmpResult1+"\n")
+			Info("We only show 50 lines, please remember to check at ./%s", filename+".api.raw")
+			fmt.Println(strings.Join(ApiResult[:50], "\n"))
+			FileWrite(filename+".api.raw", totalResult+"\n")
 		} else {
-			var tmpResult2 = strings.Join(ApiResult, "\n")
-			ImportantApiJudge(tmpResult2, Url)
-			Success(tmpResult2)
-			FileWrite(filename+".api.raw", tmpResult2+"\n")
+			ImportantApiJudge(totalResult, Url)
+			fmt.Println(totalResult)
+			FileWrite(filename+".api.raw", totalResult+"\n")
 		}
 	}
 
