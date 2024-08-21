@@ -17,7 +17,6 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/godspeedcurry/godscan/common"
-	"github.com/spf13/viper"
 	"golang.org/x/net/html/charset"
 )
 
@@ -144,8 +143,9 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 		Fatal("%s %s xxx", url, err)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
-	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 	req.Header.Set("Cookie", "rememberMe=me")
+	SetHeaders(req)
+
 	if !followRedirect {
 		Client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
