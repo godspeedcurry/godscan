@@ -53,7 +53,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	if Method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
-	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
+	SetHeaders(req)
 	resp, err := Client.Do(req)
 	if err != nil {
 		return "", "", "", err
@@ -129,9 +129,9 @@ func parseDir(fullPath string, MaxDepth int) []string {
 }
 
 func isValidUrl(Url string) bool {
-	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com", "apache.org", "gitlab.com", "centos.org"}
+	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com", "apache.org", "gitlab.com", "centos.org", "logout"}
 	for _, key := range arr {
-		if strings.Contains(Url, key) {
+		if strings.Contains(strings.ToLower(Url), key) {
 			return false
 		}
 	}
@@ -266,7 +266,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 	if err != nil {
 		return err
 	}
-	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
+	SetHeaders(req)
 	resp, err := Client.Do(req)
 	if err != nil {
 		return err
@@ -361,7 +361,7 @@ var icon_json string
 
 func IconDetect(Url string) (string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
-	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
+	SetHeaders(req)
 	resp, err := Client.Do(req)
 
 	if err != nil {
@@ -396,7 +396,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 
 	// 获取HTML内容
 	req, _ := http.NewRequest(http.MethodGet, urlStr, nil)
-	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
+	SetHeaders(req)
 	resp, err := Client.Do(req)
 	if err != nil {
 		return "", err

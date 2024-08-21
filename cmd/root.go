@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.26"
+var version = "v1.1.27"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
@@ -55,6 +55,7 @@ type GlobalOptions struct {
 
 	DefaultUA     string
 	ScanPrivateIp bool
+	Headers       []string
 }
 
 var (
@@ -101,7 +102,7 @@ func SetProxyFromEnv() string {
 	return ""
 }
 
-func Execute() {
+func init() {
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "singel url")
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "", "", "url file")
 
@@ -117,6 +118,8 @@ func Execute() {
 
 	rootCmd.PersistentFlags().BoolVarP(&GlobalOption.ScanPrivateIp, "private-ip", "", false, "scan private ip")
 
+	rootCmd.PersistentFlags().StringArrayVarP(&GlobalOption.Headers, "headers", "H", nil, "Custom headers")
+
 	viper.BindPFlag("loglevel", rootCmd.PersistentFlags().Lookup("loglevel"))
 	viper.SetDefault("loglevel", 2)
 
@@ -129,13 +132,19 @@ func Execute() {
 	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 	viper.SetDefault("output", "result.log")
 
+	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
+	viper.SetDefault("private-ip", false)
+
+	viper.BindPFlag("headers", rootCmd.PersistentFlags().Lookup("headers"))
+	viper.SetDefault("headers", []string{})
+
+}
+
+func Execute() {
 	if viper.GetString("proxy") != "" {
 		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is %s\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"), viper.GetString("proxy"))
 	} else {
 		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is null\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"))
 	}
-	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
-	viper.SetDefault("private-ip", false)
-
 	cobra.CheckErr(rootCmd.Execute())
 }

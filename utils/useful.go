@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html"
 	"math/rand"
+	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/mfonda/simhash"
 	"github.com/olekukonko/tablewriter"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -337,4 +339,22 @@ func WriteToCsv(filename string, data []string) {
 		panic(err)
 	}
 	writer.Flush()
+}
+
+func SetHeaders(req *http.Request) {
+	// 设置 User-Agent
+	req.Header.Set("User-Agent", viper.GetString("ua"))
+
+	// 设置自定义的请求头
+	headers := viper.GetStringSlice("headers")
+	for _, header := range headers {
+		parts := strings.SplitN(header, ":", 2)
+		if len(parts) != 2 {
+			Debug("Error: Invalid header format, correct format is 'Key: Value'")
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		req.Header.Set(key, value)
+	}
 }

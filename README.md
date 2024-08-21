@@ -33,16 +33,19 @@ Available Commands:
   weakpass    Start the application (Aliases: weak, wp, wk, ww)
 
 Flags:
-  -h, --help               help for godscan
-      --host string        singel host
-      --host-file string   host file
-  -v, --loglevel int       level of your log (default 2)
-  -o, --output string      output file to write log and results (default "result.log")
-      --private-ip         scan private ip
-      --proxy string       proxy
-      --ua string          set user agent (default "user agent")
-  -u, --url string         singel url
-      --url-file string    url file
+  -H, --headers stringArray   Custom headers
+  -h, --help                  help for godscan
+      --host string           singel host
+      --host-file string      host file
+  -v, --loglevel int          level of your log (default 2)
+  -o, --output string         output file to write log and results (default "result.log")
+      --private-ip            scan private ip
+      --proxy string          proxy
+      --ua string             set user agent (default "user agent")
+  -u, --url string            singel url
+      --url-file string       url file
+
+Use "godscan [command] --help" for more information about a command.
 ```
 
 
@@ -224,6 +227,7 @@ git push origin :refs/tags/v1.xx
 
 
 ## 更新说明
+* 2024-08-21 支持带cookie访问
 * 2024-07-01 新增全球端口top20000列表，`-p`参数保持不变
   * `--top 500`
   * `--top 500-1000`
