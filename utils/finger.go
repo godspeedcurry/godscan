@@ -172,7 +172,7 @@ func ImportantApiJudge(ApiResult string, Url string) {
 	}
 }
 
-func parseVueUrl(Url string, RootPath string, doc string, filename string) {
+func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
 
@@ -186,17 +186,17 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 	ApiResultLen := len(ApiResult)
 
 	if ApiResultLen > 0 {
-		FileWrite(filename+".api.raw", "==== "+Url+" ====\n")
+		FileWrite(directory+"api_raw.txt", "==== "+Url+" ====\n")
 		Success("[%s] Api Path Found %d.", Url, ApiResultLen)
 		var totalResult = strings.Join(ApiResult, "\n")
 		if ApiResultLen > 50 {
-			Info("We only show 50 lines, please remember to check at ./%s", filename+".api.raw")
+			Info("We only show 50 lines, please remember to check at ./%s", directory+"api_raw.txt")
 			fmt.Println(strings.Join(ApiResult[:50], "\n"))
-			FileWrite(filename+".api.raw", totalResult+"\n")
+			FileWrite(directory+"api_raw.txt", totalResult+"\n")
 		} else {
 			ImportantApiJudge(totalResult, Url)
 			fmt.Println(totalResult)
-			FileWrite(filename+".api.raw", totalResult+"\n")
+			FileWrite(directory+"api_raw.txt", totalResult+"\n")
 		}
 	}
 
@@ -218,9 +218,9 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 
 	subdirs = RemoveDuplicatesString(subdirs)
 	if len(subdirs) > 0 {
-		FileWrite(filename+".sub-directory", strings.Join(subdirs, "\n")+"\n")
+		FileWrite(directory+"sub_directory.txt", strings.Join(subdirs, "\n")+"\n")
 		var wg sync.WaitGroup
-		file, err := os.OpenFile(filename+".sub-directory", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+		file, err := os.OpenFile(directory+"sub_directory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			Error("%s", err)
 			return
@@ -252,12 +252,12 @@ func parseVueUrl(Url string, RootPath string, doc string, filename string) {
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, doc, filename)
+			SensitiveInfoCollect(Url, doc, directory)
 		}
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, filename string, myMap mapset.Set) error {
+func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set) error {
 	if uselessUrl(Url, depth) {
 		return nil
 	}
@@ -289,7 +289,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 			}
 			bufStr += string(buf[:n])
 		}
-		parseVueUrl(Url, RootPath, bufStr, filename)
+		parseVueUrl(Url, RootPath, bufStr, directory)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
@@ -304,7 +304,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, html, filename)
+			SensitiveInfoCollect(Url, html, directory)
 		}
 
 		// a, link 标签
@@ -315,7 +315,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 			}
 			normalizeUrl := Normalize(href, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, filename, myMap)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap)
 			}
 		})
 		// iframe, script 标签
@@ -326,7 +326,7 @@ func Spider(RootPath string, Url string, depth int, filename string, myMap mapse
 			}
 			normalizeUrl := Normalize(src, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, filename, myMap)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap)
 			}
 		})
 	}
@@ -450,16 +450,16 @@ func isAbsoluteURL(urlStr string) bool {
 	return u.IsAbs()
 }
 
-func ApiDeDuplicate(RootPath string, filename string) {
-	rawApi := FileReadLine(filename + ".api.raw")
+func ApiDeDuplicate(RootPath string, directory string) {
+	rawApi := FileReadLine(directory + "api_raw.txt")
 	fullPaths := []string{}
 	if len(rawApi) > 0 {
-		FileWrite(filename+".api.unique", strings.Join(rawApi, "\n"))
+		FileWrite(directory+"api_unique.txt", strings.Join(rawApi, "\n"))
 		for _, raw := range rawApi {
 			fullPaths = append(fullPaths, RootPath+raw)
 		}
-		FileWrite(filename+".api.unique.path", "==== Try: dirbrute --url-file "+filename+".api.unique.path\n")
-		FileWrite(filename+".api.unique.path", strings.Join(fullPaths, "\n")+"\n")
+		FileWrite(directory+"api_unique_full.txt", "==== Try: dirbrute --url-file "+directory+"api_unique_full.txt\n")
+		FileWrite(directory+"api_unique_full.txt", strings.Join(fullPaths, "\n")+"\n")
 	}
 }
 
@@ -511,20 +511,20 @@ func PrintFinger(Url string, Depth int) {
 		Error("%s", err)
 		return
 	}
-	filename := fmt.Sprintf("%s/%s/spider.log", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
-	err = Spider(RootPath, Url, Depth, filename, myMap)
+	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
+	err = Spider(RootPath, Url, Depth, directory, myMap)
 	if err != nil {
 		Error("%s", err)
 		return
 	}
-	ApiDeDuplicate(RootPath, filename)
+	ApiDeDuplicate(RootPath, directory)
 
 	var myList []string
 	for item := range myMap.Iter() {
 		myList = append(myList, item.(string))
 	}
 	if len(myList) > 0 {
-		Success("🌲🌲🌲 More info at ./%s", filename)
+		Success("🌲🌲🌲 More info at ./%s", directory)
 	}
-	FileWrite(filename, strings.Join(myList, "\n")+"\n")
+	FileWrite(directory+"spider.log", strings.Join(myList, "\n")+"\n")
 }
