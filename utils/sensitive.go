@@ -83,7 +83,7 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 	}
 	defer file.Close()
 
-	FileWrite(filename, "[%s] [%s]\n", Url, key)
+	FileWrite(filename, "\n[%s] [%s]\n", Url, key)
 
 	multiWriter := io.MultiWriter(os.Stdout, file)
 	table := tablewriter.NewWriter(multiWriter)
@@ -109,7 +109,7 @@ func UrlFilter(Url string) bool {
 	}
 	return false
 }
-func SensitiveInfoCollect(Url string, Content string, filename string) {
+func SensitiveInfoCollect(Url string, Content string, directory string) {
 	space := `[\s]{0,30}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
@@ -124,7 +124,6 @@ func SensitiveInfoCollect(Url string, Content string, filename string) {
 	infoMap["Chinese Mobile Number"] = `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`
 	infoMap["Internal IP Address"] = `[^0-9]((10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`
 	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/%.]*)?)`
-	// infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:([/\w\-]*)))`
 	// 内容在右边
 	infoMap["security-rule-0"] = `(?i)` + `(` + quote + sec + quote + space + equals + space + mustQuote + content + mustQuote + `)`
 	// 内容在左边
@@ -151,8 +150,8 @@ func SensitiveInfoCollect(Url string, Content string, filename string) {
 			if len(otherData) > 0 && len(otherData) < 20 {
 				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
 			} else if len(otherData) != 0 {
-				Success("🌲🌲🌲 More info at ./%s, found %d urls", filename+".urls", len(otherData))
-				FileWrite(filename+".urls", "[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
+				Success("🌲🌲🌲 More info at ./%s, found %d urls at %s", directory+"urls.txt", len(otherData), Url)
+				FileWrite(directory+"urls.txt", "======[%s]======[%s]\n%s", Url, key, strings.Join(otherData, "\n")+"\n")
 			}
 			if len(secData) > 0 {
 				PrintTable(Url, key, DeduplicateByContent(secData))

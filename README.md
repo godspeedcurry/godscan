@@ -235,9 +235,9 @@ git push origin :refs/tags/v1.xx
   * `-p 1-65535`
 * 2024-06-29 
   * 支持从环境变量(http_proxy,https_proxy,all_proxy)读代理，支持http、socks5
-  * 新增单目标api去重结果(`.api.unique`)
-  * 新增单目标api完整路径结果(`.api.unique.path`)此时可使用dirbrute模块再递归扫一遍
-  * dirbrute模块新增多个actuator目录遍历绕过，`..;/`的数量为1-5和8，共六个，用于暴力遍历寻找actuator接口,可与`.api.unique.path`结合使用
+  * 新增单目标api去重结果(`_api_unique.txt`)
+  * 新增单目标api完整路径结果(`_api_unique_path.txt`)此时可使用dirbrute模块再递归扫一遍
+  * dirbrute模块新增多个actuator目录遍历绕过，`..;/`的数量为1-5和8，共六个，用于暴力遍历寻找actuator接口,可与`_api_unique.path`结合使用
 * 2024-04-15 修复map并发状态下的读写条件竞争，换成sync.Map
 * 2024-04-09 优化日志输出
 * 2024-01-11 修改从JS中寻找弱口令的正则，使用香农熵算法计算密码复杂度,使用表格显示
