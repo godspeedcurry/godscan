@@ -350,8 +350,8 @@ func SetHeaders(req *http.Request) {
 	for _, header := range headers {
 		parts := strings.SplitN(header, ":", 2)
 		if len(parts) != 2 {
-			Debug("Error: Invalid header format, correct format is 'Key: Value'")
-			continue
+			Info("Invalid header format, correct format is 'Key: Value'")
+			os.Exit(1)
 		}
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
