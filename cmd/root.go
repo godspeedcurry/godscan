@@ -118,7 +118,7 @@ func init() {
 
 	rootCmd.PersistentFlags().BoolVarP(&GlobalOption.ScanPrivateIp, "private-ip", "", false, "scan private ip")
 
-	rootCmd.PersistentFlags().StringArrayVarP(&GlobalOption.Headers, "headers", "H", nil, "Custom headers")
+	rootCmd.PersistentFlags().StringArrayVarP(&GlobalOption.Headers, "headers", "H", nil, "Custom headers, eg: -H 'Cookie: 123'")
 
 	viper.BindPFlag("loglevel", rootCmd.PersistentFlags().Lookup("loglevel"))
 	viper.SetDefault("loglevel", 2)
