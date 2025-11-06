@@ -33,6 +33,7 @@ Available Commands:
   weakpass    Start the application (Aliases: weak, wp, wk, ww)
 
 Flags:
+  -e, --filter stringArray    Filter url, eg: -e 'abc.com'
   -H, --headers stringArray   Custom headers, eg: -H 'Cookie: 123'
   -h, --help                  help for godscan
       --host string           singel host
