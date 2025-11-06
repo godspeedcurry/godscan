@@ -56,6 +56,8 @@ type GlobalOptions struct {
 	DefaultUA     string
 	ScanPrivateIp bool
 	Headers       []string
+
+	Filter []string
 }
 
 var (
@@ -120,6 +122,8 @@ func init() {
 
 	rootCmd.PersistentFlags().StringArrayVarP(&GlobalOption.Headers, "headers", "H", nil, "Custom headers, eg: -H 'Cookie: 123'")
 
+	rootCmd.PersistentFlags().StringArrayVarP(&GlobalOption.Filter, "filter", "e", nil, "Filter url, eg: -e 'abc.com'")
+
 	viper.BindPFlag("loglevel", rootCmd.PersistentFlags().Lookup("loglevel"))
 	viper.SetDefault("loglevel", 2)
 
@@ -137,6 +141,9 @@ func init() {
 
 	viper.BindPFlag("headers", rootCmd.PersistentFlags().Lookup("headers"))
 	viper.SetDefault("headers", []string{})
+
+	viper.BindPFlag("filter", rootCmd.PersistentFlags().Lookup("filter"))
+	viper.SetDefault("filter", []string{})
 
 }
 

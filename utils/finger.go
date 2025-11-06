@@ -172,6 +172,17 @@ func ImportantApiJudge(ApiResult string, Url string) {
 	}
 }
 
+func filterOutUrl(Url string) bool {
+	filters := viper.GetStringSlice("filter")
+
+	for _, filter := range filters {
+		if strings.Contains(Url, filter) {
+			return true
+		}
+	}
+	return false
+}
+
 func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
@@ -258,7 +269,7 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 }
 
 func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set) error {
-	if uselessUrl(Url, depth) {
+	if uselessUrl(Url, depth) || filterOutUrl(Url) {
 		return nil
 	}
 	myMap.Add(Url)
