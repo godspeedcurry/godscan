@@ -12,3 +12,4 @@ dist/
 *.csv
 *.js
 .DS_Store
+.gocache/
