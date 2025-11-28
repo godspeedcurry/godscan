@@ -56,12 +56,13 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	SetHeaders(req)
 	resp, err := Client.Do(req)
 	if err != nil {
+		logRequestError(Url, err)
 		return "", "", "", err
 	}
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		Error("%s", err)
+		logRequestError(Url, err)
 		return "", "", "", err
 	}
 
@@ -98,7 +99,7 @@ func HighLight(data string, keywords []string, fingers []string, Url string) {
 		}
 	}
 	if output {
-		fmt.Println(Url + "\n" + data)
+		Info("%s\n%s", Url, data)
 	}
 }
 
@@ -202,11 +203,11 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 		var totalResult = strings.Join(ApiResult, "\n")
 		if ApiResultLen > 50 {
 			Info("We only show 50 lines, please remember to check at ./%s", directory+"api_raw.txt")
-			fmt.Println(strings.Join(ApiResult[:50], "\n"))
+			Info("%s", strings.Join(ApiResult[:50], "\n"))
 			FileWrite(directory+"api_raw.txt", totalResult+"\n")
 		} else {
 			ImportantApiJudge(totalResult, Url)
-			fmt.Println(totalResult)
+			Info("%s", totalResult)
 			FileWrite(directory+"api_raw.txt", totalResult+"\n")
 		}
 	}
@@ -231,6 +232,7 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 	if len(subdirs) > 0 {
 		FileWrite(directory+"sub_directory.txt", strings.Join(subdirs, "\n")+"\n")
 		var wg sync.WaitGroup
+		rows := make(chan []string)
 		file, err := os.OpenFile(directory+"sub_directory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 		if err != nil {
 			Error("%s", err)
@@ -253,11 +255,18 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 				wg.Add(1)
 				go func(url string, dir string) {
 					defer wg.Done()
-					AddDataToTable(table, DirBrute(url, dir))
+					ret := DirBrute(url, dir)
+					rows <- ret
 				}(line, dir)
 			}
 		}
-		wg.Wait()
+		go func() {
+			wg.Wait()
+			close(rows)
+		}()
+		for ret := range rows {
+			AddDataToTable(table, ret)
+		}
 		if table.NumLines() >= 1 {
 			table.Render()
 		}
@@ -290,16 +299,13 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 	}
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(u.Path) {
-		bufStr := ""
-		buf := make([]byte, 4096)
-		for {
-			n, err := resp.Body.Read(buf)
-			if err == io.EOF {
-				bufStr += string(buf[:n])
-				break
-			}
-			bufStr += string(buf[:n])
+		maxBody := viper.GetInt("max-body-bytes")
+		if maxBody <= 0 {
+			maxBody = 2 * 1024 * 1024
 		}
+		limited := io.LimitReader(resp.Body, int64(maxBody))
+		bodyBuf, _ := io.ReadAll(limited)
+		bufStr := string(bodyBuf)
 		parseVueUrl(Url, RootPath, bufStr, directory)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -349,7 +355,7 @@ func DisplayHeader(Url string, Method string) {
 	if err != nil {
 		Error("Error: %s", err)
 	} else {
-		Info("[%s] [%s] [%s] [%s] [%s]", Url, Method, ServerHeader, Status, Title)
+		Info("url=\"%s\" method=\"%s\" server=\"%s\" status=\"%s\" title=\"%s\"", Url, Method, ServerHeader, Status, Title)
 	}
 }
 
@@ -376,7 +382,7 @@ func IconDetect(Url string) (string, error) {
 	resp, err := Client.Do(req)
 
 	if err != nil {
-		Error("%s", err)
+		logRequestError(Url, err)
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -410,6 +416,7 @@ func FindFaviconURL(urlStr string) (string, error) {
 	SetHeaders(req)
 	resp, err := Client.Do(req)
 	if err != nil {
+		logRequestError(urlStr, err)
 		return "", err
 	}
 	defer resp.Body.Close()
@@ -487,33 +494,36 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetAutoWrapText(false)
+	table.SetHeader(common.TableHeader)
 
-	finger, server, title, contentType, _, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
+	finger, _, title, contentType, _, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
 
 	if statusCode != -1 {
 		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
+			AddDataToTable(table, result)
 		}
-		Info("%s [%s] [%s] [%s] [%d]", Url, finger, server, title, statusCode)
 	}
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	finger, server, title, contentType, _, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost, true)
+	finger, _, title, contentType, _, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost, true)
 	if statusCode != -1 {
 		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
+			AddDataToTable(table, result)
 		}
-		Info("%s [%s] [%s] [%s] [%d]", SecondUrl, finger, server, title, statusCode)
 	}
 
 	IconUrl, err := FindFaviconURL(RootPath)
 	if err == nil {
 		IconDetect(IconUrl)
 	} else {
-		Error("%s", err)
+		Debug("%s", err)
 	}
 	// 爬虫递归爬
 	myMap := mapset.NewSet()
@@ -536,6 +546,9 @@ func PrintFinger(Url string, Depth int) {
 	}
 	if len(myList) > 0 {
 		Success("🌲🌲🌲 More info at ./%s", directory)
+	}
+	if table.NumLines() >= 1 {
+		table.Render()
 	}
 	FileWrite(directory+"spider.log", strings.Join(myList, "\n")+"\n")
 }

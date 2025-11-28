@@ -22,23 +22,42 @@ func GetCurrentTime() string {
 	return time.Now().Format("15:04:05")
 }
 
-func log_record(level int, detail string) {
-	if level > viper.GetInt("loglevel") {
+func shouldLog(level int) bool {
+	if level == LevelFatal {
+		return true
+	}
+	return level <= viper.GetInt("loglevel")
+}
+
+func logRecord(level int, detail string) {
+	if !shouldLog(level) {
 		return
 	}
 	FileWrite(viper.GetString("output"), detail+"\n")
 }
 
-func log_print(level int, detail string) {
-	if level > viper.GetInt("loglevel") {
+func logPrint(level int, detail string) {
+	if !shouldLog(level) {
+		return
+	}
+	if viper.GetBool("quiet") {
+		return
+	}
+	if viper.GetBool("json") {
+		type jl struct {
+			Time    string `json:"time"`
+			Level   string `json:"level"`
+			Message string `json:"message"`
+		}
+		fmt.Println(fmt.Sprintf(`{"time":"%s","level":"%s","message":%q}`, GetCurrentTime(), levelName(level), detail))
 		return
 	}
 	fmt.Println(detail)
 }
 
 func LogBeautify(x string, colorAttr color.Attribute, y string, level int) {
-	log_print(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), color.New(colorAttr).Sprintf("%s", x), y))
-	log_record(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), x, y))
+	logPrint(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), color.New(colorAttr).Sprintf("%s", x), y))
+	logRecord(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), x, y))
 }
 
 func Debug(format string, args ...interface{}) {
@@ -67,4 +86,25 @@ func Error(format string, args ...interface{}) {
 
 func Fatal(format string, args ...interface{}) {
 	LogBeautify("FATAL", color.FgHiRed, fmt.Sprintf(format, args...), LevelFatal)
+}
+
+func levelName(level int) string {
+	switch level {
+	case LevelInfo:
+		return "INFO"
+	case LevelSuccess:
+		return "SUCCESS"
+	case LevelFailed:
+		return "FAILED"
+	case LevelWarning:
+		return "WARN"
+	case LevelError:
+		return "ERROR"
+	case LevelFatal:
+		return "FATAL"
+	case LevelDebug:
+		return "DEBUG"
+	default:
+		return "INFO"
+	}
 }

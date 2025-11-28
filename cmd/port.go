@@ -24,6 +24,7 @@ type PortOptions struct {
 	scanReadTimeout int
 	scanRarity      int
 	Threads         int
+	DialTimeout     int
 }
 
 var (
@@ -54,12 +55,15 @@ func init() {
 	ipCmd.PersistentFlags().BoolVarP(&portOptions.nullProbeOnly, "null-probe-only", "n", false, "Use all probes to probe service")
 
 	ipCmd.PersistentFlags().IntVarP(&portOptions.Threads, "threads", "t", 1000, "Number of threads to use")
+	ipCmd.PersistentFlags().IntVarP(&portOptions.DialTimeout, "port-dial-timeout", "", 2, "TCP dial timeout in seconds")
 
 	viper.BindPFlag("host", ipCmd.PersistentFlags().Lookup("host"))
 	viper.SetDefault("host", "")
 
 	viper.BindPFlag("threads", ipCmd.PersistentFlags().Lookup("threads"))
 	viper.SetDefault("threads", 1000)
+	viper.BindPFlag("port-dial-timeout", ipCmd.PersistentFlags().Lookup("port-dial-timeout"))
+	viper.SetDefault("port-dial-timeout", 2)
 
 	viper.BindPFlag("port", ipCmd.PersistentFlags().Lookup("port"))
 	viper.SetDefault("port", "")

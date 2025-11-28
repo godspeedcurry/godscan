@@ -132,8 +132,12 @@ func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync
 	defer wg.Done()
 
 	for task := range tasks {
-		address := fmt.Sprintf("%s:%d", task.Ip, task.Port)
-		conn, err := net.DialTimeout("tcp", address, 2*time.Second)
+		address := net.JoinHostPort(task.Ip, strconv.Itoa(task.Port))
+		dt := viper.GetInt("port-dial-timeout")
+		if dt <= 0 {
+			dt = 2
+		}
+		conn, err := net.DialTimeout("tcp", address, time.Duration(dt)*time.Second)
 		if err != nil {
 			results <- ProtocolInfo{Ip: task.Ip, Port: -task.Port}
 			continue
@@ -146,7 +150,7 @@ func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync
 func PortScan(IpRange string, PortRange string) {
 	ips, err := convertIPListToPool(strings.Split(IpRange, ","))
 	if err != nil {
-		Info("%s", err)
+		Error("%s", err)
 		return
 	}
 
@@ -157,16 +161,16 @@ func PortScan(IpRange string, PortRange string) {
 	}
 	Info("Total IP(s): %d", len(ips))
 	Info("Total Port(s): %d", len(ports_list))
-	Info("Total Threads(s): %d", viper.GetInt("Threads"))
+	Info("Total Threads(s): %d", viper.GetInt("threads"))
 
 	bar := pb.StartNew(len(ports_list) * len(ips))
 
-	taskChan := make(chan ProtocolInfo, viper.GetInt("Threads"))
+	taskChan := make(chan ProtocolInfo, viper.GetInt("threads"))
 	results := make(chan ProtocolInfo)
 
 	var wg sync.WaitGroup
 
-	for i := 0; i < viper.GetInt("Threads"); i++ {
+	for i := 0; i < viper.GetInt("threads"); i++ {
 		wg.Add(1)
 		go handleWorker(taskChan, results, &wg)
 	}

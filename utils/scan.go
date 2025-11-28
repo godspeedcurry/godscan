@@ -364,15 +364,17 @@ type Directive struct {
 	DirectiveStr  string
 }
 
-func (p *Probe) getDirectiveSyntax(data string) (directive Directive) {
+func (p *Probe) getDirectiveSyntax(data string) (directive Directive, err error) {
 	directive = Directive{}
 
 	if strings.Count(data, " ") <= 0 {
-		panic("nmap-service-probes - error directive format")
+		return directive, fmt.Errorf("directive format error")
 	}
 	blankIndex := strings.Index(data, " ")
+	if blankIndex < 0 || blankIndex+3 > len(data) {
+		return directive, fmt.Errorf("directive split error")
+	}
 	directiveName := data[:blankIndex]
-	//blankSpace := data[blankIndex: blankIndex+1]
 	Flag := data[blankIndex+1 : blankIndex+2]
 	delimiter := data[blankIndex+2 : blankIndex+3]
 	directiveStr := data[blankIndex+3:]
@@ -382,14 +384,17 @@ func (p *Probe) getDirectiveSyntax(data string) (directive Directive) {
 	directive.Delimiter = delimiter
 	directive.DirectiveStr = directiveStr
 
-	return directive
+	return directive, nil
 }
 
 func (p *Probe) getMatch(data string) (match Match, err error) {
 	match = Match{}
 
 	matchText := data[len("match")+1:]
-	directive := p.getDirectiveSyntax(matchText)
+	directive, derr := p.getDirectiveSyntax(matchText)
+	if derr != nil {
+		return match, derr
+	}
 
 	textSplited := strings.Split(directive.DirectiveStr, directive.Delimiter)
 
@@ -415,7 +420,10 @@ func (p *Probe) getSoftMatch(data string) (softMatch Match, err error) {
 	softMatch = Match{IsSoft: true}
 
 	matchText := data[len("softmatch")+1:]
-	directive := p.getDirectiveSyntax(matchText)
+	directive, derr := p.getDirectiveSyntax(matchText)
+	if derr != nil {
+		return softMatch, derr
+	}
 
 	textSplited := strings.Split(directive.DirectiveStr, directive.Delimiter)
 
@@ -467,7 +475,9 @@ func (p *Probe) fromString(data string) error {
 	lines := strings.Split(data, "\n")
 	probeStr := lines[0]
 
-	p.parseProbeInfo(probeStr)
+	if err = p.parseProbeInfo(probeStr); err != nil {
+		return err
+	}
 
 	var matchs []Match
 	for _, line := range lines {
@@ -492,9 +502,6 @@ func (p *Probe) fromString(data string) error {
 		} else if strings.HasPrefix(line, "totalwaitms ") {
 			//p.TotalWaitMS = getTotalWaitMS(line)
 			p.parseTotalWaitMS(line)
-		} else if strings.HasPrefix(line, "totalwaitms ") {
-			//p.TotalWaitMS = getTotalWaitMS(line)
-			p.parseTotalWaitMS(line)
 		} else if strings.HasPrefix(line, "tcpwrappedms ") {
 			//p.TCPWrappedMS = getTCPWrappedMS(line)
 			p.parseTCPWrappedMS(line)
@@ -510,23 +517,27 @@ func (p *Probe) fromString(data string) error {
 	return err
 }
 
-func (p *Probe) parseProbeInfo(probeStr string) {
+func (p *Probe) parseProbeInfo(probeStr string) error {
 	proto := probeStr[:4]
 	other := probeStr[4:]
 
 	if !(proto == "TCP " || proto == "UDP ") {
-		panic("Probe <protocol>must be either TCP or UDP.")
+		return fmt.Errorf("unsupported protocol")
 	}
 	if len(other) == 0 {
-		panic("nmap-service-probes - bad probe name")
+		return fmt.Errorf("bad probe name")
 	}
 
-	directive := p.getDirectiveSyntax(other)
+	directive, derr := p.getDirectiveSyntax(other)
+	if derr != nil {
+		return derr
+	}
 
 	p.Name = directive.DirectiveName
 	p.Data = strings.Split(directive.DirectiveStr, directive.Delimiter)[0]
 	p.DecodedData, _ = DecodeData(p.Data)
 	p.Protocol = strings.ToLower(strings.TrimSpace(proto))
+	return nil
 }
 
 func (p *Probe) ContainsPort(testPort int) bool {
@@ -627,7 +638,9 @@ func (v *VScan) parseProbesFromContent(content string) {
 	}
 	// 判断第一行是否为 "Exclude " 设置
 	if len(lines) == 0 {
-		panic("Failed to read nmap-service-probes file for probe data, 0 lines read.")
+		Warning("nmap-service-probes content empty")
+		v.Probes = probes
+		return
 	}
 	c := 0
 	for _, line := range lines {
@@ -636,12 +649,14 @@ func (v *VScan) parseProbesFromContent(content string) {
 		}
 		// 一份规则文件中有且至多有一个 Exclude 设置
 		if c > 1 {
-			panic("Only 1 Exclude directive is allowed in the nmap-service-probes file")
+			Warning("multiple Exclude directives, using the first one")
 		}
 	}
 	l := lines[0]
 	if !(strings.HasPrefix(l, "Exclude ") || strings.HasPrefix(l, "Probe ")) {
-		panic("Parse error on nmap-service-probes file: line was expected to begin with \"Probe \" or \"Exclude \"")
+		Warning("invalid probe file header")
+		v.Probes = probes
+		return
 	}
 	if c == 1 {
 		v.Exclude = l[len("Exclude")+1:]
@@ -941,8 +956,8 @@ func ConfigInit() {
 	config.SendTimeout = time.Duration(viper.GetInt("scan-send-timeout")) * time.Second
 	config.ReadTimeout = time.Duration(viper.GetInt("scan-read-timeout")) * time.Second
 
-	config.UseAllProbes = viper.GetBool("all")
-	config.NULLProbeOnly = viper.GetBool("nullProbeOnly")
+	config.UseAllProbes = viper.GetBool("all-probe")
+	config.NULLProbeOnly = viper.GetBool("null-probe-only")
 
 }
 

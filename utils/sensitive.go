@@ -78,7 +78,7 @@ func PrintTable(Url string, key string, data []SensitiveData) {
 	filename := "entropy.log"
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		fmt.Println("Failed to open file:", err)
+		Error("%s", err)
 		return
 	}
 	defer file.Close()

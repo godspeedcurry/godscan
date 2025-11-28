@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/google/go-github/v57/github"
 	"github.com/spf13/cobra"
@@ -20,12 +19,12 @@ func checkForUpdate(currentVersion string) {
 	client := github.NewClient(nil)
 	release, _, err := client.Repositories.GetLatestRelease(ctx, "godspeedcurry", "godscan")
 	if err != nil {
-		fmt.Println("Error checking for updates:", err)
+		utils.Info("Error checking for updates: %v", err)
 		return
 	}
 
 	if release.TagName != nil && *release.TagName != currentVersion {
-		fmt.Println(color.RedString("Update available: %s. Please download the latest version from %s", *release.TagName, *release.HTMLURL))
+		utils.Warning("Update available: %s. Please download the latest version from %s", *release.TagName, *release.HTMLURL)
 	}
 }
 func Banner() string {
@@ -105,18 +104,18 @@ func SetProxyFromEnv() string {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "singel url")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "", "", "url file")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "single target URL")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "", "", "file with target URLs (one per line)")
 
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Proxy, "proxy", "", "", "proxy")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Proxy, "proxy", "", "", "http(s)/socks proxy, e.g. http://127.0.0.1:8080")
 
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Host, "host", "", "", "singel host")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.HostFile, "host-file", "", "", "host file")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Host, "host", "", "", "single host or CIDR (for port scan)")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.HostFile, "host-file", "", "", "file with host entries (one per line)")
 
-	rootCmd.PersistentFlags().IntVarP(&GlobalOption.LogLevel, "loglevel", "v", 2, "level of your log")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputFile, "output", "o", "result.log", "output file to write log and results")
+	rootCmd.PersistentFlags().IntVarP(&GlobalOption.LogLevel, "loglevel", "v", 2, "log verbosity for info/debug (warnings/errors always shown). 0=minimal, 2=default, 6=debug")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputFile, "output", "o", "result.log", "file to write logs and results")
 
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.DefaultUA, "ua", "", "user agent", "set user agent")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.DefaultUA, "ua", "", "user agent", "override default User-Agent header")
 
 	rootCmd.PersistentFlags().BoolVarP(&GlobalOption.ScanPrivateIp, "private-ip", "", false, "scan private ip")
 
@@ -145,13 +144,32 @@ func init() {
 	viper.BindPFlag("filter", rootCmd.PersistentFlags().Lookup("filter"))
 	viper.SetDefault("filter", []string{})
 
+	rootCmd.PersistentFlags().Bool("json", false, "enable json log output")
+	rootCmd.PersistentFlags().Bool("quiet", false, "suppress console output")
+	rootCmd.PersistentFlags().Bool("insecure", true, "skip TLS verification")
+	rootCmd.PersistentFlags().Int("http-timeout", 10, "http client timeout (seconds)")
+	rootCmd.PersistentFlags().Int("conn-per-host", 0, "max connections per host (0=auto)")
+	rootCmd.PersistentFlags().Int("max-body-bytes", 2*1024*1024, "max response body bytes to read")
+
+	viper.BindPFlag("json", rootCmd.PersistentFlags().Lookup("json"))
+	viper.SetDefault("json", false)
+	viper.BindPFlag("quiet", rootCmd.PersistentFlags().Lookup("quiet"))
+	viper.SetDefault("quiet", false)
+	viper.BindPFlag("insecure", rootCmd.PersistentFlags().Lookup("insecure"))
+	viper.SetDefault("insecure", true)
+	viper.BindPFlag("http-timeout", rootCmd.PersistentFlags().Lookup("http-timeout"))
+	viper.SetDefault("http-timeout", 10)
+	viper.BindPFlag("conn-per-host", rootCmd.PersistentFlags().Lookup("conn-per-host"))
+	viper.SetDefault("conn-per-host", 0)
+	viper.BindPFlag("max-body-bytes", rootCmd.PersistentFlags().Lookup("max-body-bytes"))
+	viper.SetDefault("max-body-bytes", 2*1024*1024)
 }
 
 func Execute() {
 	if viper.GetString("proxy") != "" {
-		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is %s\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"), viper.GetString("proxy"))
+		utils.Info("Proxy is %s", viper.GetString("proxy"))
 	} else {
-		fmt.Fprintf(os.Stderr, "[%s] [%s] Proxy is null\n", utils.GetCurrentTime(), color.New(color.FgCyan).Sprintf("%s", "INFO"))
+		utils.Info("Proxy is not set")
 	}
 	cobra.CheckErr(rootCmd.Execute())
 }
