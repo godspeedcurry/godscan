@@ -1,5 +1,0 @@
-./parser.go
-./pseudo_classes.go
-./selector.go
-./serialize.go
-./specificity.go
