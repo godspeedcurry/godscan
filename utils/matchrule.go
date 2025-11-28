@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
+	"sync"
 
 	"github.com/Knetic/govaluate"
 	regexp2 "github.com/dlclark/regexp2"
+	"github.com/spf13/viper"
 
 	"regexp"
 	"strings"
@@ -44,6 +47,18 @@ func MapToJson(param map[string][]string) string {
 	return dataString
 }
 
+func logRequestError(targetURL string, err error) {
+	host := targetURL
+	if u, parseErr := url.Parse(targetURL); parseErr == nil && u.Hostname() != "" {
+		host = u.Hostname()
+	}
+	if _, loaded := hostErrorOnce.LoadOrStore(host, struct{}{}); !loaded {
+		Warning("Skip %s: %v", targetURL, err)
+		return
+	}
+	Debug("Skip %s: %v", targetURL, err)
+}
+
 type Packjson struct {
 	Fingerprint []Fingerprint
 }
@@ -64,6 +79,8 @@ var methodMatchers = map[string]methodMatcher{
 	"keyword": iskeyword,
 	"regular": isregular,
 }
+
+var hostErrorOnce sync.Map
 
 func chooseLocator(headers string, body string, title string, fp Fingerprint) string {
 	if fp.Location == "header" {
@@ -138,23 +155,23 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 	if !isValidUrl(url) {
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		Fatal("%s %s xxx", url, err)
+		logRequestError(url, err)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	req.Header.Set("Cookie", "rememberMe=me")
 	SetHeaders(req)
-
+	var httpClient *http.Client
 	if !followRedirect {
-		Client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		}
+		httpClient = ClientNoRedirect
+	} else {
+		httpClient = Client
 	}
 
-	resp, err := Client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		Fatal("%s %s create request failed", url, err)
+		logRequestError(url, err)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	defer resp.Body.Close()
@@ -178,26 +195,32 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 	}
 	ContentLengthStr := resp.Header.Get("Content-Length")
 	ServerContentType := resp.Header.Get("Content-Type")
-	ContentLength, err := strconv.Atoi(ContentLengthStr)
-	if err != nil {
-		Fatal("%s %s %s", url, err, ContentLengthStr)
-		return common.NoFinger, "", "", "", "", nil, -1
-	}
-	if ContentLength > 1024*1024*10 { // 10M
-		return "Large Data", retServerValue, "Large Data size = [" + ContentLengthStr + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
-	}
 	var cms []string
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	maxBody := viper.GetInt("max-body-bytes")
+	if maxBody <= 0 {
+		maxBody = 2 * 1024 * 1024
+	}
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBody)))
+	actualLen := len(bodyBytes)
+	contentLength := actualLen
+	if ContentLengthStr != "" {
+		if v, e := strconv.Atoi(ContentLengthStr); e == nil {
+			contentLength = v
+		}
+	}
+	if contentLength > 1024*1024*10 { // 10M
+		return "Large Data", retServerValue, "Large Data size = [" + strconv.Itoa(contentLength) + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
+	}
 	_, DetermineContentType, _ := charset.DetermineEncoding(bodyBytes, ServerContentType)
 	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), DetermineContentType)
 	if err != nil {
-		Fatal("%s %s %s", url, err, DetermineContentType)
+		logRequestError(url, fmt.Errorf("%v (%s)", err, DetermineContentType))
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
 	doc, err := goquery.NewDocumentFromReader(reader)
 
 	if err != nil {
-		Fatal("%s %s", url, err)
+		logRequestError(url, err)
 		return common.NoFinger, "", "", "", "", nil, -1
 	}
 

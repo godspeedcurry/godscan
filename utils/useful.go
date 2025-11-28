@@ -89,12 +89,12 @@ func RandomString(length int) string {
 	charset := "0123456789abcdef"
 
 	// 初始化随机数生成器
-	rand.NewSource(time.Now().UnixNano())
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	// 生成随机字符
 	result := make([]byte, length)
 	for i := range result {
-		result[i] = charset[rand.Intn(len(charset))]
+		result[i] = charset[r.Intn(len(charset))]
 	}
 
 	return string(result)
@@ -153,10 +153,10 @@ func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
 }
 
 func ShowInfo() {
-	fmt.Println("--suffix '" + strings.Join(common.SuffixTop, ",") + "'")
-	fmt.Println("--prefix '" + strings.Join(common.PrefixTop, ",") + "'")
-	fmt.Println("--sep '" + strings.Join(common.SeparatorTop, ",") + "'")
-	fmt.Println("-k '" + strings.Join(common.KeywordTop, ",") + "'")
+	Info("--suffix '%s'", strings.Join(common.SuffixTop, ","))
+	Info("--prefix '%s'", strings.Join(common.PrefixTop, ","))
+	Info("--sep '%s'", strings.Join(common.SeparatorTop, ","))
+	Info("-k '%s'", strings.Join(common.KeywordTop, ","))
 }
 func RemoveDuplicatesString(arr []string) []string {
 	// 创建一个空的map，用于存储唯一的元素
@@ -165,6 +165,7 @@ func RemoveDuplicatesString(arr []string) []string {
 
 	// 遍历数组中的每个元素
 	for _, ele := range arr {
+		ele := strings.TrimSpace(ele)
 		if strings.HasPrefix(ele, "====") {
 			continue
 		}
@@ -206,7 +207,7 @@ func UrlFormated(lines []string) []string {
 func FileReadLine(filename string) []string {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		Error("Error read file %s", filename)
+		Debug("Skip reading file %s: %v", filename, err)
 		return []string{}
 	}
 	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
@@ -315,43 +316,47 @@ func CheckFinger(finger string, title string, Url string, contentType string, lo
 }
 
 func WriteToCsv(filename string, data []string) {
+	fileMutex.Lock()
+	defer fileMutex.Unlock()
+
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		panic(err)
+		Error("%s", err)
+		return
 	}
 	defer file.Close()
 
 	header := common.TableHeader
 	fileInfo, err := file.Stat()
-	writer := csv.NewWriter(file)
-
 	if err != nil {
-		panic(err)
+		Error("%s", err)
+		return
 	}
+	writer := csv.NewWriter(file)
 	if fileInfo.Size() == 0 {
 		if err := writer.Write(header); err != nil {
-			panic(err) // 处理写入错误
+			Error("%s", err)
+			return
 		}
 	}
-
-	err = writer.Write(data)
-	if err != nil {
-		panic(err)
+	if err := writer.Write(data); err != nil {
+		Error("%s", err)
+		return
 	}
 	writer.Flush()
 }
 
 func SetHeaders(req *http.Request) {
 	// 设置 User-Agent
-	req.Header.Set("User-Agent", viper.GetString("ua"))
+	req.Header.Set("User-Agent", viper.GetString("DefaultUA"))
 
 	// 设置自定义的请求头
 	headers := viper.GetStringSlice("headers")
 	for _, header := range headers {
 		parts := strings.SplitN(header, ":", 2)
 		if len(parts) != 2 {
-			Info("Invalid header format, correct format is 'Key: Value'")
-			os.Exit(1)
+			Warning("Invalid header format, correct format is 'Key: Value'")
+			continue
 		}
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])

@@ -1,0 +1,4 @@
+./term.go
+./term_bsd.go
+./term_nix.go
+./term_x.go

@@ -2,11 +2,12 @@ package cmd
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/godspeedcurry/godscan/utils"
 )
 
 type CleanOptions struct {
@@ -19,8 +20,8 @@ var (
 // iconCmd represents the icon command
 
 func init() {
-	iconCmd := newCommandWithAliases("clean", "clean logs", []string{"cc"}, &cleanOptions)
-	rootCmd.AddCommand(iconCmd)
+	cleanCmd := newCommandWithAliases("clean", "Remove generated logs and dated folders", []string{"cc"}, &cleanOptions)
+	rootCmd.AddCommand(cleanCmd)
 }
 
 func (o *CleanOptions) validateOptions() error {
@@ -33,7 +34,7 @@ func (o *CleanOptions) run() {
 	// 获取当前工作目录
 	currentDir, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Error fetching current directory:", err)
+		utils.Error("Error fetching current directory: %v", err)
 		return
 	}
 
@@ -42,32 +43,32 @@ func (o *CleanOptions) run() {
 
 	err = filepath.Walk(currentDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			fmt.Println("Error accessing path:", path, err)
+			utils.Error("Error accessing path: %s %v", path, err)
 			return err
 		}
 
 		if info.IsDir() && dateDirRegex.MatchString(info.Name()) {
 			// 检查是否删除目录
-			fmt.Printf("Do you want to delete directory: %s? (y/N) ", path)
+			utils.Info("Do you want to delete directory: %s? (y/N)", path)
 			response, _ := reader.ReadString('\n')
 			if strings.TrimSpace(response) == "y" || strings.TrimSpace(response) == "" {
 				if err := os.RemoveAll(path); err != nil {
-					fmt.Println("Error deleting directory:", err)
+					utils.Error("Error deleting directory: %v", err)
 				} else {
-					fmt.Println("Directory deleted:", path)
+					utils.Success("Directory deleted: %s", path)
 				}
 			}
 			return filepath.SkipDir
 		} else if !info.IsDir() {
 			if strings.HasSuffix(info.Name(), ".log") || strings.HasSuffix(info.Name(), ".csv") {
 				// 检查是否删除文件
-				fmt.Printf("Do you want to delete file: %s? (y/N) ", path)
+				utils.Info("Do you want to delete file: %s? (y/N)", path)
 				response, _ := reader.ReadString('\n')
 				if strings.TrimSpace(response) == "y" || strings.TrimSpace(response) == "" {
 					if err := os.Remove(path); err != nil {
-						fmt.Println("Error deleting file:", err)
+						utils.Error("Error deleting file: %v", err)
 					} else {
-						fmt.Println("File deleted:", path)
+						utils.Success("File deleted: %s", path)
 					}
 				}
 			}
@@ -75,6 +76,6 @@ func (o *CleanOptions) run() {
 		return nil
 	})
 	if err != nil {
-		fmt.Println("Error walking the path:", err)
+		utils.Error("Error walking the path: %v", err)
 	}
 }

@@ -1,0 +1,15 @@
+./EvaluableExpression.go
+./EvaluableExpression_sql.go
+./ExpressionToken.go
+./OperatorSymbol.go
+./TokenKind.go
+./evaluationStage.go
+./expressionFunctions.go
+./expressionOutputStream.go
+./lexerState.go
+./lexerStream.go
+./parameters.go
+./parsing.go
+./sanitizedParameters.go
+./stagePlanner.go
+./tokenStream.go

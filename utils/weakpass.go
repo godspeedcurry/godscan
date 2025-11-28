@@ -35,7 +35,7 @@ func MightBePhone(Phone string) bool {
 func TranslateToEnglish(Name string) (string, string, string, string) {
 	str, err := pinyin.New(Name).Split(" ").Mode(pinyin.WithoutTone).Convert()
 	if err != nil {
-		fmt.Println(err)
+		Error("%s", err)
 		return "", "", "", ""
 	}
 	// 首字母
@@ -207,9 +207,9 @@ func outputListFormat(UniqPasswordList []string) {
 			quotedStrings = append(quotedStrings, strconv.Quote(str))
 		}
 		output := "[" + strings.Join(quotedStrings, ", ") + "]"
-		fmt.Println(output)
+		Info("%s", output)
 	} else {
-		fmt.Println(strings.Join(UniqPasswordList, "\n"))
+		Info("%s", strings.Join(UniqPasswordList, "\n"))
 	}
 
 }

@@ -1,0 +1,11 @@
+./array.go
+./doc.go
+./expand.go
+./filter.go
+./iteration.go
+./manipulation.go
+./property.go
+./query.go
+./traversal.go
+./type.go
+./utilities.go
