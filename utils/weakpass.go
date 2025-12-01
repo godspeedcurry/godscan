@@ -126,6 +126,7 @@ func generateVariants(input string) []string {
 	variants = append(variants, strings.ReplaceAll(input, "o", "0"))
 	variants = append(variants, strings.ReplaceAll(input, "i", "1"))
 	variants = append(variants, strings.ReplaceAll(input, "l", "!"))
+	variants = append(variants, strings.ReplaceAll(input, "S", "$"))
 	variants = append(variants, ReplaceWithTable(input))
 	return variants
 }

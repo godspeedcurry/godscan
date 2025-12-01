@@ -90,6 +90,8 @@ source /tmp/x
 ./godscan port -i '1.2.3.4/28'
 # 自定义端口
 ./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'
+# 也支持域名列表，自动解析
+# ./godscan port -i 'example.com,foo.bar'
 # 指定top端口 数字范围在20000以内
 ./godscan port -i '1.2.3.4/28' --top 1000
 # 第top100~第top200端口

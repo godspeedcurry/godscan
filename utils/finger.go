@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"crypto/md5"
+	"database/sql"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -15,7 +16,7 @@ import (
 	"time"
 
 	"github.com/godspeedcurry/godscan/common"
-	"github.com/olekukonko/tablewriter"
+	prettytable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/viper"
 
 	"net/http"
@@ -26,6 +27,8 @@ import (
 	b64 "encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"sort"
+	"strconv"
 
 	"github.com/PuerkitoBio/goquery"
 
@@ -35,6 +38,25 @@ import (
 )
 
 var sensitiveUrl sync.Map
+var importantApiSeen sync.Map
+
+type SpiderSummary struct {
+	URL         string
+	Title       string
+	Finger      string
+	ContentType string
+	Status      int
+	Length      int
+	Keyword     string
+	SimHash     string
+	IconHash    string
+	ApiCount    int
+	UrlCount    int
+	CDNCount    int
+	CDNHosts    string
+	SaveDir     string
+	Err         error
+}
 
 func Mmh3Hash32(raw []byte) string {
 	var h32 hash.Hash32 = murmur3.New32()
@@ -130,7 +152,11 @@ func parseDir(fullPath string, MaxDepth int) []string {
 }
 
 func isValidUrl(Url string) bool {
-	arr := []string{"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com", "apache.org", "gitlab.com", "centos.org", "logout", "delete", "drop", "remove", "clear", "clean", "purge", "erase", "discard", "unregister", "revoke"}
+	arr := []string{
+		"alicdn.com", "163.com", "nginx.com", "qq.com", "amap.com", "cnzz.com", "github.com", "apache.org", "gitlab.com", "centos.org",
+		"fonts.googleapis.com", "fonts.gstatic.com", "gstatic.com", "w3.org", "cloudflare.com", "cdnjs.cloudflare.com",
+		"logout", "delete", "drop", "remove", "clear", "clean", "purge", "erase", "discard", "unregister", "revoke",
+	}
 	for _, key := range arr {
 		if strings.Contains(strings.ToLower(Url), key) {
 			return false
@@ -164,7 +190,12 @@ func isValidUrl(Url string) bool {
 func ImportantApiJudge(ApiResult string, Url string) {
 	for _, key := range common.ImportantApi {
 		if strings.Contains(ApiResult, key) {
-			Success("Import Api found " + key)
+			mark := Url + "|" + key
+			if _, ok := importantApiSeen.Load(mark); ok {
+				continue
+			}
+			importantApiSeen.Store(mark, true)
+			Success("Import Api found %s @ %s", key, Url)
 			if key == "/api/blade-user" {
 				Success("Might related to SpringBlade CVE-2021-44910")
 				FileWrite("cve.log", "[%s] Might related to SpringBlade CVE-2021-44910", Url)
@@ -184,7 +215,7 @@ func filterOutUrl(Url string) bool {
 	return false
 }
 
-func parseVueUrl(Url string, RootPath string, doc string, directory string) {
+func parseVueUrl(Url string, RootPath string, doc string, directory string, apiCounter *int, db *sql.DB) {
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
 
@@ -198,18 +229,11 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 	ApiResultLen := len(ApiResult)
 
 	if ApiResultLen > 0 {
-		FileWrite(directory+"api_raw.txt", "==== "+Url+" ====\n")
-		Success("[%s] Api Path Found %d.", Url, ApiResultLen)
+		*apiCounter += ApiResultLen
 		var totalResult = strings.Join(ApiResult, "\n")
-		if ApiResultLen > 50 {
-			Info("We only show 50 lines, please remember to check at ./%s", directory+"api_raw.txt")
-			Info("%s", strings.Join(ApiResult[:50], "\n"))
-			FileWrite(directory+"api_raw.txt", totalResult+"\n")
-		} else {
-			ImportantApiJudge(totalResult, Url)
-			Info("%s", totalResult)
-			FileWrite(directory+"api_raw.txt", totalResult+"\n")
-		}
+		ImportantApiJudge(totalResult, Url)
+		FileWrite(directory+"api_raw.txt", "==== %s ====\n# total: %d\n%s\n", Url, ApiResultLen, totalResult)
+		SaveAPIPaths(db, RootPath, Url, ApiResult, directory)
 	}
 
 	subdirs := []string{}
@@ -230,7 +254,7 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 
 	subdirs = RemoveDuplicatesString(subdirs)
 	if len(subdirs) > 0 {
-		FileWrite(directory+"sub_directory.txt", strings.Join(subdirs, "\n")+"\n")
+		FileWrite(directory+"sub_directory.txt", "%s\n", strings.Join(subdirs, "\n"))
 		var wg sync.WaitGroup
 		rows := make(chan []string)
 		file, err := os.OpenFile(directory+"sub_directory.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -238,11 +262,10 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 			Error("%s", err)
 			return
 		}
-		multiWriter := io.MultiWriter(os.Stdout, file)
-		table := tablewriter.NewWriter(multiWriter)
-
-		// 创建表格
-		table.SetHeader([]string{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
+		table := prettytable.NewWriter()
+		table.SetOutputMirror(file)
+		table.AppendHeader(prettytable.Row{"Url", "Title", "Finger", "Content-Type", "StatusCode", "Length"})
+		table.SetStyle(prettytable.StyleRounded)
 
 		cnt := 0
 
@@ -267,17 +290,17 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string) {
 		for ret := range rows {
 			AddDataToTable(table, ret)
 		}
-		if table.NumLines() >= 1 {
+		if table.Length() >= 1 {
 			table.Render()
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, doc, directory)
+			SensitiveInfoCollect(db, Url, doc, directory)
 		}
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set) error {
+func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, apiCounter *int, db *sql.DB) error {
 	if uselessUrl(Url, depth) || filterOutUrl(Url) {
 		return nil
 	}
@@ -306,7 +329,7 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 		limited := io.LimitReader(resp.Body, int64(maxBody))
 		bodyBuf, _ := io.ReadAll(limited)
 		bufStr := string(bodyBuf)
-		parseVueUrl(Url, RootPath, bufStr, directory)
+		parseVueUrl(Url, RootPath, bufStr, directory, apiCounter, db)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
@@ -321,7 +344,7 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 		}
 		if _, ok := sensitiveUrl.Load(Url); !ok {
 			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(Url, html, directory)
+			SensitiveInfoCollect(db, Url, html, directory)
 		}
 
 		// a, link 标签
@@ -332,7 +355,7 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 			}
 			normalizeUrl := Normalize(href, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, apiCounter, db)
 			}
 		})
 		// iframe, script 标签
@@ -343,7 +366,7 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 			}
 			normalizeUrl := Normalize(src, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, apiCounter, db)
 			}
 		})
 	}
@@ -376,14 +399,14 @@ func StandBase64(braw []byte) []byte {
 //go:embed icon.json
 var icon_json string
 
-func IconDetect(Url string) (string, error) {
+func IconDetect(Url string) (string, string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	SetHeaders(req)
 	resp, err := Client.Do(req)
 
 	if err != nil {
 		logRequestError(Url, err)
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := io.ReadAll(resp.Body)
@@ -392,16 +415,7 @@ func IconDetect(Url string) (string, error) {
 	hash := md5.Sum(bodyBytes)
 	hunterIco := hex.EncodeToString(hash[:])
 
-	Info("icon_url=\"%s\" [fofa]   icon_hash=\"%s\" %d", Url, ico, resp.StatusCode)
-	Info("icon_url=\"%s\" [hunter] web.icon==\"%s\" %d", Url, hunterIco, resp.StatusCode)
-
-	var icon_hash_map map[string]interface{}
-	json.Unmarshal([]byte(icon_json), &icon_hash_map)
-	tmp := icon_hash_map[ico]
-	if tmp != nil {
-		Success("icon_url=\"%s\" icon_finger=\"%s\"", Url, tmp)
-	}
-	return "", nil
+	return ico, hunterIco, nil
 }
 
 func FindFaviconURL(urlStr string) (string, error) {
@@ -472,20 +486,47 @@ func ApiDeDuplicate(RootPath string, directory string) {
 	rawApi := FileReadLine(directory + "api_raw.txt")
 	fullPaths := []string{}
 	if len(rawApi) > 0 {
-		FileWrite(directory+"api_unique.txt", strings.Join(rawApi, "\n"))
+		FileWrite(directory+"api_unique.txt", "%s", strings.Join(rawApi, "\n"))
 		for _, raw := range rawApi {
 			fullPaths = append(fullPaths, RootPath+raw)
 		}
-		FileWrite(directory+"api_unique_full.txt", "==== Try: dirbrute --url-file "+directory+"api_unique_full.txt\n")
-		FileWrite(directory+"api_unique_full.txt", strings.Join(fullPaths, "\n")+"\n")
+		FileWrite(directory+"api_unique_full.txt", "==== Try: dirbrute --url-file %s\n", directory+"api_unique_full.txt")
+		FileWrite(directory+"api_unique_full.txt", "%s\n", strings.Join(fullPaths, "\n"))
 	}
 }
 
 func PrintFinger(Url string, Depth int) {
+	summary := FingerSummary(Url, Depth, nil)
+	if summary.URL == "" {
+		return
+	}
+	table := prettytable.NewWriter()
+	table.SetOutputMirror(os.Stdout)
+	table.AppendHeader(prettytable.Row(StringListToInterfaceList(common.TableHeader)))
+	table.SetStyle(prettytable.StyleRounded)
+	table.SetColumnConfigs([]prettytable.ColumnConfig{
+		{Number: 1, WidthMax: 42},
+		{Number: 2, WidthMax: 32},
+		{Number: 3, WidthMax: 36},
+		{Number: 4, WidthMax: 24},
+		{Number: 5, WidthMax: 8, Transformer: StatusColorTransformer},
+		{Number: 8, WidthMax: 28},
+	})
+	row := []string{summary.URL, summary.Title, summary.Finger, summary.ContentType, strconv.Itoa(summary.Status), "", strconv.Itoa(summary.Length), summary.Keyword, summary.SimHash}
+	AddDataToTable(table, row)
+	if table.Length() >= 1 {
+		table.Render()
+	}
+}
+
+// FingerSummary scans a target and returns a compact per-host summary while still writing detailed CSV files.
+func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
+	out := SpiderSummary{URL: Url, Status: -1}
 	Host, err := url.Parse(Url)
 	if err != nil {
 		Error("%s", err)
-		return
+		out.Err = err
+		return out
 	}
 	RootPath := Host.Scheme + "://" + Host.Hostname()
 	if Host.Port() != "" {
@@ -494,34 +535,60 @@ func PrintFinger(Url string, Depth int) {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetAutoWrapText(false)
-	table.SetHeader(common.TableHeader)
-
 	finger, _, title, contentType, _, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
+	out.Status = statusCode
+	out.Finger = finger
+	out.Title = title
+	out.ContentType = contentType
+	out.Length = len(respBody)
 
 	if statusCode != -1 {
 		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
-			AddDataToTable(table, result)
+			out.Finger = result[2]
+			out.ContentType = result[3]
+			out.Status, _ = strconv.Atoi(result[4])
+			out.Length, _ = strconv.Atoi(result[6])
+			out.Keyword = result[7]
+			out.SimHash = result[8]
 		}
 	}
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	finger, _, title, contentType, _, respBody, statusCode = FingerScan(SecondUrl, http.MethodPost, true)
-	if statusCode != -1 {
-		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
+	finger2, _, title2, contentType2, _, respBody2, statusCode2 := FingerScan(SecondUrl, http.MethodPost, true)
+	if statusCode2 != -1 {
+		result := CheckFinger(finger2, title2, Url, contentType2, "", respBody2, statusCode2)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
-			AddDataToTable(table, result)
+			// Prefer POST fingerprint if it has a real finger.
+			if result[2] != common.NoFinger {
+				out.Finger = result[2]
+				out.Title = title2
+				out.ContentType = result[3]
+				out.Status, _ = strconv.Atoi(result[4])
+				out.Length, _ = strconv.Atoi(result[6])
+				out.Keyword = result[7]
+				out.SimHash = result[8]
+			}
 		}
 	}
 
 	IconUrl, err := FindFaviconURL(RootPath)
 	if err == nil {
-		IconDetect(IconUrl)
+		fofaHash, hunterHash, iconErr := IconDetect(IconUrl)
+		if iconErr == nil {
+			out.IconHash = fmt.Sprintf("fofa:%s hunter:%s", fofaHash, hunterHash)
+			var icon_hash_map map[string]interface{}
+			json.Unmarshal([]byte(icon_json), &icon_hash_map)
+			tmp := icon_hash_map[fofaHash]
+			if tmp != nil {
+				Debug("icon_url=\"%s\" icon_finger=\"%s\"", IconUrl, tmp)
+			}
+		} else {
+			Debug("%s", iconErr)
+		}
 	} else {
 		Debug("%s", err)
 	}
@@ -530,25 +597,58 @@ func PrintFinger(Url string, Depth int) {
 	host, err := url.Parse(RootPath)
 	if err != nil {
 		Error("%s", err)
-		return
+		out.Err = err
+		return out
 	}
 	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
-	err = Spider(RootPath, Url, Depth, directory, myMap)
+	apiCounter := 0
+	err = Spider(RootPath, Url, Depth, directory, myMap, &apiCounter, db)
 	if err != nil {
 		Error("%s", err)
-		return
+		out.Err = err
+		return out
 	}
+	out.SaveDir = directory
+	out.ApiCount = apiCounter
 	ApiDeDuplicate(RootPath, directory)
 
 	var myList []string
 	for item := range myMap.Iter() {
 		myList = append(myList, item.(string))
 	}
-	if len(myList) > 0 {
-		Success("🌲🌲🌲 More info at ./%s", directory)
+	out.UrlCount = len(myList)
+	cdnHosts := collectCDNHosts(myList)
+	out.CDNCount = len(cdnHosts)
+	out.CDNHosts = strings.Join(cdnHosts, ",")
+	if len(cdnHosts) > 0 {
+		FileWrite(directory+"cdn_hosts.txt", "%s\n", strings.Join(cdnHosts, "\n"))
 	}
-	if table.NumLines() >= 1 {
-		table.Render()
+	FileWrite(directory+"spider.log", "%s\n", strings.Join(myList, "\n"))
+	return out
+}
+
+func collectCDNHosts(urls []string) []string {
+	candidates := []string{
+		"aliyuncs.com", "alicdn.com", "qiniucdn.com", "qiniu.com", "myqcloud.com", "tencentcs.com", "ksyuncs.com", "bcebos.com", "cloudfront.net",
 	}
-	FileWrite(directory+"spider.log", strings.Join(myList, "\n")+"\n")
+	seen := make(map[string]struct{})
+	for _, raw := range urls {
+		u, err := url.Parse(raw)
+		if err != nil {
+			continue
+		}
+		host := strings.ToLower(u.Hostname())
+		for _, c := range candidates {
+			if strings.HasSuffix(host, c) {
+				seen[host] = struct{}{}
+				break
+			}
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for h := range seen {
+		out = append(out, h)
+	}
+	sort.Strings(out)
+	return out
 }

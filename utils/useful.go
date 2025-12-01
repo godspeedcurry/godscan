@@ -1,10 +1,8 @@
 package utils
 
 import (
-	"encoding/csv"
 	"fmt"
 	"html"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,11 +12,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/godspeedcurry/godscan/common"
+	prettytable "github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/mfonda/simhash"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/viper"
 )
 
@@ -37,33 +35,30 @@ func Max(nums ...int) int {
 	return maxNum
 }
 
-func Min(nums ...int) int {
-	var minNum int = INT_MAX
-	for _, num := range nums {
-		if num < minNum {
-			minNum = num
-		}
-	}
-	return minNum
-}
-
-type Pair struct {
-	Key   string
-	Value int
-}
-
-type PairList []Pair
-
-func (p PairList) Len() int           { return len(p) }
-func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
-func (p PairList) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
 func StringListToInterfaceList(tmpList []string) []interface{} {
 	vals := make([]interface{}, len(tmpList))
 	for i, v := range tmpList {
 		vals[i] = v
 	}
 	return vals
+}
+
+func StatusColorTransformer(val interface{}) string {
+	s := fmt.Sprintf("%v", val)
+	code, err := strconv.Atoi(strings.TrimSpace(s))
+	if err != nil {
+		return s
+	}
+	switch {
+	case code >= 500:
+		return text.FgRed.Sprintf("%d", code)
+	case code >= 400:
+		return text.FgYellow.Sprintf("%d", code)
+	case code >= 300:
+		return text.FgHiYellow.Sprintf("%d", code)
+	default:
+		return text.FgHiGreen.Sprintf("%d", code)
+	}
 }
 
 func Normalize(Path string, RootPath string) string {
@@ -82,22 +77,6 @@ func Normalize(Path string, RootPath string) string {
 	} else {
 		return RootPath + "/" + Path
 	}
-}
-
-func RandomString(length int) string {
-	// 定义字符集
-	charset := "0123456789abcdef"
-
-	// 初始化随机数生成器
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	// 生成随机字符
-	result := make([]byte, length)
-	for i := range result {
-		result[i] = charset[r.Intn(len(charset))]
-	}
-
-	return string(result)
 }
 
 type sliceError struct {
@@ -222,28 +201,36 @@ func FilReadUrl(filename string) []string {
 var fileMutex sync.Mutex
 
 func FileWrite(filename string, format string, args ...interface{}) {
+	if filename == "" {
+		return
+	}
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
 	dir := filepath.Dir(filename)
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
-		Fatal("%s", err)
+		fmt.Fprintf(os.Stderr, "file write mkdir failed: %v\n", err)
 		return
 	}
 
 	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
-		Fatal("%s", err)
+		fmt.Fprintf(os.Stderr, "file open failed: %v\n", err)
 		return
 	}
 	file.WriteString(fmt.Sprintf(format, args...))
 }
 
-func AddDataToTable(table *tablewriter.Table, data []string) {
-	if len(data) > 0 {
-		table.Append(data)
+func AddDataToTable(table prettytable.Writer, data []string) {
+	if len(data) == 0 {
+		return
 	}
+	row := make(prettytable.Row, len(data))
+	for i := range data {
+		row[i] = data[i]
+	}
+	table.AppendRow(row)
 }
 
 func extractText(htmlContent string) string {
@@ -319,31 +306,15 @@ func WriteToCsv(filename string, data []string) {
 	fileMutex.Lock()
 	defer fileMutex.Unlock()
 
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		Error("%s", err)
-		return
+	// mirror to sqlite if available
+	switch filename {
+	case "finger.csv":
+		SaveFingerLike("finger_results", data)
+	case "dirbrute.csv":
+		SaveFingerLike("dirbrute_results", data)
 	}
-	defer file.Close()
 
-	header := common.TableHeader
-	fileInfo, err := file.Stat()
-	if err != nil {
-		Error("%s", err)
-		return
-	}
-	writer := csv.NewWriter(file)
-	if fileInfo.Size() == 0 {
-		if err := writer.Write(header); err != nil {
-			Error("%s", err)
-			return
-		}
-	}
-	if err := writer.Write(data); err != nil {
-		Error("%s", err)
-		return
-	}
-	writer.Flush()
+	// Skip disk CSV artifacts to reduce intermediate files.
 }
 
 func SetHeaders(req *http.Request) {
