@@ -29,14 +29,30 @@ func shouldLog(level int) bool {
 	return level <= viper.GetInt("loglevel")
 }
 
-func logRecord(level int, detail string) {
+func formatLine(levelText string, msg string, colorize bool, colorAttr color.Attribute) string {
+	if colorize {
+		return fmt.Sprintf("[%s] %s", color.New(colorAttr).Sprintf("%s", levelText), msg)
+	}
+	return fmt.Sprintf("[%s] %s", levelText, msg)
+}
+
+func logRecordOnly(levelText string, msg string) {
+	line := formatLine(levelText, msg, false, color.Reset)
+	out := viper.GetString("output")
+	if out == "" {
+		return
+	}
+	FileWrite(out, "%s\n", line)
+}
+
+func logRecord(level int, levelText string, msg string) {
 	if !shouldLog(level) {
 		return
 	}
-	FileWrite(viper.GetString("output"), detail+"\n")
+	logRecordOnly(levelText, msg)
 }
 
-func logPrint(level int, detail string) {
+func logPrint(level int, levelText string, msg string, colorAttr color.Attribute) {
 	if !shouldLog(level) {
 		return
 	}
@@ -44,20 +60,23 @@ func logPrint(level int, detail string) {
 		return
 	}
 	if viper.GetBool("json") {
-		type jl struct {
-			Time    string `json:"time"`
-			Level   string `json:"level"`
-			Message string `json:"message"`
-		}
-		fmt.Println(fmt.Sprintf(`{"time":"%s","level":"%s","message":%q}`, GetCurrentTime(), levelName(level), detail))
+		fmt.Println(fmt.Sprintf(`{"time":"%s","level":"%s","message":%q}`, GetCurrentTime(), levelName(level), msg))
 		return
 	}
-	fmt.Println(detail)
+	fmt.Println(formatLine(levelText, msg, true, colorAttr))
 }
 
-func LogBeautify(x string, colorAttr color.Attribute, y string, level int) {
-	logPrint(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), color.New(colorAttr).Sprintf("%s", x), y))
-	logRecord(level, fmt.Sprintf("[%s] [%s] %s", GetCurrentTime(), x, y))
+func LogBeautify(levelText string, colorAttr color.Attribute, msg string, level int) {
+	logPrint(level, levelText, msg, colorAttr)
+	logRecord(level, levelText, msg)
+}
+
+// InfoFile writes INFO lines to file only (no console), respecting loglevel.
+func InfoFile(format string, args ...interface{}) {
+	if !shouldLog(LevelInfo) {
+		return
+	}
+	logRecordOnly("INFO", fmt.Sprintf(format, args...))
 }
 
 func Debug(format string, args ...interface{}) {

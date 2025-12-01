@@ -13,3 +13,6 @@ dist/
 *.js
 .DS_Store
 .gocache/
+*.xlsx
+*.db
+.cache/

@@ -780,12 +780,12 @@ func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (
 	for _, probe := range *probes {
 		var response []byte
 
-		Debug("Try Probe(" + probe.Name + ")" + ", Data(" + probe.Data + ")")
+		Debug("Try Probe(%s), Data(%s)", probe.Name, probe.Data)
 		response, _ = grabResponse(target, probe.DecodedData, config)
 
 		// 成功获取 Banner 即开始匹配规则，无规则匹配则直接返回
 		if len(response) > 0 {
-			Debug("Get response " + strconv.Itoa(len(response)) + " bytes from destination with Probe(" + probe.Name + ")")
+			Debug("Get response %d bytes from destination with Probe(%s)", len(response), probe.Name)
 			found := false
 
 			softFound := false
@@ -1054,7 +1054,7 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	wgOutput.Wait()
 
 	sort.Strings(ServiceInfoResults)
-	Success("🌲🌲🌲 Log at ./service.txt")
-	FileWrite("service.txt", strings.Join(ServiceInfoResults, "\n"))
+	Success("Log at ./service.txt")
+	FileWrite("service.txt", "%s", strings.Join(ServiceInfoResults, "\n"))
 
 }

@@ -41,8 +41,8 @@ func init() {
 	ipCmd := newCommandWithAliases("port", "port scanner", []string{"pp"}, &portOptions)
 	rootCmd.AddCommand(ipCmd)
 
-	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRange, "host", "i", "", "your ip list")
-	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRangeFile, "host-file", "I", "", "your ip list file")
+	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRange, "host", "i", "", "your ip or domain list (comma separated)")
+	ipCmd.PersistentFlags().StringVarP(&portOptions.IpRangeFile, "host-file", "I", "", "your ip or domain list file")
 
 	ipCmd.PersistentFlags().StringVarP(&portOptions.PortRange, "port", "p", strings.Join(common.DefaultPorts, ","), "your port list")
 	ipCmd.PersistentFlags().StringVarP(&portOptions.TopPorts, "top", "", "", "top ports to scan, default is empty")

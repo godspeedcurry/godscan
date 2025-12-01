@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,10 +18,6 @@ import (
 type ProtocolInfo struct {
 	Ip   string
 	Port int
-}
-type ServiceInfo struct {
-	Addr   string
-	Banner string
 }
 
 func parsePorts(portsStr string) ([]int, error) {
@@ -65,67 +62,60 @@ func parsePorts(portsStr string) ([]int, error) {
 	return uniquePorts.([]int), nil
 }
 
-func ipLessThanOrEqual(a, b net.IP) bool {
-	for i := range a {
-		if a[i] < b[i] {
-			return true
+// convertTargetListToPool accepts IPs, IP ranges/CIDRs, or domain names.
+func convertTargetListToPool(targetList []string) ([]string, error) {
+	var targets []string
+
+	for _, raw := range targetList {
+		target := sanitizeHost(raw)
+		if target == "" {
+			continue
 		}
-		if a[i] > b[i] {
-			return false
+		// Try range/CIDR first
+		if strings.Contains(target, "/") || strings.Contains(target, "-") {
+			if ipr, err := iprange.Parse(target); err == nil {
+				for _, ip := range ipr.Expand() {
+					targets = append(targets, ip.String())
+				}
+				continue
+			}
 		}
+		// Plain IP
+		if parsed := net.ParseIP(target); parsed != nil {
+			targets = append(targets, parsed.String())
+			continue
+		}
+		// Fallback: treat as hostname
+		targets = append(targets, target)
 	}
-	return true
+
+	targets = RemoveDuplicatesString(targets)
+	return targets, nil
 }
 
-func incrementIP(ip net.IP) net.IP {
-	nextIP := make(net.IP, len(ip))
-	copy(nextIP, ip)
-	for i := len(nextIP) - 1; i >= 0; i-- {
-		nextIP[i]++
-		if nextIP[i] > 0 {
-			break
+func sanitizeHost(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if strings.HasPrefix(s, "http://") || strings.HasPrefix(s, "https://") {
+		if u, err := url.Parse(s); err == nil {
+			return u.Hostname()
 		}
 	}
-	return nextIP
-}
-
-// convertIPListToPool 将给定的IP列表转换为IP池
-func convertIPListToPool(ipList []string) ([]net.IP, error) {
-	var ipPool []net.IP
-
-	for _, ipStr := range ipList {
-		ipStr = strings.TrimSpace(ipStr)
-		if strings.Contains(ipStr, "-") { // 处理范围格式的IP
-			ipRange := strings.Split(ipStr, "-")
-			if len(ipRange) != 2 {
-				return nil, fmt.Errorf("invalid IP range format: %s", ipStr)
-			}
-
-			startIP := net.ParseIP(strings.TrimSpace(ipRange[0]))
-			endIP := net.ParseIP(strings.TrimSpace(ipRange[1]))
-			if startIP == nil || endIP == nil {
-				return nil, fmt.Errorf("invalid IP address in range: %s", ipStr)
-			}
-
-			for ip := startIP; ipLessThanOrEqual(ip, endIP); ip = incrementIP(ip) {
-				ipPool = append(ipPool, ip)
-			}
-		} else if strings.Contains(ipStr, "/") { // 处理CIDR格式的IP
-			ipr, err := iprange.Parse(ipStr)
-			if err != nil {
-				return nil, fmt.Errorf("Error parsing CIDR IP: %v", err)
-			}
-			ipPool = append(ipPool, ipr.Expand()...)
-		} else { // 单个IP
-			parsedIP := net.ParseIP(ipStr)
-			if parsedIP == nil {
-				return nil, fmt.Errorf("invalid IP address: %s", ipStr)
-			}
-			ipPool = append(ipPool, parsedIP)
+	// Handle scheme-less URLs like //example.com/path
+	if strings.HasPrefix(s, "//") {
+		if u, err := url.Parse("http:" + s); err == nil {
+			return u.Hostname()
 		}
 	}
-
-	return ipPool, nil
+	// Try to parse arbitrary URL forms
+	if strings.Contains(s, "/") {
+		if u, err := url.Parse(s); err == nil && u.Hostname() != "" {
+			return u.Hostname()
+		}
+	}
+	return s
 }
 
 func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync.WaitGroup) {
@@ -148,7 +138,7 @@ func handleWorker(tasks <-chan ProtocolInfo, results chan ProtocolInfo, wg *sync
 }
 
 func PortScan(IpRange string, PortRange string) {
-	ips, err := convertIPListToPool(strings.Split(IpRange, ","))
+	ips, err := convertTargetListToPool(strings.Split(IpRange, ","))
 	if err != nil {
 		Error("%s", err)
 		return
@@ -176,10 +166,10 @@ func PortScan(IpRange string, PortRange string) {
 	}
 
 	// 任务生产者-分发任务 (新起一个 goroutinue ，进行分发数据)
-	go func(arr []net.IP) {
+	go func(arr []string) {
 		for _, ip := range arr {
 			for _, port := range ports_list {
-				taskChan <- ProtocolInfo{Ip: ip.String(), Port: port}
+				taskChan <- ProtocolInfo{Ip: ip, Port: port}
 			}
 		}
 		close(taskChan)

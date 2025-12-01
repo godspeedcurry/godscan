@@ -1,16 +1,16 @@
 package utils
 
 import (
+	"database/sql"
 	"fmt"
 	"html"
-	"io"
 	"math"
 	"os"
 	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/olekukonko/tablewriter"
+	prettytable "github.com/jedib0t/go-pretty/v6/table"
 )
 
 type SensitiveData struct {
@@ -23,7 +23,7 @@ func SecList() string {
 		"aws[_-]?access[_-]?key[_-]?id", "aws[_-]?secret[_-]?access[_-]?key", "auth[-_]?token", "access[-_]?token",
 		"auth[-_]?key", "client[-_]?secret", "access[-_]?key(?:secret|id)?",
 		"id_dsa", "encryption[-_]?key", "passwd", "authorization", "bearer", "GITHUB[_-]?TOKEN",
-		"api[_-]?key", "api[-_]?secret", "client[_-]?key", "client[_-]?id", "ssh[-_]?key",
+		"api[_-]?key", "api[-_]?secret", "client[_-]?key", "ssh[-_]?key",
 		"ssh[-_]?key", "irc_pass", "xoxa-2", "xoxr", "private[_-]?key", "consumer[_-]?key", "consumer[_-]?secret",
 		"SLACK_BOT_TOKEN", "api[-_]?token", "session[_-]?token", "session[_-]?key",
 		"session[_-]?secret", "slack[_-]?token"}, "|") + ")"
@@ -70,31 +70,23 @@ func DeduplicateByContent(data []SensitiveData) []SensitiveData {
 }
 
 func PrintTable(Url string, key string, data []SensitiveData) {
-	Success("[%s] [%s]", Url, key)
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].Entropy > data[j].Entropy
 	})
 
-	filename := "entropy.log"
-	file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		Error("%s", err)
-		return
-	}
-	defer file.Close()
-
-	FileWrite(filename, "\n[%s] [%s]\n", Url, key)
-
-	multiWriter := io.MultiWriter(os.Stdout, file)
-	table := tablewriter.NewWriter(multiWriter)
-
-	table.SetHeader([]string{"Content", "Entropy"})
+	fmt.Printf("\n[%s] [%s]\n", Url, key)
+	table := prettytable.NewWriter()
+	table.SetOutputMirror(os.Stdout)
+	table.SetStyle(prettytable.StyleRounded)
+	table.SetColumnConfigs([]prettytable.ColumnConfig{
+		{Number: 1, WidthMax: 80},
+	})
+	table.AppendHeader(prettytable.Row{"Content", "Entropy"})
 
 	for _, d := range data {
-		row := []string{d.Content, fmt.Sprintf("%.2f", d.Entropy)}
-		table.Append(row)
+		table.AppendRow(prettytable.Row{d.Content, fmt.Sprintf("%.2f", d.Entropy)})
 	}
-	if table.NumLines() >= 1 {
+	if table.Length() >= 1 {
 		table.Render()
 	}
 }
@@ -109,7 +101,7 @@ func UrlFilter(Url string) bool {
 	}
 	return false
 }
-func SensitiveInfoCollect(Url string, Content string, directory string) {
+func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory string) {
 	space := `[\s]{0,30}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
@@ -147,14 +139,28 @@ func SensitiveInfoCollect(Url string, Content string, directory string) {
 				}
 			}
 			otherData = RemoveDuplicatesString(otherData)
-			if len(otherData) > 0 && len(otherData) < 20 {
-				Success("[%s] [%s]\n%s", Url, key, strings.Join(otherData, "\n"))
-			} else if len(otherData) != 0 {
-				Success("🌲🌲🌲 More info at ./%s, found %d urls at %s", directory+"urls.txt", len(otherData), Url)
+			if len(otherData) > 0 {
 				FileWrite(directory+"urls.txt", "======[%s]======[%s]\n%s", Url, key, strings.Join(otherData, "\n")+"\n")
+				InfoFile("[%s] [%s] %d item(s) saved to ./%s\n%s", Url, key, len(otherData), directory+"urls.txt", strings.Join(otherData, "\n"))
+				SaveSensitiveHits(db, Url, key, otherData, directory)
 			}
 			if len(secData) > 0 {
-				PrintTable(Url, key, DeduplicateByContent(secData))
+				dedup := DeduplicateByContent(secData)
+				PrintTable(Url, key, dedup)
+				contents := []string{}
+				entList := []EntropyHit{}
+				for _, d := range dedup {
+					contents = append(contents, d.Content)
+					entList = append(entList, EntropyHit{
+						SourceURL: Url,
+						Category:  key,
+						Content:   d.Content,
+						Entropy:   d.Entropy,
+						SaveDir:   directory,
+					})
+				}
+				SaveSensitiveHits(db, Url, key, contents, directory)
+				SaveEntropyHits(db, Url, key, directory, entList)
 			}
 		}
 	}

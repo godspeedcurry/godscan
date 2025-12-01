@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"sync"
 
 	"github.com/Knetic/govaluate"
 	regexp2 "github.com/dlclark/regexp2"
@@ -52,6 +51,7 @@ func logRequestError(targetURL string, err error) {
 	if u, parseErr := url.Parse(targetURL); parseErr == nil && u.Hostname() != "" {
 		host = u.Hostname()
 	}
+	recordHostError(host, err.Error())
 	if _, loaded := hostErrorOnce.LoadOrStore(host, struct{}{}); !loaded {
 		Warning("Skip %s: %v", targetURL, err)
 		return
@@ -79,8 +79,6 @@ var methodMatchers = map[string]methodMatcher{
 	"keyword": iskeyword,
 	"regular": isregular,
 }
-
-var hostErrorOnce sync.Map
 
 func chooseLocator(headers string, body string, title string, fp Fingerprint) string {
 	if fp.Location == "header" {

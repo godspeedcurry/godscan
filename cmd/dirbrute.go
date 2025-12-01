@@ -7,7 +7,7 @@ import (
 	"github.com/cheggaaa/pb/v3"
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
-	"github.com/olekukonko/tablewriter"
+	prettytable "github.com/jedib0t/go-pretty/v6/table"
 	"github.com/spf13/viper"
 )
 
@@ -45,13 +45,14 @@ func (o *DirbruteOptions) run() {
 	utils.Info("Total: %d url(s)", len(targetUrlList))
 	utils.Info("Total: %d payload(s) in dir dict", len(targetDirList))
 	utils.Info("Total: %d threads", viper.GetInt("dirbrute-threads"))
-	utils.Success("🌲🌲🌲 Log at ./dirbrute.csv")
+	utils.Success("Log at ./dirbrute.csv")
 
 	bar := pb.StartNew(len(targetUrlList) * len(targetDirList))
 
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetAutoWrapText(false)
-	table.SetHeader(common.TableHeader)
+	table := prettytable.NewWriter()
+	table.SetOutputMirror(os.Stdout)
+	table.AppendHeader(prettytable.Row(utils.StringListToInterfaceList(common.TableHeader)))
+	table.SetStyle(prettytable.StyleRounded)
 
 	// 定义最大并发量
 	maxGoroutines := viper.GetInt("dirbrute-threads")
@@ -79,7 +80,7 @@ func (o *DirbruteOptions) run() {
 		bar.Increment()
 	}
 	bar.Finish()
-	if table.NumLines() >= 1 {
+	if table.Length() >= 1 {
 		table.Render()
 	}
 
