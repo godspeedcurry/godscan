@@ -13,7 +13,31 @@
   </a>
 </p>
 
-## Usage
+## 亮点
+- Web 指纹 + API 抽取：GET/POST/404 多探针、favicon hash（fofa/hunter）、SimHash/关键词辅助识别。
+- 爬虫情报：DFS 深度可调，自动存档 `spider.db`/`report.xlsx`，敏感信息 + 熵值高亮，CDN/OSS 侧写。
+- 端口服务识别：nmap 样式探针 + JDWP/HTTP 自定义规则，域名/IP/CIDR/范围混合输入。
+- 弱口令生成：基础/变异/阴历模式，支持前后缀、分隔符；可直接喂在线爆破或 hashcat。
+- 纯 Go，默认 `CGO_ENABLED=0`，提供 linux/windows/macos/freebsd 多平台包。
+
+## 快速上手
+```bash
+# 单域名爬虫（指纹+API）
+godscan sp -u https://example.com           # 简写：sp, ss
+godscan sp -f urls.txt                      # 简写：--url-file/-f/-uf
+
+# 目录扫描
+godscan dir -u https://example.com          # 简写：dir, dirb, dd
+
+# 端口扫描（支持域名/IP/CIDR/范围）
+godscan port -i '1.2.3.4/28,example.com' -p 80,443
+
+# 图标 hash
+godscan icon -u https://example.com/favicon.ico
+
+# 弱口令生成
+godscan weak -k "foo,bar" --full
+```
 
 ### 主要命令
 
@@ -44,7 +68,7 @@ Flags:
       --proxy string          proxy
       --ua string             set user agent (default "user agent")
   -u, --url string            singel url
-      --url-file string       url file
+  -f, --url-file string       url file (也接受 -uf file)
 
 Use "godscan [command] --help" for more information about a command.
 ```

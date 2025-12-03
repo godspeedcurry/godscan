@@ -17,32 +17,24 @@
 ## Quick Usage
 
 ```bash
-# One target
-./godscan dirbrute --url http://www.example.com
-# Batch
-./godscan dirbrute --url-file url.txt
+# Spider (fingerprint + API extraction)
+godscan sp -u https://example.com            # aliases: sp, ss
+godscan sp -f urls.txt                       # --url-file shorthand: -f or -uf
 
-# Icon hash (fofa/hunter)
-./godscan icon --url http://www.example.com/favicon.ico
+# Dir brute
+godscan dir -u https://example.com           # aliases: dir, dirb, dd
 
-# Port scan (top 500 by default)
-./godscan port -i '1.2.3.4/28'
-# Custom ports
-./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'
-# Domains are supported (auto-resolve)
-# ./godscan port -i 'example.com,foo.bar'
+# Port scan (domains/IP/CIDR/ranges)
+godscan port -i '1.2.3.4/28,example.com' -p 80,443
+
+# Icon hash
+godscan icon -u https://example.com/favicon.ico
 
 # Weak password generator
-./godscan weakpass -k "ZhangSan,110101199003070759,18288888888"
-./godscan weakpass -k "baidu,admin,root,server" --full > dict.txt
-
-# Spider + API/fingerprint
-./godscan spider --url http://example.com
-# Depth defaults to 2; increase with -d
-./godscan spider --url-file url.txt   # shorthand: -f url.txt or -uf url.txt
+godscan weak -k "foo,bar" --full
 
 # Clean logs
-./godscan clean
+godscan clean
 ```
 
 ### Flags (common)
@@ -86,6 +78,13 @@ git push -u origin v1.xx
 git tag -d v1.xx
 git push origin :refs/tags/v1.xx
 ```
+
+## Highlights
+- Web fingerprinting + API extraction: multi-probe (GET/POST/404), favicon hash (fofa/hunter), SimHash/keywords for hints.
+- Crawl intelligence: DFS with depth control, stores to `spider.db`/`report.xlsx`, sensitive data + entropy surfaced, CDN/OSS profiling.
+- Port/service detection: nmap-style probes plus custom JDWP/HTTP rules; supports domains, IPs, CIDRs, ranges.
+- Weak passwords: base/full/mutation (incl. lunar birthday), configurable prefixes/suffixes/separators; ready for online brute or hashcat.
+- Pure Go, `CGO_ENABLED=0`, ships linux/windows/macos/freebsd multi-arch builds.
 
 ### Reports
 - Spider results persist to `spider.db`; run `godscan report` to export `report.xlsx`.
