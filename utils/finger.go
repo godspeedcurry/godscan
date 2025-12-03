@@ -622,6 +622,7 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	out.CDNHosts = strings.Join(cdnHosts, ",")
 	if len(cdnHosts) > 0 {
 		FileWrite(directory+"cdn_hosts.txt", "%s\n", strings.Join(cdnHosts, "\n"))
+		SaveCDNHosts(db, RootPath, cdnHosts)
 	}
 	FileWrite(directory+"spider.log", "%s\n", strings.Join(myList, "\n"))
 	return out
@@ -629,7 +630,7 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 
 func collectCDNHosts(urls []string) []string {
 	candidates := []string{
-		"aliyuncs.com", "alicdn.com", "qiniucdn.com", "qiniu.com", "myqcloud.com", "tencentcs.com", "ksyuncs.com", "bcebos.com", "cloudfront.net",
+		"aliyuncs.com", "alicdn.com", "qiniucdn.com", "qiniu.com", "myqcloud.com", "tencentcs.com", "ksyuncs.com", "bcebos.com", "cloudfront.net", "bitly.com",
 	}
 	seen := make(map[string]struct{})
 	for _, raw := range urls {

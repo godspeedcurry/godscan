@@ -56,6 +56,25 @@ Use "godscan [command] --help" for more information about a command.
 ./godscan completion zsh > /tmp/x
 source /tmp/x
 ```
+
+### 发布与版本
+- 只要打新 tag，GitHub Actions + GoReleaser 会自动打包发布，覆盖 linux/windows/macos/freebsd (amd64/arm64/386/armv7)。
+- 归档命名：`godscan_<version>_<os>_<arch>`，macOS 显示为 `macos`，windows 用 zip。
+- 版本号从 tag 注入，手动本地构建默认显示 `dev`，如需本地指定版本：`go build -ldflags="-X github.com/godspeedcurry/godscan/cmd.version=vX.Y.Z"`。
+
+## 开发
+```bash
+# 提交改动
+git add . && git commit -m "fix bug" && git push -u origin main
+
+# 发布（打 tag 即触发 GitHub Actions + GoReleaser 构建发布包，版本号自动注入二进制）
+git tag -a v1.xx -m "v1.xx"
+git push -u origin v1.xx
+
+# 删除 tag（如需撤回发布）
+git tag -d v1.xx
+git push origin :refs/tags/v1.xx
+```
 ### 日志清理
 ```
 ./godscan clean
@@ -148,7 +167,7 @@ match http m|^HTTP| p/HTTP Protocol/
 ./godscan spider --url http://example.com
 # -d 1 可以指定爬虫的深度 默认为2 可以适当提高深度至3 
 # 从文件批量爬取 适合针对API型资产 url不建议太多
-./godscan spider --url-file url.txt
+./godscan spider --url-file url.txt   # 简写：-f url.txt 或 -uf url.txt
 ```
 注意：godscan默认不扫内网IP，来减少卡顿，如果要扫内网IP,使用`--private-ip`参数即可
 

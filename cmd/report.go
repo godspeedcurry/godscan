@@ -130,6 +130,17 @@ func exportXLSX(db *sql.DB, path string) error {
 	}
 	sheets = append(sheets, utils.Worksheet{Name: "entropy_hits", Rows: entRows})
 
+	// cdn hosts sheet
+	cdns, err := utils.LoadCDNHosts(db)
+	if err != nil {
+		return err
+	}
+	cdnRows := [][]string{{"Root URL", "CDN Host"}}
+	for _, c := range cdns {
+		cdnRows = append(cdnRows, []string{c.Root, c.Host})
+	}
+	sheets = append(sheets, utils.Worksheet{Name: "cdn_hosts", Rows: cdnRows})
+
 	return utils.WriteSimpleXLSX(path, sheets)
 }
 

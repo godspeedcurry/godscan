@@ -101,6 +101,13 @@ CREATE TABLE IF NOT EXISTS dirbrute_results (
 	keyword TEXT,
 	simhash TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS cdn_hosts (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	root_url TEXT,
+	host TEXT,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );`
 	_, err := db.Exec(ddl)
 	if err != nil {
@@ -109,6 +116,7 @@ CREATE TABLE IF NOT EXISTS dirbrute_results (
 	// best-effort migrations for older databases
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_count INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_hosts TEXT DEFAULT ''`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS cdn_hosts (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, host TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
 	return nil
 }
 
@@ -147,6 +155,29 @@ func SaveAPIPaths(db *sql.DB, rootURL, sourceURL string, paths []string, saveDir
 	defer stmt.Close()
 	for _, p := range paths {
 		if _, err := stmt.Exec(rootURL, sourceURL, p, saveDir); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func SaveCDNHosts(db *sql.DB, rootURL string, hosts []string) error {
+	if db == nil || len(hosts) == 0 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT INTO cdn_hosts (root_url, host) VALUES (?, ?)`)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, h := range hosts {
+		if _, err := stmt.Exec(rootURL, h); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -199,6 +230,11 @@ type APICount struct {
 	Cnt  int
 }
 
+type CDNHostRow struct {
+	Root string
+	Host string
+}
+
 func LoadAPICounts(db *sql.DB) ([]APICount, error) {
 	rows, err := db.Query(`SELECT root_url, COUNT(*) as cnt FROM api_paths GROUP BY root_url ORDER BY cnt DESC`)
 	if err != nil {
@@ -209,6 +245,23 @@ func LoadAPICounts(db *sql.DB) ([]APICount, error) {
 	for rows.Next() {
 		var r APICount
 		if err := rows.Scan(&r.Root, &r.Cnt); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func LoadCDNHosts(db *sql.DB) ([]CDNHostRow, error) {
+	rows, err := db.Query(`SELECT root_url, host FROM cdn_hosts ORDER BY root_url, host`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CDNHostRow
+	for rows.Next() {
+		var r CDNHostRow
+		if err := rows.Scan(&r.Root, &r.Host); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

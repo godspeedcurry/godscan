@@ -9,21 +9,37 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/godspeedcurry/godscan/cmd.version={{.Version}}
+    goarch:
+      - amd64
+      - arm64
+      - 386
+    goarm:
+      - 7
     goos:
       - linux
       - windows
       - darwin
+      - freebsd
     ignore:
       - goos: darwin
+        goarch: 386
+      - goos: freebsd
         goarch: 386
 archives:
   - id: godscan
     name_template: >-
-      {{ .ProjectName }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x64
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macos{{ else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm" }}armv{{ .Arm }}
       {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
 checksum:
   name_template: 'checksums.txt'
 snapshot:

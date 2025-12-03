@@ -39,7 +39,7 @@
 # Spider + API/fingerprint
 ./godscan spider --url http://example.com
 # Depth defaults to 2; increase with -d
-./godscan spider --url-file url.txt
+./godscan spider --url-file url.txt   # shorthand: -f url.txt or -uf url.txt
 
 # Clean logs
 ./godscan clean
@@ -66,6 +66,25 @@
 ```bash
 ./godscan completion zsh > /tmp/x
 source /tmp/x
+```
+
+### Releases & Versioning
+- Every new Git tag triggers GoReleaser (GitHub Actions) to build archives for linux/windows/macos/freebsd (amd64/arm64/386/armv7).
+- Archive naming: `godscan_<version>_<os>_<arch>` (macOS labeled `macos`, windows uses zip).
+- Binary version is injected from the tag; local builds without ldflags show `dev`. To embed a custom version locally: `go build -ldflags="-X github.com/godspeedcurry/godscan/cmd.version=vX.Y.Z"`.
+
+## Development
+```bash
+# commit changes
+git add . && git commit -m "fix bug" && git push -u origin main
+
+# release (tag triggers GitHub Actions + GoReleaser; tag value is injected into the binary)
+git tag -a v1.xx -m "v1.xx"
+git push -u origin v1.xx
+
+# delete tag (retract release)
+git tag -d v1.xx
+git push origin :refs/tags/v1.xx
 ```
 
 ### Reports

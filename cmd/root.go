@@ -12,7 +12,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-var version = "v1.1.28"
+// version is injected at build time via -ldflags "-X github.com/godspeedcurry/godscan/cmd.version=vX.Y.Z".
+// Default to "dev" for local builds.
+var version = "dev"
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
@@ -105,7 +107,7 @@ func SetProxyFromEnv() string {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "single target URL")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "", "", "file with target URLs (one per line)")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "f", "", "file with target URLs (one per line)")
 
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Proxy, "proxy", "", "", "http(s)/socks proxy, e.g. http://127.0.0.1:8080")
 
@@ -166,10 +168,37 @@ func init() {
 }
 
 func Execute() {
+	os.Args = expandUF(os.Args)
 	if viper.GetString("proxy") != "" {
 		utils.Info("Proxy is %s", viper.GetString("proxy"))
 	} else {
 		utils.Info("Proxy is not set")
 	}
 	cobra.CheckErr(rootCmd.Execute())
+}
+
+// expandUF allows fscan-style "-uf file.txt" or "-uf=file.txt" as an alias for "-f file.txt".
+// Cobra does not support multi-letter shorthands, so we normalize here before flag parsing.
+func expandUF(args []string) []string {
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		switch {
+		case a == "-uf":
+			if i+1 < len(args) {
+				out = append(out, "-f", args[i+1])
+				i++
+			} else {
+				out = append(out, "-f")
+			}
+		case strings.HasPrefix(a, "-uf="):
+			out = append(out, "-f", strings.TrimPrefix(a, "-uf="))
+		case strings.HasPrefix(a, "-uf"):
+			// e.g., -uffile.txt
+			out = append(out, "-f", strings.TrimPrefix(a, "-uf"))
+		default:
+			out = append(out, a)
+		}
+	}
+	return out
 }
