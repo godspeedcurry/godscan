@@ -15,7 +15,8 @@
 
 ## 亮点
 - Web 指纹 + API 抽取：GET/POST/404 多探针、favicon hash（fofa/hunter）、SimHash/关键词辅助识别。
-- 爬虫情报：DFS 深度可调，自动存档 `spider.db`/`report.xlsx`，敏感信息 + 熵值高亮，CDN/OSS 侧写。
+- 爬虫情报：DFS 深度可调，自动存档 `spider.db`/`report.xlsx`，敏感信息 + 熵值高亮，CDN/OSS 提取。
+- SourceMap 发现：从 JS/脚本标签自动探测同源 `.map`，记录到 `spider.db`/`sourcemaps.txt`，少量请求高命中。
 - 端口服务识别：nmap 样式探针 + JDWP/HTTP 自定义规则，域名/IP/CIDR/范围混合输入。
 - 弱口令生成：基础/变异/阴历模式，支持前后缀、分隔符；可直接喂在线爆破或 hashcat。
 - 纯 Go，默认 `CGO_ENABLED=0`，提供 linux/windows/macos/freebsd 多平台包。
@@ -37,6 +38,13 @@ godscan icon -u https://example.com/favicon.ico
 
 # 弱口令生成
 godscan weak -k "foo,bar" --full
+
+# 数据检索（正则）
+godscan search --pattern "/api/v1" --db spider.db   # 去重搜索 api_paths/sensitive_hits，结果保存到 output/search_results.json
+
+# 进度与输出
+- 爬虫默认打印进度（10% 阶梯）和每个 URL 的开始日志，可用 `--progress-log=false` 关闭。
+- 所有日志/产物写入 `--output-dir`（默认 output），包括 result.log、service.txt、spider_summary.json、search_results.json。
 ```
 
 ### 主要命令
@@ -62,8 +70,9 @@ Flags:
   -h, --help                  help for godscan
       --host string           singel host
       --host-file string      host file
-  -v, --loglevel int          level of your log (default 2)
-  -o, --output string         output file to write log and results (default "result.log")
+-v, --loglevel int          level of your log (default 2)
+-o, --output string         output file to write log and results (default "result.log")
+-O, --output-dir string     directory to write logs/results/json (default "output")
       --private-ip            scan private ip
       --proxy string          proxy
       --ua string             set user agent (default "user agent")

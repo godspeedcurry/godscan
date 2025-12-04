@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -1054,7 +1055,12 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	wgOutput.Wait()
 
 	sort.Strings(ServiceInfoResults)
-	Success("Log at ./service.txt")
-	FileWrite("service.txt", "%s", strings.Join(ServiceInfoResults, "\n"))
+	outDir := viper.GetString("output-dir")
+	if outDir == "" {
+		outDir = "."
+	}
+	servicePath := filepath.Join(outDir, "service.txt")
+	Success("Log at %s", servicePath)
+	FileWrite(servicePath, "%s", strings.Join(ServiceInfoResults, "\n"))
 
 }

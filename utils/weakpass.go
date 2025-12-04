@@ -208,9 +208,9 @@ func outputListFormat(UniqPasswordList []string) {
 			quotedStrings = append(quotedStrings, strconv.Quote(str))
 		}
 		output := "[" + strings.Join(quotedStrings, ", ") + "]"
-		Info("%s", output)
+		fmt.Println(output)
 	} else {
-		Info("%s", strings.Join(UniqPasswordList, "\n"))
+		fmt.Println(strings.Join(UniqPasswordList, "\n"))
 	}
 
 }

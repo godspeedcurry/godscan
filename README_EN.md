@@ -14,6 +14,14 @@
 </p>
 
 
+## Highlights
+- Web fingerprinting + API extraction: multi-probe (GET/POST/404), favicon hash (fofa/hunter), SimHash/keywords for hints.
+- Crawl intelligence: DFS with depth control, stores to `spider.db`/`report.xlsx`, sensitive data + entropy surfaced, CDN/OSS profiling.
+- Source map discovery: auto-probe same-origin `.map` from scripts/JS bodies, saved to `spider.db` and `sourcemaps.txt` with minimal extra requests.
+- Port/service detection: nmap-style probes plus custom JDWP/HTTP rules; supports domains, IPs, CIDRs, ranges.
+- Weak passwords: base/full/mutation (incl. lunar birthday), configurable prefixes/suffixes/separators; ready for online brute or hashcat.
+- Pure Go, `CGO_ENABLED=0`, ships linux/windows/macos/freebsd multi-arch builds.
+
 ## Quick Usage
 
 ```bash
@@ -33,6 +41,13 @@ godscan icon -u https://example.com/favicon.ico
 # Weak password generator
 godscan weak -k "foo,bar" --full
 
+# Regex search (dedup)
+godscan search --pattern "/api/v1" --db spider.db   # searches api_paths/sensitive_hits; results saved to output/search_results.json
+
+# Progress & output
+- Spider prints progress (10% steps) and per-URL start logs by default; disable with `--progress-log=false`.
+- All logs/artifacts go to `--output-dir` (default `output`): result.log, service.txt, spider_summary.json, search_results.json.
+
 # Clean logs
 godscan clean
 ```
@@ -43,16 +58,9 @@ godscan clean
 - `-e, --filter stringArray` substring filters to drop URLs
 - `--private-ip` include private IP ranges (off by default)
 - `-o, --output string` log/result file (default `result.log`)
+- `-O, --output-dir string` directory for logs/results/json (default `output`)
 - `-v, --loglevel int` log level (default 2)
 - `--proxy string` HTTP proxy
-
-### Notable Features
-- **Dirbrute**: Small curated wordlist focusing on high-value leaks and code-exec spots.
-- **Fingerprinting**: Multi-probe (GET/POST/404), favicon hash (fofa/hunter), similarity hash, keyword hints.
-- **Spider**: DFS crawl with API path extraction from JS (Vue chunk detection included); saves per-target artifacts to `YYYY-MM-DD/<host>_port/spider/`.
-- **Sensitive data hunt**: Regex + entropy to surface secrets, URLs, tokens; stored in SQLite (`spider.db`) and `report.xlsx`.
-- **Weakpass**: Generates focused weak-password lists; supports prefixes/suffixes/separators and `--full` mutation mode.
-- **Port scan**: Nmap-style probes plus custom JDWP/HTTP tweaks; configurable top lists and ranges.
 
 ### Autocomplete
 ```bash
@@ -80,11 +88,7 @@ git push origin :refs/tags/v1.xx
 ```
 
 ## Highlights
-- Web fingerprinting + API extraction: multi-probe (GET/POST/404), favicon hash (fofa/hunter), SimHash/keywords for hints.
-- Crawl intelligence: DFS with depth control, stores to `spider.db`/`report.xlsx`, sensitive data + entropy surfaced, CDN/OSS profiling.
-- Port/service detection: nmap-style probes plus custom JDWP/HTTP rules; supports domains, IPs, CIDRs, ranges.
-- Weak passwords: base/full/mutation (incl. lunar birthday), configurable prefixes/suffixes/separators; ready for online brute or hashcat.
-- Pure Go, `CGO_ENABLED=0`, ships linux/windows/macos/freebsd multi-arch builds.
+See above section.
 
 ### Reports
 - Spider results persist to `spider.db`; run `godscan report` to export `report.xlsx`.
