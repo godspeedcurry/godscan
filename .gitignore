@@ -16,3 +16,4 @@ dist/
 *.xlsx
 *.db
 .cache/
+output/

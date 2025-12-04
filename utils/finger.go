@@ -132,6 +132,125 @@ func uselessUrl(Url string, Depth int) bool {
 	return false
 }
 
+func isJSAssetPath(p string) bool {
+	lp := strings.ToLower(p)
+	return strings.HasSuffix(lp, ".js") || strings.HasSuffix(lp, ".mjs")
+}
+
+func buildSourceMapURL(jsURL string) string {
+	u, err := url.Parse(jsURL)
+	if err != nil || u.Path == "" {
+		return ""
+	}
+	lp := strings.ToLower(u.Path)
+	if strings.HasSuffix(lp, ".map") || !isJSAssetPath(u.Path) {
+		return ""
+	}
+	u.Path = u.Path + ".map"
+	return u.String()
+}
+
+func fetchSourceMap(mapURL string) (int, int, error) {
+	// Prefer HEAD to avoid large transfers; fall back to GET if HEAD fails hard.
+	doReq := func(method string) (int, int, error) {
+		req, err := http.NewRequest(method, mapURL, nil)
+		if err != nil {
+			return -1, 0, err
+		}
+		SetHeaders(req)
+		resp, err := Client.Do(req)
+		if err != nil {
+			return -1, 0, err
+		}
+		defer resp.Body.Close()
+		maxBody := viper.GetInt("max-body-bytes")
+		if maxBody <= 0 {
+			maxBody = 2 * 1024 * 1024
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBody)))
+		length := len(body)
+		if cl := resp.Header.Get("Content-Length"); cl != "" {
+			if v, e := strconv.Atoi(cl); e == nil {
+				length = v
+			}
+		}
+		return resp.StatusCode, length, nil
+	}
+
+	status, length, err := doReq(http.MethodHead)
+	if err == nil && status > 0 {
+		return status, length, nil
+	}
+
+	return doReq(http.MethodGet)
+}
+
+func sameHost(rootURL, target string) bool {
+	root, err := url.Parse(rootURL)
+	if err != nil {
+		return true
+	}
+	t, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(root.Hostname(), t.Hostname())
+}
+
+func sourceMapFromContent(jsURL string, body string) string {
+	// Look for //# sourceMappingURL=... or //@ sourceMappingURL=...
+	re := regexp.MustCompile(`(?m)sourceMappingURL=([^\s]+)`)
+	m := re.FindStringSubmatch(body)
+	if len(m) < 2 {
+		return ""
+	}
+	raw := strings.TrimSpace(m[1])
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	if u.IsAbs() {
+		return u.String()
+	}
+	base, err := url.Parse(jsURL)
+	if err != nil {
+		return ""
+	}
+	return base.ResolveReference(u).String()
+}
+
+func probeSourceMap(rootURL, jsURL, saveDir string, seen mapset.Set, db *sql.DB) {
+	mapURL := buildSourceMapURL(jsURL)
+	if mapURL == "" {
+		return
+	}
+	if seen != nil && seen.Contains(mapURL) {
+		return
+	}
+	if seen != nil {
+		seen.Add(mapURL)
+	}
+	if !sameHost(rootURL, mapURL) {
+		return
+	}
+	status, length, err := fetchSourceMap(mapURL)
+	if err != nil || status < 0 || status >= 400 {
+		return
+	}
+	Info("source map found: %s (status=%d size=%d) from %s", mapURL, status, length, jsURL)
+	FileWrite(saveDir+"sourcemaps.txt", "%s\t%d\t%d\t%s\n", mapURL, status, length, jsURL)
+	_ = SaveSourceMaps(db, []SourceMapHit{{
+		RootURL: rootURL,
+		JSURL:   jsURL,
+		MapURL:  mapURL,
+		Status:  status,
+		Length:  length,
+	}})
+}
+
 func parseDir(fullPath string, MaxDepth int) []string {
 	// 去除末尾的斜杠, 最多两层
 	dirs := []string{}
@@ -300,7 +419,7 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string, apiC
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, apiCounter *int, db *sql.DB) error {
+func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) error {
 	if uselessUrl(Url, depth) || filterOutUrl(Url) {
 		return nil
 	}
@@ -320,6 +439,9 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 		Error("%s", Url)
 		return err
 	}
+	if isJSAssetPath(u.Path) {
+		probeSourceMap(RootPath, Url, directory, sourceMapSeen, db)
+	}
 	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
 	if IsVuePath(u.Path) {
 		maxBody := viper.GetInt("max-body-bytes")
@@ -329,6 +451,9 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 		limited := io.LimitReader(resp.Body, int64(maxBody))
 		bodyBuf, _ := io.ReadAll(limited)
 		bufStr := string(bodyBuf)
+		if sm := sourceMapFromContent(Url, bufStr); sm != "" {
+			probeSourceMap(RootPath, sm, directory, sourceMapSeen, db)
+		}
 		parseVueUrl(Url, RootPath, bufStr, directory, apiCounter, db)
 	} else {
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -355,7 +480,7 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 			}
 			normalizeUrl := Normalize(href, RootPath)
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, apiCounter, db)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db)
 			}
 		})
 		// iframe, script 标签
@@ -365,8 +490,11 @@ func Spider(RootPath string, Url string, depth int, directory string, myMap maps
 				return
 			}
 			normalizeUrl := Normalize(src, RootPath)
+			if goquery.NodeName(selector) == "script" {
+				probeSourceMap(RootPath, normalizeUrl, directory, sourceMapSeen, db)
+			}
 			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, apiCounter, db)
+				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db)
 			}
 		})
 	}
@@ -594,6 +722,7 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	}
 	// 爬虫递归爬
 	myMap := mapset.NewSet()
+	sourceMapSeen := mapset.NewSet()
 	host, err := url.Parse(RootPath)
 	if err != nil {
 		Error("%s", err)
@@ -602,7 +731,7 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	}
 	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
 	apiCounter := 0
-	err = Spider(RootPath, Url, Depth, directory, myMap, &apiCounter, db)
+	err = Spider(RootPath, Url, Depth, directory, myMap, sourceMapSeen, &apiCounter, db)
 	if err != nil {
 		Error("%s", err)
 		out.Err = err

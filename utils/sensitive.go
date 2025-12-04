@@ -142,16 +142,24 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 			if len(otherData) > 0 {
 				FileWrite(directory+"urls.txt", "======[%s]======[%s]\n%s", Url, key, strings.Join(otherData, "\n")+"\n")
 				InfoFile("[%s] [%s] %d item(s) saved to ./%s\n%s", Url, key, len(otherData), directory+"urls.txt", strings.Join(otherData, "\n"))
-				SaveSensitiveHits(db, Url, key, otherData, directory)
+				var hits []SensitiveHit
+				for _, c := range otherData {
+					hits = append(hits, SensitiveHit{
+						SourceURL: Url,
+						Category:  key,
+						Content:   c,
+						Entropy:   0,
+						SaveDir:   directory,
+					})
+				}
+				SaveSensitiveHits(db, hits)
 			}
 			if len(secData) > 0 {
 				dedup := DeduplicateByContent(secData)
 				PrintTable(Url, key, dedup)
-				contents := []string{}
-				entList := []EntropyHit{}
+				var hits []SensitiveHit
 				for _, d := range dedup {
-					contents = append(contents, d.Content)
-					entList = append(entList, EntropyHit{
+					hits = append(hits, SensitiveHit{
 						SourceURL: Url,
 						Category:  key,
 						Content:   d.Content,
@@ -159,8 +167,7 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 						SaveDir:   directory,
 					})
 				}
-				SaveSensitiveHits(db, Url, key, contents, directory)
-				SaveEntropyHits(db, Url, key, directory, entList)
+				SaveSensitiveHits(db, hits)
 			}
 		}
 	}

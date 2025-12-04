@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/google/go-github/v57/github"
@@ -15,6 +17,7 @@ import (
 // version is injected at build time via -ldflags "-X github.com/godspeedcurry/godscan/cmd.version=vX.Y.Z".
 // Default to "dev" for local builds.
 var version = "dev"
+var updateCheckOnce sync.Once
 
 func checkForUpdate(currentVersion string) {
 	ctx := context.Background()
@@ -29,9 +32,9 @@ func checkForUpdate(currentVersion string) {
 		utils.Warning("Update available: %s. Please download the latest version from %s", *release.TagName, *release.HTMLURL)
 	}
 }
-func Banner() string {
-	checkForUpdate(version)
-	banner := `
+
+func bannerText() string {
+	return `
 ██████╗   ██████╗ ██████╗ ███████╗ ██████╗ █████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗████╗  ██║
 ██║  ███╗██║   ██║██║  ██║███████╗██║     ███████║██╔██╗ ██║
@@ -40,7 +43,10 @@ func Banner() string {
  ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝															
 godscan version: ` + version + `
 `
-	return banner
+}
+
+func maybeCheckForUpdate() {
+	updateCheckOnce.Do(func() { checkForUpdate(version) })
 }
 
 type GlobalOptions struct {
@@ -52,6 +58,7 @@ type GlobalOptions struct {
 
 	LogLevel   int
 	OutputFile string
+	OutputDir  string
 	Proxy      string
 
 	DefaultUA     string
@@ -67,7 +74,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "godscan",
-	Short: Banner() + "Let's fight against the world.",
+	Short: bannerText() + "Let's fight against the world.",
 	Long: `godscan - web recon, API extraction, weakpass generator, port fingerprint.
 
 Quick usage:
@@ -89,6 +96,9 @@ Global flags (common):
       --private-ip     include private IP ranges
       --ua             custom User-Agent
       --loglevel       0=minimal, 2=default, 6=debug`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		maybeCheckForUpdate()
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
@@ -136,6 +146,7 @@ func init() {
 
 	rootCmd.PersistentFlags().IntVarP(&GlobalOption.LogLevel, "loglevel", "v", 2, "log verbosity for info/debug (warnings/errors always shown). 0=minimal, 2=default, 6=debug")
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputFile, "output", "o", "result.log", "file to write logs and results")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.OutputDir, "output-dir", "O", "output", "directory for logs/results")
 
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.DefaultUA, "ua", "", "user agent", "override default User-Agent header")
 
@@ -156,6 +167,8 @@ func init() {
 
 	viper.BindPFlag("output", rootCmd.PersistentFlags().Lookup("output"))
 	viper.SetDefault("output", "result.log")
+	viper.BindPFlag("output-dir", rootCmd.PersistentFlags().Lookup("output-dir"))
+	viper.SetDefault("output-dir", "output")
 
 	viper.BindPFlag("private-ip", rootCmd.PersistentFlags().Lookup("private-ip"))
 	viper.SetDefault("private-ip", false)
@@ -189,12 +202,33 @@ func init() {
 
 func Execute() {
 	os.Args = expandUF(os.Args)
+	normalizeOutputPaths()
 	if viper.GetString("proxy") != "" {
 		utils.Info("Proxy is %s", viper.GetString("proxy"))
 	} else {
 		utils.Info("Proxy is not set")
 	}
 	cobra.CheckErr(rootCmd.Execute())
+}
+
+// normalizeOutputPaths ensures output dir exists and output file is placed under it unless an absolute path is provided.
+func normalizeOutputPaths() {
+	dir := viper.GetString("output-dir")
+	if dir == "" {
+		dir = "output"
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		utils.Warning("create output dir failed: %v", err)
+	}
+	out := viper.GetString("output")
+	if out == "" {
+		out = "result.log"
+	}
+	if !filepath.IsAbs(out) {
+		out = filepath.Join(dir, filepath.Base(out))
+	}
+	viper.Set("output-dir", dir)
+	viper.Set("output", out)
 }
 
 // expandUF allows fscan-style "-uf file.txt" or "-uf=file.txt" as an alias for "-f file.txt".

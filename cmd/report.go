@@ -83,6 +83,10 @@ func exportXLSX(db *sql.DB, path string) error {
 	if err != nil {
 		return err
 	}
+	sensHits, err := utils.LoadSensitiveHits(db)
+	if err != nil {
+		return err
+	}
 	var sheets []utils.Worksheet
 
 	// summary sheet
@@ -129,6 +133,13 @@ func exportXLSX(db *sql.DB, path string) error {
 		entRows = append(entRows, []string{e.SourceURL, e.Category, e.Content, fmt.Sprintf("%.2f", e.Entropy), e.SaveDir})
 	}
 	sheets = append(sheets, utils.Worksheet{Name: "entropy_hits", Rows: entRows})
+
+	// sensitive hits detail
+	sensDetail := [][]string{{"Source URL", "Category", "Content", "Entropy", "Save Dir"}}
+	for _, s := range sensHits {
+		sensDetail = append(sensDetail, []string{s.SourceURL, s.Category, s.Content, fmt.Sprintf("%.2f", s.Entropy), s.SaveDir})
+	}
+	sheets = append(sheets, utils.Worksheet{Name: "sensitive_detail", Rows: sensDetail})
 
 	// cdn hosts sheet
 	cdns, err := utils.LoadCDNHosts(db)

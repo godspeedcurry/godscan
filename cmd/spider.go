@@ -4,15 +4,16 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"database/sql"
 
 	"github.com/cheggaaa/pb/v3"
 	"github.com/godspeedcurry/godscan/common"
@@ -26,6 +27,7 @@ type SpiderOptions struct {
 	Depth     int
 	ApiPrefix string
 	Threads   int
+	Progress  bool
 }
 
 var (
@@ -39,11 +41,14 @@ func init() {
 	spiderCmd.PersistentFlags().IntVarP(&spiderOptions.Depth, "depth", "d", 2, "your search depth, default 2")
 	spiderCmd.PersistentFlags().StringVarP(&spiderOptions.ApiPrefix, "api", "", "", "your api prefix")
 	spiderCmd.PersistentFlags().IntVarP(&spiderOptions.Threads, "threads", "t", 20, "Number of concurrent targets")
+	spiderCmd.PersistentFlags().BoolVar(&spiderOptions.Progress, "progress-log", true, "print progress logs and per-target start notices")
 
 	viper.BindPFlag("ApiPrefix", spiderCmd.PersistentFlags().Lookup("api"))
 	viper.SetDefault("ApiPrefix", "")
 	viper.BindPFlag("spider-threads", spiderCmd.PersistentFlags().Lookup("threads"))
 	viper.SetDefault("spider-threads", 20)
+	viper.BindPFlag("spider-progress-log", spiderCmd.PersistentFlags().Lookup("progress-log"))
+	viper.SetDefault("spider-progress-log", true)
 
 }
 
@@ -59,6 +64,7 @@ func (o *SpiderOptions) run() {
 	utils.InitHttp()
 	targetUrlList := GetTargetList()
 	utils.Info("Total: %d url(s)", len(targetUrlList))
+	progressLog := viper.GetBool("spider-progress-log")
 
 	var wg sync.WaitGroup
 	maxGoroutines := viper.GetInt("spider-threads")
@@ -69,6 +75,10 @@ func (o *SpiderOptions) run() {
 	results := make(chan utils.SpiderSummary, len(targetUrlList))
 	var summaries []utils.SpiderSummary
 	var mu sync.Mutex
+	var processed int32
+	var started int32
+	var finished int32
+	doneCh := make(chan struct{})
 
 	db, err := utils.InitSpiderDB("spider.db")
 	if err != nil {
@@ -94,9 +104,40 @@ func (o *SpiderOptions) run() {
 		go func(url string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			if progressLog {
+				curStart := atomic.AddInt32(&started, 1)
+				remaining := int32(len(targetUrlList)) - curStart
+				utils.Info("spider start: %s (started %d, remaining ~%d)", url, curStart, remaining)
+			}
 			res := utils.FingerSummary(url, o.Depth, db)
+			if progressLog {
+				curFinished := atomic.AddInt32(&finished, 1)
+				remaining := int32(len(targetUrlList)) - curFinished
+				utils.Info("spider finish: %s status=%d api=%d urls=%d | finished %d/%d remaining %d", res.URL, res.Status, res.ApiCount, res.UrlCount, curFinished, len(targetUrlList), remaining)
+			}
 			results <- res
 		}(line)
+	}
+	// heartbeat to show progress even when no finishes yet
+	if progressLog {
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-doneCh:
+					return
+				case <-ticker.C:
+					curStart := atomic.LoadInt32(&started)
+					curDone := atomic.LoadInt32(&processed)
+					inflight := curStart - curDone
+					if inflight < 0 {
+						inflight = 0
+					}
+					utils.Info("spider heartbeat: started %d done %d inflight %d total %d", curStart, curDone, inflight, len(targetUrlList))
+				}
+			}
+		}()
 	}
 	wg.Wait()
 	close(results)
@@ -123,20 +164,38 @@ func (o *SpiderOptions) run() {
 	reachable := 0
 	findings := 0
 	var bar *pb.ProgressBar
+	progressMilestone := 10
 	if !viper.GetBool("quiet") {
 		bar = pb.StartNew(total)
-		bar.SetMaxWidth(80)
-		bar.SetTemplateString(`{{counters . }} {{bar . "[" "=" ">" " " "]"}} {{percent .}}`)
+		bar.SetMaxWidth(90)
+		bar.Set("prefix", "spider")
+		bar.SetTemplateString(`{{string . "prefix"}} {{counters .}} {{bar . "[" "=" ">" " " "]"}} {{percent .}} | elapsed: {{etime .}} | eta: {{rtime .}}`)
+		bar.SetRefreshRate(200 * time.Millisecond)
 	}
 	for res := range results {
 		if bar != nil {
 			bar.Increment()
+			cur := atomic.AddInt32(&processed, 1)
+			bar.Set("prefix", fmt.Sprintf("spider %d/%d", cur, total))
+		}
+		cur := atomic.LoadInt32(&processed)
+		if progressLog && total > 0 && progressMilestone <= 100 {
+			percent := int(cur) * 100 / total
+			if percent >= progressMilestone {
+				utils.Info("spider progress: %d/%d (%d%%)", cur, total, percent)
+				progressMilestone += 10
+			}
 		}
 		if res.Status >= 0 {
 			reachable++
 		}
 		if res.Finger != "" && res.Finger != common.NoFinger {
 			findings++
+		}
+		if progressLog {
+			successRate := float64(reachable) / float64(total)
+			remaining := total - int(cur)
+			utils.Info("spider finish: %s status=%d api=%d urls=%d | done %d/%d (%.1f%% success) remaining %d", res.URL, res.Status, res.ApiCount, res.UrlCount, cur, total, successRate*100, remaining)
 		}
 		if res.Status == -1 {
 			continue
@@ -167,6 +226,7 @@ func (o *SpiderOptions) run() {
 	if table.Length() > 0 {
 		table.Render()
 	}
+	writeSpiderJSONSummary(summaries)
 	utils.Info("Data persisted to spider.db (run `godscan report` to view)")
 	autoExportReport(db)
 
@@ -193,4 +253,69 @@ func autoExportReport(db *sql.DB) {
 		return
 	}
 	utils.Success("report.xlsx updated")
+}
+
+func writeSpiderJSONSummary(summaries []utils.SpiderSummary) {
+	if len(summaries) == 0 {
+		return
+	}
+	type out struct {
+		URL         string   `json:"url"`
+		Title       string   `json:"title"`
+		Finger      string   `json:"finger"`
+		ContentType string   `json:"content_type"`
+		Status      int      `json:"status"`
+		Length      int      `json:"length"`
+		Keyword     string   `json:"keyword"`
+		SimHash     string   `json:"simhash"`
+		IconHash    string   `json:"icon_hash"`
+		ApiCount    int      `json:"api_count"`
+		UrlCount    int      `json:"url_count"`
+		CDNCount    int      `json:"cdn_count"`
+		CDNHosts    []string `json:"cdn_hosts"`
+		SaveDir     string   `json:"save_dir"`
+	}
+	outList := make([]out, 0, len(summaries))
+	for _, s := range summaries {
+		cdns := []string{}
+		if s.CDNHosts != "" {
+			for _, h := range strings.Split(s.CDNHosts, ",") {
+				h = strings.TrimSpace(h)
+				if h != "" {
+					cdns = append(cdns, h)
+				}
+			}
+		}
+		outList = append(outList, out{
+			URL:         s.URL,
+			Title:       s.Title,
+			Finger:      s.Finger,
+			ContentType: s.ContentType,
+			Status:      s.Status,
+			Length:      s.Length,
+			Keyword:     s.Keyword,
+			SimHash:     s.SimHash,
+			IconHash:    s.IconHash,
+			ApiCount:    s.ApiCount,
+			UrlCount:    s.UrlCount,
+			CDNCount:    s.CDNCount,
+			CDNHosts:    cdns,
+			SaveDir:     s.SaveDir,
+		})
+	}
+	data, err := json.MarshalIndent(outList, "", "  ")
+	if err != nil {
+		utils.Debug("failed to marshal spider summary: %v", err)
+		return
+	}
+	outDir := viper.GetString("output-dir")
+	if outDir == "" {
+		outDir = "."
+	}
+	outPath := filepath.Join(outDir, "spider_summary.json")
+	if err := os.WriteFile(outPath, data, 0644); err != nil {
+		utils.Debug("failed to write spider_summary.json: %v", err)
+		return
+	}
+	utils.Info("spider_summary.json updated at %s", outPath)
 }

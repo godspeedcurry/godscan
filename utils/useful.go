@@ -309,9 +309,9 @@ func WriteToCsv(filename string, data []string) {
 	// mirror to sqlite if available
 	switch filename {
 	case "finger.csv":
-		SaveFingerLike("finger_results", data)
+		SaveService("finger", data)
 	case "dirbrute.csv":
-		SaveFingerLike("dirbrute_results", data)
+		SaveService("dirbrute", data)
 	}
 
 	// Skip disk CSV artifacts to reduce intermediate files.

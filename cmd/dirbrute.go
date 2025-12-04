@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/cheggaaa/pb/v3"
 	"github.com/godspeedcurry/godscan/common"
@@ -46,37 +47,61 @@ func (o *DirbruteOptions) run() {
 	utils.Info("Total: %d payload(s) in dir dict", len(targetDirList))
 	utils.Info("Total: %d threads", viper.GetInt("dirbrute-threads"))
 	utils.Success("Log at ./dirbrute.csv")
+	totalTasks := len(targetUrlList) * len(targetDirList)
+	if totalTasks == 0 {
+		utils.Warning("No tasks to run")
+		return
+	}
 
-	bar := pb.StartNew(len(targetUrlList) * len(targetDirList))
+	bar := pb.StartNew(totalTasks)
 
 	table := prettytable.NewWriter()
 	table.SetOutputMirror(os.Stdout)
 	table.AppendHeader(prettytable.Row(utils.StringListToInterfaceList(common.TableHeader)))
 	table.SetStyle(prettytable.StyleRounded)
 
-	// 定义最大并发量
 	maxGoroutines := viper.GetInt("dirbrute-threads")
-	sem := make(chan struct{}, maxGoroutines)
-	rows := make(chan []string)
+	if maxGoroutines <= 0 {
+		maxGoroutines = 1
+	}
+	tasks := make(chan struct {
+		url string
+		dir string
+	})
+	rows := make(chan []string, maxGoroutines)
+	var workerWG sync.WaitGroup
+
+	for i := 0; i < maxGoroutines; i++ {
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			for task := range tasks {
+				rows <- utils.DirBrute(task.url, task.dir)
+			}
+		}()
+	}
 
 	go func() {
 		for _, line := range targetUrlList {
 			for _, dir := range targetDirList {
-				sem <- struct{}{} // 向通道发送信号，表示一个新的协程即将启动
-
-				go func(url string, dir string) {
-					defer func() { <-sem }()
-					ret := utils.DirBrute(url, dir)
-					rows <- ret
-				}(line, dir)
+				tasks <- struct {
+					url string
+					dir string
+				}{url: line, dir: dir}
 			}
 		}
+		close(tasks)
 	}()
 
-	// 等待所有任务完成
-	for i := 0; i < len(targetUrlList)*len(targetDirList); i++ {
-		ret := <-rows
-		utils.AddDataToTable(table, ret)
+	go func() {
+		workerWG.Wait()
+		close(rows)
+	}()
+
+	for ret := range rows {
+		if len(ret) > 0 {
+			utils.AddDataToTable(table, ret)
+		}
 		bar.Increment()
 	}
 	bar.Finish()

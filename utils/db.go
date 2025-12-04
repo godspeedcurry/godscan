@@ -75,9 +75,12 @@ CREATE TABLE IF NOT EXISTS entropy_hits (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS finger_results (
+CREATE TABLE IF NOT EXISTS services (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	root_url TEXT,
+	source_url TEXT,
 	url TEXT,
+	category TEXT,
 	title TEXT,
 	finger TEXT,
 	content_type TEXT,
@@ -89,17 +92,13 @@ CREATE TABLE IF NOT EXISTS finger_results (
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS dirbrute_results (
+CREATE TABLE IF NOT EXISTS source_maps (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	url TEXT,
-	title TEXT,
-	finger TEXT,
-	content_type TEXT,
+	root_url TEXT,
+	js_url TEXT,
+	map_url TEXT,
 	status INTEGER,
-	location TEXT,
 	length INTEGER,
-	keyword TEXT,
-	simhash TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -108,7 +107,17 @@ CREATE TABLE IF NOT EXISTS cdn_hosts (
 	root_url TEXT,
 	host TEXT,
 	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);`
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_paths_root ON api_paths(root_url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_api_paths_root_path ON api_paths(root_url, path);
+CREATE INDEX IF NOT EXISTS idx_sensitive_source ON sensitive_hits(source_url);
+CREATE INDEX IF NOT EXISTS idx_entropy_source ON entropy_hits(source_url);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cdn_host ON cdn_hosts(root_url, host);
+CREATE INDEX IF NOT EXISTS idx_services_root ON services(root_url);
+CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url, map_url);
+`
 	_, err := db.Exec(ddl)
 	if err != nil {
 		return err
@@ -117,6 +126,18 @@ CREATE TABLE IF NOT EXISTS cdn_hosts (
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_count INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_hosts TEXT DEFAULT ''`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS cdn_hosts (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, host TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_api_paths_root ON api_paths(root_url)`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_paths_root_path ON api_paths(root_url, path)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_sensitive_source ON sensitive_hits(source_url)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_entropy_source ON entropy_hits(source_url)`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_cdn_host ON cdn_hosts(root_url, host)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS services (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, source_url TEXT, url TEXT, category TEXT, title TEXT, finger TEXT, content_type TEXT, status INTEGER, location TEXT, length INTEGER, keyword TEXT, simhash TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_services_root ON services(root_url)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_services_category ON services(category)`)
+	_, _ = db.Exec(`ALTER TABLE sensitive_hits ADD COLUMN entropy REAL DEFAULT 0`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sensitive_unique ON sensitive_hits(source_url, category, content)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS source_maps (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, js_url TEXT, map_url TEXT, status INTEGER, length INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url, map_url)`)
 	return nil
 }
 
@@ -178,29 +199,6 @@ func SaveCDNHosts(db *sql.DB, rootURL string, hosts []string) error {
 	defer stmt.Close()
 	for _, h := range hosts {
 		if _, err := stmt.Exec(rootURL, h); err != nil {
-			tx.Rollback()
-			return err
-		}
-	}
-	return tx.Commit()
-}
-
-func SaveSensitiveHits(db *sql.DB, sourceURL, category string, contents []string, saveDir string) error {
-	if db == nil || len(contents) == 0 {
-		return nil
-	}
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	stmt, err := tx.Prepare(`INSERT INTO sensitive_hits (source_url, category, content, save_dir) VALUES (?, ?, ?, ?)`)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	defer stmt.Close()
-	for _, c := range contents {
-		if _, err := stmt.Exec(sourceURL, category, c, saveDir); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -299,22 +297,30 @@ type EntropyHit struct {
 	SaveDir   string
 }
 
-func SaveEntropyHits(db *sql.DB, sourceURL, category, saveDir string, data []EntropyHit) error {
-	if db == nil || len(data) == 0 {
+type SensitiveHit struct {
+	SourceURL string
+	Category  string
+	Content   string
+	Entropy   float64
+	SaveDir   string
+}
+
+func SaveSensitiveHits(db *sql.DB, hits []SensitiveHit) error {
+	if db == nil || len(hits) == 0 {
 		return nil
 	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare(`INSERT INTO entropy_hits (source_url, category, content, entropy, save_dir) VALUES (?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO sensitive_hits (source_url, category, content, entropy, save_dir) VALUES (?, ?, ?, ?, ?)`)
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
 	defer stmt.Close()
-	for _, d := range data {
-		if _, err := stmt.Exec(sourceURL, category, d.Content, d.Entropy, saveDir); err != nil {
+	for _, h := range hits {
+		if _, err := stmt.Exec(h.SourceURL, h.Category, h.Content, h.Entropy, h.SaveDir); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -323,7 +329,7 @@ func SaveEntropyHits(db *sql.DB, sourceURL, category, saveDir string, data []Ent
 }
 
 func LoadEntropyHits(db *sql.DB) ([]EntropyHit, error) {
-	rows, err := db.Query(`SELECT source_url, category, content, entropy, save_dir FROM entropy_hits ORDER BY created_at DESC`)
+	rows, err := db.Query(`SELECT source_url, category, content, entropy, save_dir FROM sensitive_hits WHERE entropy > 0 ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -339,25 +345,73 @@ func LoadEntropyHits(db *sql.DB) ([]EntropyHit, error) {
 	return out, rows.Err()
 }
 
-// Global DB handle used for CSV mirroring.
+func LoadSensitiveHits(db *sql.DB) ([]SensitiveHit, error) {
+	rows, err := db.Query(`SELECT source_url, category, content, entropy, save_dir FROM sensitive_hits ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SensitiveHit
+	for rows.Next() {
+		var s SensitiveHit
+		if err := rows.Scan(&s.SourceURL, &s.Category, &s.Content, &s.Entropy, &s.SaveDir); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+type SourceMapHit struct {
+	RootURL string
+	JSURL   string
+	MapURL  string
+	Status  int
+	Length  int
+}
+
+func SaveSourceMaps(db *sql.DB, hits []SourceMapHit) error {
+	if db == nil || len(hits) == 0 {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO source_maps (root_url, js_url, map_url, status, length) VALUES (?, ?, ?, ?, ?)`)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+	for _, h := range hits {
+		if _, err := stmt.Exec(h.RootURL, h.JSURL, h.MapURL, h.Status, h.Length); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// Global DB handle used for mirroring.
 var spiderDB *sql.DB
 
 func SetSpiderDB(db *sql.DB) {
 	spiderDB = db
 }
 
-func SaveFingerLike(table string, row []string) {
+// SaveService stores scan result into unified services table.
+func SaveService(category string, row []string) {
 	if spiderDB == nil || len(row) < 9 {
 		return
 	}
 	status, _ := strconv.Atoi(row[4])
 	length, _ := strconv.Atoi(row[6])
 	_, err := spiderDB.Exec(
-		fmt.Sprintf(`INSERT INTO %s (url, title, finger, content_type, status, location, length, keyword, simhash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, table),
-		row[0], row[1], row[2], row[3], status, row[5], length, row[7], row[8],
+		`INSERT INTO services (url, category, title, finger, content_type, status, location, length, keyword, simhash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		row[0], category, row[1], row[2], row[3], status, row[5], length, row[7], row[8],
 	)
 	if err != nil {
-		// silent to avoid noisy logs in hot path
 		return
 	}
 }
