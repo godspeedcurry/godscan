@@ -50,11 +50,8 @@ func init() {
 }
 
 func runSearch(opt SearchOptions) error {
-	if opt.Pattern == "" {
-		return fmt.Errorf("pattern is required")
-	}
-	if _, err := os.Stat(opt.DbPath); err != nil {
-		return fmt.Errorf("db not found: %s", opt.DbPath)
+	if err := validateSearchOpts(opt); err != nil {
+		return err
 	}
 	db, err := utils.InitSpiderDB(opt.DbPath)
 	if err != nil {
@@ -62,77 +59,137 @@ func runSearch(opt SearchOptions) error {
 	}
 	defer db.Close()
 
+	re, err := buildRegex(opt.Pattern, opt.IgnoreCase)
+	if err != nil {
+		return err
+	}
+
+	cfg := normalizeTables(opt.Tables)
+	apiRows, sensRows, mapRows, pageRows, err := loadSearchRows(db, opt.UrlLike, cfg)
+	if err != nil {
+		return err
+	}
+
+	hits := collectHits(re, apiRows, sensRows, mapRows, pageRows)
+	if len(hits) == 0 {
+		utils.Info("No matches (pattern=%q, db=%s)", opt.Pattern, opt.DbPath)
+		return nil
+	}
+	hits = limitHits(hits, opt.MaxResult)
+	printHits(hits)
+	writeHitsJSON(hits)
+	return nil
+}
+
+type apiRow struct {
+	Root string
+	Path string
+}
+
+type sourceMapRow struct {
+	Root   string
+	JSURL  string
+	MapURL string
+}
+
+type pageRow struct {
+	Root    string
+	URL     string
+	Headers string
+	Body    string
+}
+
+type searchTables struct {
+	api       bool
+	sensitive bool
+	maps      bool
+	pages     bool
+}
+
+type hit struct {
+	Source string
+	Field  string
+	Value  string
+}
+
+func validateSearchOpts(opt SearchOptions) error {
+	if opt.Pattern == "" {
+		return fmt.Errorf("pattern is required")
+	}
+	if _, err := os.Stat(opt.DbPath); err != nil {
+		return fmt.Errorf("db not found: %s", opt.DbPath)
+	}
+	return nil
+}
+
+func buildRegex(pattern string, ignoreCase bool) (*regexp.Regexp, error) {
 	flags := ""
-	if opt.IgnoreCase {
+	if ignoreCase {
 		flags = "(?i)"
 	}
-	re, err := regexp.Compile(flags + opt.Pattern)
-	if err != nil {
-		return fmt.Errorf("bad regex: %w", err)
-	}
+	return regexp.Compile(flags + pattern)
+}
 
-	searchAPI := false
-	searchSensitive := false
-	searchMaps := false
-	searchPages := false
-	for _, t := range opt.Tables {
+func normalizeTables(tbls []string) searchTables {
+	cfg := searchTables{}
+	for _, t := range tbls {
 		t = strings.ToLower(strings.TrimSpace(t))
-		if t == "api" {
-			searchAPI = true
-		}
-		if t == "sensitive" {
-			searchSensitive = true
-		}
-		if t == "map" || t == "sourcemap" || t == "sourcemaps" {
-			searchMaps = true
-		}
-		if t == "page" || t == "body" || t == "header" {
-			searchPages = true
+		switch t {
+		case "api":
+			cfg.api = true
+		case "sensitive":
+			cfg.sensitive = true
+		case "map", "sourcemap", "sourcemaps":
+			cfg.maps = true
+		case "page", "body", "header":
+			cfg.pages = true
 		}
 	}
-	if !searchAPI && !searchSensitive && !searchMaps && !searchPages {
-		searchAPI, searchSensitive, searchMaps, searchPages = true, true, true, true
+	if !cfg.api && !cfg.sensitive && !cfg.maps && !cfg.pages {
+		cfg = searchTables{api: true, sensitive: true, maps: true, pages: true}
 	}
+	return cfg
+}
 
-	apiRows := []apiRow{}
-	if searchAPI {
-		apiRows, err = queryAPIPaths(db, opt.UrlLike)
+func loadSearchRows(db *sql.DB, like string, cfg searchTables) ([]apiRow, []utils.SensitiveHit, []sourceMapRow, []pageRow, error) {
+	var (
+		apiRows  []apiRow
+		sensRows []utils.SensitiveHit
+		mapRows  []sourceMapRow
+		pageRows []pageRow
+		err      error
+	)
+	if cfg.api {
+		apiRows, err = queryAPIPaths(db, like)
 		if err != nil {
-			return err
+			return nil, nil, nil, nil, err
 		}
 	}
-	sensRows := []utils.SensitiveHit{}
-	if searchSensitive {
-		sensRows, err = querySensitive(db, opt.UrlLike)
+	if cfg.sensitive {
+		sensRows, err = querySensitive(db, like)
 		if err != nil {
-			return err
+			return nil, nil, nil, nil, err
 		}
 	}
-	mapRows := []sourceMapRow{}
-	if searchMaps {
-		mapRows, err = querySourceMaps(db, opt.UrlLike)
+	if cfg.maps {
+		mapRows, err = querySourceMaps(db, like)
 		if err != nil {
-			return err
+			return nil, nil, nil, nil, err
 		}
 	}
-	pageRows := []pageRow{}
-	if searchPages {
-		pageRows, err = queryPages(db, opt.UrlLike)
+	if cfg.pages {
+		pageRows, err = queryPages(db, like)
 		if err != nil {
-			return err
+			return nil, nil, nil, nil, err
 		}
 	}
+	return apiRows, sensRows, mapRows, pageRows, nil
+}
 
-	type hit struct {
-		Source string
-		Field  string
-		Value  string
-	}
-
+func collectHits(re *regexp.Regexp, apiRows []apiRow, sensRows []utils.SensitiveHit, mapRows []sourceMapRow, pageRows []pageRow) []hit {
 	uniq := make(map[string]hit)
 	addHit := func(h hit) {
-		key := h.Source + "|" + h.Field + "|" + h.Value
-		uniq[key] = h
+		uniq[h.Source+"|"+h.Field+"|"+h.Value] = h
 	}
 
 	for _, r := range apiRows {
@@ -162,28 +219,28 @@ func runSearch(opt SearchOptions) error {
 		}
 	}
 
-	var hits []hit
+	hits := make([]hit, 0, len(uniq))
 	for _, h := range uniq {
 		hits = append(hits, h)
 	}
 	sort.Slice(hits, func(i, j int) bool { return hits[i].Source < hits[j].Source })
+	return hits
+}
 
-	if len(hits) == 0 {
-		utils.Info("No matches (pattern=%q, db=%s)", opt.Pattern, opt.DbPath)
-		return nil
+func limitHits(h []hit, max int) []hit {
+	if max <= 0 || max > len(h) {
+		return h
 	}
+	return h[:max]
+}
 
-	limit := opt.MaxResult
-	if limit <= 0 || limit > len(hits) {
-		limit = len(hits)
-	}
-	hits = hits[:limit]
-
+func printHits(hits []hit) {
 	for _, h := range hits {
 		fmt.Printf("%s\t[%s]\t%s\n", h.Source, h.Field, h.Value)
 	}
+}
 
-	// write json
+func writeHitsJSON(hits []hit) {
 	type out struct {
 		Source string `json:"source"`
 		Field  string `json:"field"`
@@ -198,25 +255,6 @@ func runSearch(opt SearchOptions) error {
 	if err := os.WriteFile(outPath, data, 0644); err == nil {
 		utils.Info("search results saved: %s", outPath)
 	}
-	return nil
-}
-
-type apiRow struct {
-	Root string
-	Path string
-}
-
-type sourceMapRow struct {
-	Root   string
-	JSURL  string
-	MapURL string
-}
-
-type pageRow struct {
-	Root    string
-	URL     string
-	Headers string
-	Body    string
 }
 
 func queryAPIPaths(db *sql.DB, like string) ([]apiRow, error) {
