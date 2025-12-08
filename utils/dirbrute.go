@@ -38,7 +38,13 @@ func DirBrute(baseUrl string, dir string) []string {
 	if strings.HasSuffix(dir, "/") && dir != "/" {
 		fullURL.Path += "/"
 	}
-	finger, _, title, contentType, location, _, respBody, statusCode := FingerScan(fullURL.String(), http.MethodGet, viper.GetBool("redirect"))
+	fres := FingerScan(fullURL.String(), http.MethodGet, viper.GetBool("redirect"))
+	finger := fres.Finger
+	title := fres.Title
+	contentType := fres.ContentType
+	location := fres.Location
+	respBody := fres.Body
+	statusCode := fres.Status
 	if statusCode == 200 || statusCode == 500 || statusCode == 302 {
 		result = CheckFinger(finger, title, fullURL.String(), contentType, location, respBody, statusCode)
 	}

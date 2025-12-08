@@ -110,101 +110,59 @@ func (m *Match) MatchPattern(response []byte) bool {
 }
 
 func (m *Match) ParseVersionInfo(response []byte) Extras {
-	var extras = Extras{}
+	extras := Extras{}
+	v := m.fillVersionInfoPlaceholders(response)
+	extras.VendorProduct = extractSingle(v, `p/([^/]*)/`, `p|([^|]*)|`)
+	extras.Version = extractSingle(v, `v/([^/]*)/`, `v|([^|]*)|`)
+	extras.Info = extractSingle(v, `i/([^/]*)/`, `i|([^|]*)|`)
+	extras.Hostname = extractSingle(v, `h/([^/]*)/`, `h|([^|]*)|`)
+	extras.OperatingSystem = extractSingle(v, `o/([^/]*)/`, `o|([^|]*)|`)
+	extras.DeviceType = extractSingle(v, `d/([^/]*)/`, `d|([^|]*)|`)
+	extras.CPE = extractCPE(v)
+	return extras
+}
 
+func (m *Match) fillVersionInfoPlaceholders(response []byte) string {
 	responseStr := string([]rune(string(response)))
 	foundItems, err := m.PatternCompiled.FindStringMatch(responseStr)
 	if err != nil {
 		Error("%s", err)
 	}
-
 	versionInfo := m.VersionInfo
+	if foundItems == nil {
+		return versionInfo
+	}
 	foundItemsList := foundItems.Groups()[1:]
 	for index, value := range foundItemsList {
 		dollarName := "$" + strconv.Itoa(index+1)
 		versionInfo = strings.Replace(versionInfo, dollarName, value.String(), -1)
 	}
+	return versionInfo
+}
 
-	v := versionInfo
-	if strings.Contains(v, " p/") {
-		regex := regexp.MustCompile(`p/([^/]*)/`)
-		vendorProductName := regex.FindStringSubmatch(v)
-		extras.VendorProduct = vendorProductName[1]
-	}
-	if strings.Contains(v, " p|") {
-		regex := regexp.MustCompile(`p|([^|]*)|`)
-		vendorProductName := regex.FindStringSubmatch(v)
-		extras.VendorProduct = vendorProductName[1]
-	}
-	if strings.Contains(v, " v/") {
-		regex := regexp.MustCompile(`v/([^/]*)/`)
-		version := regex.FindStringSubmatch(v)
-		extras.Version = version[1]
-	}
-	if strings.Contains(v, " v|") {
-		regex := regexp.MustCompile(`v|([^|]*)|`)
-		version := regex.FindStringSubmatch(v)
-		extras.Version = version[1]
-	}
-	if strings.Contains(v, " i/") {
-		regex := regexp.MustCompile(`i/([^/]*)/`)
-		info := regex.FindStringSubmatch(v)
-		extras.Info = info[1]
-	}
-	if strings.Contains(v, " i|") {
-		regex := regexp.MustCompile(`i|([^|]*)|`)
-		info := regex.FindStringSubmatch(v)
-		extras.Info = info[1]
-	}
-	if strings.Contains(v, " h/") {
-		regex := regexp.MustCompile(`h/([^/]*)/`)
-		hostname := regex.FindStringSubmatch(v)
-		extras.Hostname = hostname[1]
-	}
-	if strings.Contains(v, " h|") {
-		regex := regexp.MustCompile(`h|([^|]*)|`)
-		hostname := regex.FindStringSubmatch(v)
-		extras.Hostname = hostname[1]
-	}
-	if strings.Contains(v, " o/") {
-		regex := regexp.MustCompile(`o/([^/]*)/`)
-		operatingSystem := regex.FindStringSubmatch(v)
-		extras.OperatingSystem = operatingSystem[1]
-	}
-	if strings.Contains(v, " o|") {
-		regex := regexp.MustCompile(`o|([^|]*)|`)
-		operatingSystem := regex.FindStringSubmatch(v)
-		extras.OperatingSystem = operatingSystem[1]
-	}
-	if strings.Contains(v, " d/") {
-		regex := regexp.MustCompile(`d/([^/]*)/`)
-		deviceType := regex.FindStringSubmatch(v)
-		extras.DeviceType = deviceType[1]
-	}
-	if strings.Contains(v, " d|") {
-		regex := regexp.MustCompile(`d|([^|]*)|`)
-		deviceType := regex.FindStringSubmatch(v)
-		extras.DeviceType = deviceType[1]
-	}
-	if strings.Contains(v, " cpe:/") {
-		regex := regexp.MustCompile(`cpe:/([^/]*)/`)
-		cpeName := regex.FindStringSubmatch(v)
-		if len(cpeName) > 1 {
-			extras.CPE = cpeName[1]
-		} else {
-			extras.CPE = cpeName[0]
+func extractSingle(source string, patterns ...string) string {
+	for _, p := range patterns {
+		regex := regexp.MustCompile(p)
+		m := regex.FindStringSubmatch(source)
+		if len(m) > 1 {
+			return m[1]
 		}
 	}
-	if strings.Contains(v, " cpe:|") {
-		regex := regexp.MustCompile(`cpe:|([^|]*)|`)
-		cpeName := regex.FindStringSubmatch(v)
-		if len(cpeName) > 1 {
-			extras.CPE = cpeName[1]
-		} else {
-			extras.CPE = cpeName[0]
+	return ""
+}
+
+func extractCPE(source string) string {
+	for _, p := range []string{`cpe:/([^/]*)/`, `cpe:|([^|]*)|`} {
+		regex := regexp.MustCompile(p)
+		cpe := regex.FindStringSubmatch(source)
+		if len(cpe) > 1 {
+			return cpe[1]
+		}
+		if len(cpe) > 0 {
+			return cpe[0]
 		}
 	}
-	return extras
+	return ""
 }
 
 // 探针规则，包含该探针规则下的服务匹配条目和其他探测信息
@@ -777,126 +735,98 @@ func (v *VScan) Explore(target Target, config *Config) (Result, error) {
 
 func (v *VScan) scanWithProbes(target Target, probes *[]Probe, config *Config) (Result, error) {
 	var result = Result{Target: target}
-
 	for _, probe := range *probes {
-		var response []byte
-
 		Debug("Try Probe(%s), Data(%s)", probe.Name, probe.Data)
-		response, _ = grabResponse(target, probe.DecodedData, config)
+		response, _ := grabResponse(target, probe.DecodedData, config)
+		if len(response) == 0 {
+			continue
+		}
+		Debug("Get response %d bytes from destination with Probe(%s)", len(response), probe.Name)
+		res, matched := v.matchProbe(target, probe, response)
+		if matched {
+			return res, nil
+		}
+	}
+	return result, errEmptyResponse
+}
 
-		// 成功获取 Banner 即开始匹配规则，无规则匹配则直接返回
-		if len(response) > 0 {
-			Debug("Get response %d bytes from destination with Probe(%s)", len(response), probe.Name)
-			found := false
-
-			softFound := false
-			var softMatch Match
-			if probe.Matchs != nil {
-				for _, match := range *probe.Matchs {
-					matched := match.MatchPattern(response)
-					if matched && !match.IsSoft {
-						extras := match.ParseVersionInfo(response)
-						result.Service.Target = target
-						result.Service.Details.ProbeName = probe.Name
-						result.Service.Details.ProbeData = probe.Data
-						result.Service.Details.MatchMatched = match.Pattern
-
-						result.Service.Protocol = strings.ToLower(probe.Protocol)
-						result.Service.Name = match.Service
-
-						result.Banner = string(response)
-						result.BannerBytes = response
-						result.Service.Extras = extras
-
-						result.Timestamp = int32(time.Now().Unix())
-
-						return result, nil
-					} else
-					// soft 匹配，记录结果
-					if matched && match.IsSoft && !softFound {
-						Info("Soft matched: %s, pattern: %s", match.Service, match.Pattern)
-						softFound = true
-						softMatch = match
-					}
-				}
-			}
-
-			// 当前 Probe 下的 Matchs 未匹配成功，使用 Fallback Probe 中的 Matchs 进行尝试
-			fallback := probe.Fallback
-			if _, ok := v.ProbesMapKName[fallback]; ok {
-				fbProbe := v.ProbesMapKName[fallback]
-				for _, match := range *fbProbe.Matchs {
-					matched := match.MatchPattern(response)
-					if matched && !match.IsSoft {
-						extras := match.ParseVersionInfo(response)
-
-						result.Service.Target = target
-
-						result.Service.Details.ProbeName = probe.Name
-						result.Service.Details.ProbeData = probe.Data
-						result.Service.Details.MatchMatched = match.Pattern
-
-						result.Service.Protocol = strings.ToLower(probe.Protocol)
-						result.Service.Name = match.Service
-
-						result.Banner = string(response)
-						result.BannerBytes = response
-						result.Service.Extras = extras
-
-						result.Timestamp = int32(time.Now().Unix())
-
-						found = true
-						Warning("Probe found=%t", found)
-						return result, nil
-					} else
-					// soft 匹配，记录结果
-					if matched && match.IsSoft && !softFound {
-						Info("Soft fallback matched: %s, pattern: %s", match.Service, match.Pattern)
-						softFound = true
-						softMatch = match
-					}
-				}
-			}
-
-			if !found {
-				if !softFound {
-					result.Service.Target = target
-					result.Service.Protocol = strings.ToLower(probe.Protocol)
-
-					result.Service.Details.ProbeName = probe.Name
-					result.Service.Details.ProbeData = probe.Data
-
-					result.Banner = string(response)
-					result.BannerBytes = response
-					result.Service.Name = "unknown"
-
-					result.Timestamp = int32(time.Now().Unix())
-
-					return result, nil
-				} else {
-					result.Service.Target = target
-					result.Service.Protocol = strings.ToLower(probe.Protocol)
-					result.Service.Details.ProbeName = probe.Name
-					result.Service.Details.ProbeData = probe.Data
-					result.Service.Details.MatchMatched = softMatch.Pattern
-					result.Service.Details.IsSoftMatched = true
-
-					result.Banner = string(response)
-					result.BannerBytes = response
-
-					result.Timestamp = int32(time.Now().Unix())
-
-					extras := softMatch.ParseVersionInfo(response)
-					result.Service.Extras = extras
-					result.Service.Name = softMatch.Service
-
-					return result, nil
-				}
-			}
+func (v *VScan) matchProbe(target Target, probe Probe, response []byte) (Result, bool) {
+	if probe.Matchs != nil {
+		if res, ok := applyMatches(target, probe, response, probe.Matchs, false); ok {
+			return res, true
 		}
 	}
 
-	return result, errEmptyResponse
+	if res, ok := v.tryFallback(target, probe, response); ok {
+		return res, true
+	}
+
+	if res, ok := buildUnknown(target, probe, response); ok {
+		return res, true
+	}
+	return Result{}, false
+}
+
+func applyMatches(target Target, probe Probe, response []byte, matches *[]Match, markSoft bool) (Result, bool) {
+	var soft *Match
+	for _, match := range *matches {
+		matched := match.MatchPattern(response)
+		if matched && !match.IsSoft {
+			return buildMatchResult(target, probe, match, response, false), true
+		}
+		if matched && match.IsSoft && soft == nil {
+			Info("Soft matched: %s, pattern: %s", match.Service, match.Pattern)
+			soft = &match
+		}
+	}
+	if soft != nil {
+		return buildMatchResult(target, probe, *soft, response, true), true
+	}
+	return Result{}, false
+}
+
+func (v *VScan) tryFallback(target Target, probe Probe, response []byte) (Result, bool) {
+	fallback := probe.Fallback
+	fbProbe, ok := v.ProbesMapKName[fallback]
+	if !ok || fbProbe.Matchs == nil {
+		return Result{}, false
+	}
+	if res, ok := applyMatches(target, probe, response, fbProbe.Matchs, true); ok {
+		return res, true
+	}
+	return Result{}, false
+}
+
+func buildUnknown(target Target, probe Probe, response []byte) (Result, bool) {
+	result := Result{Target: target}
+	result.Service.Target = target
+	result.Service.Protocol = strings.ToLower(probe.Protocol)
+	result.Service.Details.ProbeName = probe.Name
+	result.Service.Details.ProbeData = probe.Data
+	result.Banner = string(response)
+	result.BannerBytes = response
+	result.Service.Name = "unknown"
+	result.Timestamp = int32(time.Now().Unix())
+	return result, true
+}
+
+func buildMatchResult(target Target, probe Probe, match Match, response []byte, soft bool) Result {
+	extras := match.ParseVersionInfo(response)
+	result := Result{Target: target}
+	result.Service.Target = target
+	result.Service.Details.ProbeName = probe.Name
+	result.Service.Details.ProbeData = probe.Data
+	result.Service.Details.MatchMatched = match.Pattern
+	result.Service.Details.IsSoftMatched = soft
+
+	result.Service.Protocol = strings.ToLower(probe.Protocol)
+	result.Service.Name = match.Service
+
+	result.Banner = string(response)
+	result.BannerBytes = response
+	result.Service.Extras = extras
+	result.Timestamp = int32(time.Now().Unix())
+	return result
 }
 
 func grabResponse(target Target, data []byte, config *Config) ([]byte, error) {

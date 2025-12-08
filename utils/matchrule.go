@@ -149,89 +149,151 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 	return result.(bool), nil
 }
 
-func FingerScan(url string, method string, followRedirect bool) (string, string, string, string, string, string, []byte, int) {
+type FingerResult struct {
+	Finger      string
+	Server      string
+	Title       string
+	ContentType string
+	Location    string
+	HeadersJSON string
+	Body        []byte
+	Status      int
+	Err         error
+}
+
+func FingerScan(url string, method string, followRedirect bool) FingerResult {
 	if !isValidUrl(url) {
-		return common.NoFinger, "", "", "", "", "", nil, -1
+		return FingerResult{Finger: common.NoFinger, Status: -1, Err: fmt.Errorf("invalid url")}
 	}
+	resp, serverHeader, err := doHTTPRequest(url, method, followRedirect)
+	if err != nil {
+		return FingerResult{Finger: common.NoFinger, Status: -1, Err: err}
+	}
+	defer resp.Body.Close()
+
+	if isRedirect(resp.StatusCode) {
+		return FingerResult{
+			Finger:      common.NoFinger,
+			Server:      serverHeader,
+			Title:       "",
+			ContentType: resp.Header.Get("Content-Type"),
+			Location:    resp.Header.Get("Location"),
+			HeadersJSON: MapToJson(resp.Header),
+			Status:      resp.StatusCode,
+		}
+	}
+
+	headersJSON := MapToJson(resp.Header)
+	config, err := loadFingerConfig(url)
+	if err != nil {
+		return FingerResult{Finger: common.NoFinger, HeadersJSON: headersJSON, Status: -1, Err: err}
+	}
+
+	bodyBytes, contentLength := readResponseBody(resp)
+	if contentLength > 10*1024*1024 {
+		return FingerResult{
+			Finger:      "Large Data",
+			Server:      serverHeader,
+			Title:       fmt.Sprintf("Large Data size = [%d]", contentLength),
+			ContentType: resp.Header.Get("Content-Type"),
+			Location:    resp.Header.Get("Location"),
+			HeadersJSON: headersJSON,
+			Status:      resp.StatusCode,
+		}
+	}
+
+	doc, title, err := buildDocument(bodyBytes, resp.Header.Get("Content-Type"))
+	if err != nil {
+		return FingerResult{Finger: common.NoFinger, HeadersJSON: headersJSON, Status: -1, Err: err}
+	}
+
+	finger := matchFingerprints(doc, string(bodyBytes), title, headersJSON, config)
+	return FingerResult{
+		Finger:      finger,
+		Server:      serverHeader,
+		Title:       title,
+		ContentType: resp.Header.Get("Content-Type"),
+		Location:    resp.Header.Get("Location"),
+		HeadersJSON: headersJSON,
+		Body:        bodyBytes,
+		Status:      resp.StatusCode,
+	}
+}
+
+func doHTTPRequest(url, method string, followRedirect bool) (*http.Response, string, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", "", nil, -1
+		return nil, "", err
 	}
 	req.Header.Set("Cookie", "rememberMe=me")
 	SetHeaders(req)
-	var httpClient *http.Client
+	client := Client
 	if !followRedirect {
-		httpClient = ClientNoRedirect
-	} else {
-		httpClient = Client
+		client = ClientNoRedirect
 	}
-
-	resp, err := httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", "", nil, -1
+		return nil, "", err
 	}
-	defer resp.Body.Close()
-	ServerValue := resp.Header["Server"]
-	retServerValue := ""
-	if len(ServerValue) != 0 {
-		retServerValue = ServerValue[0]
+	serverHeader := ""
+	if sv := resp.Header["Server"]; len(sv) > 0 {
+		serverHeader = sv[0]
 	}
+	return resp, serverHeader, nil
+}
 
-	if resp.StatusCode == 301 || resp.StatusCode == 302 {
-		return common.NoFinger, retServerValue, "", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), MapToJson(resp.Header), nil, resp.StatusCode
-	}
-	headers := MapToJson(resp.Header)
+func isRedirect(status int) bool {
+	return status == 301 || status == 302
+}
 
+func loadFingerConfig(url string) (Packjson, error) {
 	var config Packjson
-
-	err = json.Unmarshal([]byte(eholeJson), &config)
-	if err != nil {
+	if err := json.Unmarshal([]byte(eholeJson), &config); err != nil {
 		Fatal("%s %s unmarshal failed", url, err)
-		return common.NoFinger, "", "", "", "", headers, nil, -1
+		return config, err
 	}
-	ContentLengthStr := resp.Header.Get("Content-Length")
-	ServerContentType := resp.Header.Get("Content-Type")
-	var cms []string
+	return config, nil
+}
+
+func readResponseBody(resp *http.Response) ([]byte, int) {
 	maxBody := viper.GetInt("max-body-bytes")
 	if maxBody <= 0 || maxBody > 4*1024*1024 {
 		maxBody = 4 * 1024 * 1024
 	}
 	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBody)))
-	actualLen := len(bodyBytes)
-	contentLength := actualLen
-	if ContentLengthStr != "" {
-		if v, e := strconv.Atoi(ContentLengthStr); e == nil {
+	contentLength := len(bodyBytes)
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		if v, e := strconv.Atoi(cl); e == nil {
 			contentLength = v
 		}
 	}
-	if contentLength > 1024*1024*10 { // 10M
-		return "Large Data", retServerValue, "Large Data size = [" + strconv.Itoa(contentLength) + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), headers, nil, resp.StatusCode
-	}
-	_, DetermineContentType, _ := charset.DetermineEncoding(bodyBytes, ServerContentType)
-	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), DetermineContentType)
+	return bodyBytes, contentLength
+}
+
+func buildDocument(body []byte, serverContentType string) (*goquery.Document, string, error) {
+	_, determineContentType, _ := charset.DetermineEncoding(body, serverContentType)
+	reader, err := charset.NewReader(bytes.NewBuffer(body), determineContentType)
 	if err != nil {
-		logRequestError(url, fmt.Errorf("%v (%s)", err, DetermineContentType))
-		return common.NoFinger, "", "", "", "", headers, nil, -1
+		return nil, "", fmt.Errorf("%v (%s)", err, determineContentType)
 	}
 	doc, err := goquery.NewDocumentFromReader(reader)
-
 	if err != nil {
-		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", headers, nil, -1
+		return nil, "", err
 	}
-
-	// 查找标题元素并获取内容
 	title := strings.TrimSpace(doc.Find("title").Text())
+	return doc, title, nil
+}
 
-	body := string(bodyBytes)
+func matchFingerprints(doc *goquery.Document, body string, title string, headers string, config Packjson) string {
 	context := map[string]string{
 		"title":  title,
 		"body":   body,
 		"server": headers,
 		"header": headers,
 	}
+	var cms []string
 	for _, fp := range config.Fingerprint {
 		matcher, found := methodMatchers[fp.Method]
 		if found {
@@ -239,23 +301,20 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 			if matcher(locator, fp.Keyword) {
 				cms = append(cms, fp.Cms)
 			}
-		} else {
-			// 逻辑表达式 location字段不重要
-			res, err := preprocessAndEvaluate(fp.Keyword[0], context)
-			if err != nil {
-				Error("%s %s", err, fp.Keyword[0])
-				continue
-			}
-			if res {
-				cms = append(cms, fp.Cms)
-			}
+			continue
+		}
+		res, err := preprocessAndEvaluate(fp.Keyword[0], context)
+		if err != nil {
+			Error("%s %s", err, fp.Keyword[0])
+			continue
+		}
+		if res {
+			cms = append(cms, fp.Cms)
 		}
 	}
-	finger := common.NoFinger
 	cms = RemoveDuplicatesString(cms)
-	if len(cms) != 0 {
-		finger = strings.Join(cms, ",")
+	if len(cms) == 0 {
+		return common.NoFinger
 	}
-
-	return finger, retServerValue, title, resp.Header.Get("Content-Type"), resp.Header.Get("Location"), headers, bodyBytes, resp.StatusCode
+	return strings.Join(cms, ",")
 }

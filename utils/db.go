@@ -431,6 +431,10 @@ func SetSpiderDB(db *sql.DB) {
 	spiderDB = db
 }
 
+func GetSpiderDB() *sql.DB {
+	return spiderDB
+}
+
 // SaveService stores scan result into unified services table.
 func SaveService(category string, row []string) {
 	if spiderDB == nil || len(row) < 9 {

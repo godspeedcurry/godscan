@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -52,6 +51,201 @@ func init() {
 
 }
 
+type spiderContext struct {
+	started   int32
+	processed int32
+	finished  int32
+	doneCh    chan struct{}
+}
+
+func spawnSpiderWorkers(targets []string, depth int, db *sql.DB, progressLog bool) (*sync.WaitGroup, chan utils.SpiderSummary, *spiderContext) {
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxSpiderGoroutines())
+	results := make(chan utils.SpiderSummary, len(targets))
+	ctx := &spiderContext{doneCh: make(chan struct{})}
+
+	for _, line := range targets {
+		sem <- struct{}{}
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			if progressLog {
+				curStart := atomic.AddInt32(&ctx.started, 1)
+				remaining := int32(len(targets)) - curStart
+				utils.Info("spider start: %s (started %d, remaining ~%d)", url, curStart, remaining)
+			}
+			res := utils.FingerSummary(url, depth, db)
+			if progressLog {
+				curFinished := atomic.AddInt32(&ctx.finished, 1)
+				remaining := int32(len(targets)) - curFinished
+				utils.Info("spider finish: %s status=%d api=%d urls=%d | finished %d/%d remaining %d", res.URL, res.Status, res.ApiCount, res.UrlCount, curFinished, len(targets), remaining)
+			}
+			results <- res
+		}(line)
+	}
+	return &wg, results, ctx
+}
+
+func maxSpiderGoroutines() int {
+	maxGoroutines := viper.GetInt("spider-threads")
+	if maxGoroutines <= 0 {
+		maxGoroutines = 20
+	}
+	return maxGoroutines
+}
+
+func heartbeat(progressLog bool, ctx *spiderContext, total int) {
+	if !progressLog {
+		return
+	}
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.doneCh:
+				return
+			case <-ticker.C:
+				curStart := atomic.LoadInt32(&ctx.started)
+				curDone := atomic.LoadInt32(&ctx.processed)
+				inflight := curStart - curDone
+				if inflight < 0 {
+					inflight = 0
+				}
+				utils.Info("spider heartbeat: started %d done %d inflight %d total %d", curStart, curDone, inflight, total)
+			}
+		}
+	}()
+}
+
+func collectSpiderResults(results chan utils.SpiderSummary, total int, progressLog bool) (prettytable.Writer, []utils.SpiderSummary, int, int) {
+	collector := newSpiderCollector(total, progressLog)
+	for res := range results {
+		collector.updateProgress()
+		collector.processResult(res)
+	}
+	collector.finish()
+	return collector.table, collector.summaries, collector.reachable, collector.findings
+}
+
+func renderSpiderTable(table prettytable.Writer) {
+	if table.Length() > 0 {
+		table.Render()
+	}
+}
+
+type spiderCollector struct {
+	table             prettytable.Writer
+	summaries         []utils.SpiderSummary
+	reachable         int
+	findings          int
+	bar               *pb.ProgressBar
+	processed         int32
+	progressLog       bool
+	progressMilestone int
+	total             int
+	mu                sync.Mutex
+}
+
+func cdnHostColor(val interface{}) string {
+	s := strings.TrimSpace(fmt.Sprint(val))
+	if s == "" || s == "-" {
+		return s
+	}
+	return text.FgYellow.Sprintf("%s", s)
+}
+
+func newSpiderCollector(total int, progressLog bool) *spiderCollector {
+	table := prettytable.NewWriter()
+	table.SetOutputMirror(os.Stdout)
+	table.AppendHeader(prettytable.Row{"Url", "IconHash (fofa/hunter)", "API Count", "CDN URLs", "CDN Hosts"})
+	table.SetStyle(prettytable.StyleRounded)
+	table.SetColumnConfigs([]prettytable.ColumnConfig{
+		{Number: 1, WidthMax: 64},
+		{Number: 2, WidthMax: 48},
+		{Number: 3, WidthMax: 10},
+		{Number: 4, WidthMax: 10},
+		{Number: 5, WidthMax: 36, Transformer: cdnHostColor},
+	})
+
+	var bar *pb.ProgressBar
+	if !viper.GetBool("quiet") {
+		bar = pb.StartNew(total)
+		bar.SetMaxWidth(90)
+		bar.Set("prefix", "spider")
+		bar.SetTemplateString(`{{string . "prefix"}} {{counters .}} {{bar . "[" "=" ">" " " "]"}} {{percent .}} | elapsed: {{etime .}} | eta: {{rtime .}}`)
+		bar.SetRefreshRate(200 * time.Millisecond)
+	}
+
+	return &spiderCollector{
+		table:             table,
+		bar:               bar,
+		progressLog:       progressLog,
+		progressMilestone: 10,
+		total:             total,
+	}
+}
+
+func (c *spiderCollector) updateProgress() {
+	if c.bar != nil {
+		c.bar.Increment()
+		cur := atomic.AddInt32(&c.processed, 1)
+		c.bar.Set("prefix", fmt.Sprintf("spider %d/%d", cur, c.total))
+		if !c.progressLog || c.total == 0 {
+			return
+		}
+		percent := int(cur) * 100 / c.total
+		if percent >= c.progressMilestone {
+			utils.Info("spider progress: %d/%d (%d%%)", cur, c.total, percent)
+			c.progressMilestone += 10
+		}
+	}
+}
+
+func (c *spiderCollector) processResult(res utils.SpiderSummary) {
+	if res.Status >= 0 {
+		c.reachable++
+	}
+	if res.Finger != "" && res.Finger != common.NoFinger {
+		c.findings++
+	}
+	if res.Status == -1 {
+		return
+	}
+
+	c.mu.Lock()
+	c.summaries = append(c.summaries, res)
+	if err := utils.SaveSpiderSummary(utils.GetSpiderDB(), utils.SpiderRecord{
+		Url:      res.URL,
+		IconHash: res.IconHash,
+		ApiCount: res.ApiCount,
+		UrlCount: res.UrlCount,
+		SaveDir:  res.SaveDir,
+		Status:   res.Status,
+	}); err != nil {
+		utils.Error("db save failed: %v", err)
+	}
+	c.mu.Unlock()
+
+	icon := res.IconHash
+	if icon == "" {
+		icon = "-"
+	}
+	cdnHosts := res.CDNHosts
+	if cdnHosts == "" {
+		cdnHosts = "-"
+	}
+	row := []string{res.URL, icon, fmt.Sprintf("%d", res.ApiCount), fmt.Sprintf("%d", res.CDNCount), cdnHosts}
+	utils.AddDataToTable(c.table, row)
+}
+
+func (c *spiderCollector) finish() {
+	if c.bar != nil {
+		c.bar.Finish()
+	}
+}
+
 func (o *SpiderOptions) validateOptions() error {
 	if GlobalOption.Url == "" && GlobalOption.UrlFile == "" {
 		return fmt.Errorf("please give target url")
@@ -62,23 +256,8 @@ func (o *SpiderOptions) validateOptions() error {
 func (o *SpiderOptions) run() {
 	start := time.Now()
 	utils.InitHttp()
-	targetUrlList := GetTargetList()
-	utils.Info("Total: %d url(s)", len(targetUrlList))
-	progressLog := viper.GetBool("spider-progress-log")
-
-	var wg sync.WaitGroup
-	maxGoroutines := viper.GetInt("spider-threads")
-	if maxGoroutines <= 0 {
-		maxGoroutines = 20
-	}
-	sem := make(chan struct{}, maxGoroutines)
-	results := make(chan utils.SpiderSummary, len(targetUrlList))
-	var summaries []utils.SpiderSummary
-	var mu sync.Mutex
-	var processed int32
-	var started int32
-	var finished int32
-	doneCh := make(chan struct{})
+	targets := GetTargetList()
+	utils.Info("Total: %d url(s)", len(targets))
 
 	db, err := utils.InitSpiderDB("spider.db")
 	if err != nil {
@@ -88,144 +267,15 @@ func (o *SpiderOptions) run() {
 	utils.SetSpiderDB(db)
 	defer db.Close()
 
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt)
-	defer signal.Stop(sigCh)
-	go func() {
-		for range sigCh {
-			utils.Warning("Interrupted: data persisted to spider.db (run `godscan report` to view)")
-			autoExportReport(db)
-			os.Exit(1)
-		}
-	}()
-	for _, line := range targetUrlList {
-		sem <- struct{}{}
-		wg.Add(1)
-		go func(url string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			if progressLog {
-				curStart := atomic.AddInt32(&started, 1)
-				remaining := int32(len(targetUrlList)) - curStart
-				utils.Info("spider start: %s (started %d, remaining ~%d)", url, curStart, remaining)
-			}
-			res := utils.FingerSummary(url, o.Depth, db)
-			if progressLog {
-				curFinished := atomic.AddInt32(&finished, 1)
-				remaining := int32(len(targetUrlList)) - curFinished
-				utils.Info("spider finish: %s status=%d api=%d urls=%d | finished %d/%d remaining %d", res.URL, res.Status, res.ApiCount, res.UrlCount, curFinished, len(targetUrlList), remaining)
-			}
-			results <- res
-		}(line)
-	}
-	// heartbeat to show progress even when no finishes yet
-	if progressLog {
-		go func() {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-doneCh:
-					return
-				case <-ticker.C:
-					curStart := atomic.LoadInt32(&started)
-					curDone := atomic.LoadInt32(&processed)
-					inflight := curStart - curDone
-					if inflight < 0 {
-						inflight = 0
-					}
-					utils.Info("spider heartbeat: started %d done %d inflight %d total %d", curStart, curDone, inflight, len(targetUrlList))
-				}
-			}
-		}()
-	}
+	progressLog := viper.GetBool("spider-progress-log")
+	wg, results, ctx := spawnSpiderWorkers(targets, o.Depth, db, progressLog)
+	heartbeat(progressLog, ctx, len(targets))
 	wg.Wait()
 	close(results)
 
-	table := prettytable.NewWriter()
-	table.SetOutputMirror(os.Stdout)
-	table.AppendHeader(prettytable.Row{"Url", "IconHash (fofa/hunter)", "API Count", "CDN URLs", "CDN Hosts"})
-	table.SetStyle(prettytable.StyleRounded)
-	table.SetColumnConfigs([]prettytable.ColumnConfig{
-		{Number: 1, WidthMax: 64},
-		{Number: 2, WidthMax: 48},
-		{Number: 3, WidthMax: 10},
-		{Number: 4, WidthMax: 10},
-		{Number: 5, WidthMax: 36, Transformer: func(val interface{}) string {
-			s := strings.TrimSpace(fmt.Sprint(val))
-			if s == "" {
-				return s
-			}
-			return text.FgYellow.Sprintf("%s", s)
-		}},
-	})
-
-	total := len(targetUrlList)
-	reachable := 0
-	findings := 0
-	var bar *pb.ProgressBar
-	progressMilestone := 10
-	if !viper.GetBool("quiet") {
-		bar = pb.StartNew(total)
-		bar.SetMaxWidth(90)
-		bar.Set("prefix", "spider")
-		bar.SetTemplateString(`{{string . "prefix"}} {{counters .}} {{bar . "[" "=" ">" " " "]"}} {{percent .}} | elapsed: {{etime .}} | eta: {{rtime .}}`)
-		bar.SetRefreshRate(200 * time.Millisecond)
-	}
-	for res := range results {
-		if bar != nil {
-			bar.Increment()
-			cur := atomic.AddInt32(&processed, 1)
-			bar.Set("prefix", fmt.Sprintf("spider %d/%d", cur, total))
-		}
-		cur := atomic.LoadInt32(&processed)
-		if progressLog && total > 0 && progressMilestone <= 100 {
-			percent := int(cur) * 100 / total
-			if percent >= progressMilestone {
-				utils.Info("spider progress: %d/%d (%d%%)", cur, total, percent)
-				progressMilestone += 10
-			}
-		}
-		if res.Status >= 0 {
-			reachable++
-		}
-		if res.Finger != "" && res.Finger != common.NoFinger {
-			findings++
-		}
-		if progressLog {
-			successRate := float64(reachable) / float64(total)
-			remaining := total - int(cur)
-			utils.Info("spider finish: %s status=%d api=%d urls=%d | done %d/%d (%.1f%% success) remaining %d", res.URL, res.Status, res.ApiCount, res.UrlCount, cur, total, successRate*100, remaining)
-		}
-		if res.Status == -1 {
-			continue
-		}
-		mu.Lock()
-		summaries = append(summaries, res)
-		if err := utils.SaveSpiderSummary(db, utils.SpiderRecord{
-			Url:      res.URL,
-			IconHash: res.IconHash,
-			ApiCount: res.ApiCount,
-			UrlCount: res.UrlCount,
-			SaveDir:  res.SaveDir,
-			Status:   res.Status,
-		}); err != nil {
-			utils.Error("db save failed: %v", err)
-		}
-		mu.Unlock()
-		icon := res.IconHash
-		if icon == "" {
-			icon = "-"
-		}
-		row := []string{res.URL, icon, fmt.Sprintf("%d", res.ApiCount), fmt.Sprintf("%d", res.CDNCount), res.CDNHosts}
-		utils.AddDataToTable(table, row)
-	}
-	if bar != nil {
-		bar.Finish()
-	}
-	if table.Length() > 0 {
-		table.Render()
-	}
+	table, summaries, reachable, findings := collectSpiderResults(results, len(targets), progressLog)
+	close(ctx.doneCh)
+	renderSpiderTable(table)
 	writeSpiderJSONSummary(summaries)
 	utils.Info("Data persisted to spider.db (run `godscan report` to view)")
 	autoExportReport(db)
@@ -234,7 +284,7 @@ func (o *SpiderOptions) run() {
 	for host, stat := range hostErrs {
 		utils.Warning("%s unreachable x%d: %s", host, stat.Count, stat.Sample)
 	}
-	utils.Info("Summary: %d urls | %d reachable | %d findings | %d host-errors | %s", total, reachable, findings, len(hostErrs), time.Since(start).Round(time.Millisecond))
+	utils.Info("Summary: %d urls | %d reachable | %d findings | %d host-errors | %s", len(targets), reachable, findings, len(hostErrs), time.Since(start).Round(time.Millisecond))
 
 }
 

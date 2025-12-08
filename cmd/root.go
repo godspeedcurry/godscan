@@ -137,7 +137,7 @@ func SetProxyFromEnv() string {
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Url, "url", "u", "", "single target URL")
-	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "f", "", "file with target URLs (one per line)")
+	rootCmd.PersistentFlags().StringVarP(&GlobalOption.UrlFile, "url-file", "f", "", "short alias, -uf, file with target URLs (one per line)")
 
 	rootCmd.PersistentFlags().StringVarP(&GlobalOption.Proxy, "proxy", "", "", "http(s)/socks proxy, e.g. http://127.0.0.1:8080")
 

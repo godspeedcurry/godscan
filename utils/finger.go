@@ -419,85 +419,116 @@ func parseVueUrl(Url string, RootPath string, doc string, directory string, apiC
 	}
 }
 
-func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) error {
+type prefetchedPage struct {
+	body        string
+	contentType string
+}
+
+func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB, cached *prefetchedPage) error {
 	if uselessUrl(Url, depth) || filterOutUrl(Url) {
 		return nil
 	}
 	myMap.Add(Url)
-	req, err := http.NewRequest(http.MethodGet, Url, nil)
-	if err != nil {
-		return err
-	}
-	SetHeaders(req)
-	resp, err := Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
 	u, err := url.Parse(Url)
 	if err != nil {
 		Error("%s", Url)
 		return err
 	}
 	if isJSAssetPath(u.Path) {
-		probeSourceMap(RootPath, Url, directory, sourceMapSeen, db)
+		resp, err := fetchGet(Url)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		return handleJSAsset(RootPath, Url, u.Path, resp, directory, sourceMapSeen, apiCounter, db)
 	}
-	// 如果是vue.js app.xxxxxxxx.js 识别其中的api接口
-	if IsVuePath(u.Path) {
-		maxBody := viper.GetInt("max-body-bytes")
-		if maxBody <= 0 {
-			maxBody = 2 * 1024 * 1024
-		}
-		limited := io.LimitReader(resp.Body, int64(maxBody))
-		bodyBuf, _ := io.ReadAll(limited)
-		bufStr := string(bodyBuf)
-		if sm := sourceMapFromContent(Url, bufStr); sm != "" {
-			probeSourceMap(RootPath, sm, directory, sourceMapSeen, db)
-		}
-		parseVueUrl(Url, RootPath, bufStr, directory, apiCounter, db)
-	} else {
-		doc, err := goquery.NewDocumentFromReader(resp.Body)
-		if err != nil {
-			Error("%s", err)
-			return err
-		}
-		// 敏感信息搜集
-		html, err := doc.Html()
-		if err != nil {
-			Error("%s", err)
-			return err
-		}
-		if _, ok := sensitiveUrl.Load(Url); !ok {
-			sensitiveUrl.Store(Url, true)
-			SensitiveInfoCollect(db, Url, html, directory)
-		}
+	if cached != nil {
+		return handleHTMLContent(RootPath, Url, depth, directory, myMap, sourceMapSeen, apiCounter, db, cached.body)
+	}
+	resp, err := fetchGet(Url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	bodyStr := readBodyString(resp)
+	return handleHTMLContent(RootPath, Url, depth, directory, myMap, sourceMapSeen, apiCounter, db, bodyStr)
+}
 
-		// a, link 标签
-		doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
-			href, _ := selector.Attr("href")
-			if href == "" {
-				return
-			}
-			normalizeUrl := Normalize(href, RootPath)
-			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db)
-			}
-		})
-		// iframe, script 标签
-		doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
-			src, _ := selector.Attr("src")
-			if src == "" {
-				return
-			}
-			normalizeUrl := Normalize(src, RootPath)
-			if goquery.NodeName(selector) == "script" {
-				probeSourceMap(RootPath, normalizeUrl, directory, sourceMapSeen, db)
-			}
-			if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
-				Spider(RootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db)
-			}
-		})
+func fetchGet(Url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, Url, nil)
+	if err != nil {
+		return nil, err
 	}
+	SetHeaders(req)
+	return Client.Do(req)
+}
+
+func handleJSAsset(rootPath, fullURL, path string, resp *http.Response, directory string, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) error {
+	probeSourceMap(rootPath, fullURL, directory, sourceMapSeen, db)
+	bodyStr := readBodyString(resp)
+	if sm := sourceMapFromContent(fullURL, bodyStr); sm != "" {
+		probeSourceMap(rootPath, sm, directory, sourceMapSeen, db)
+	}
+	if IsVuePath(path) {
+		parseVueUrl(fullURL, rootPath, bodyStr, directory, apiCounter, db)
+	}
+	return nil
+}
+
+func readBodyString(resp *http.Response) string {
+	maxBody := viper.GetInt("max-body-bytes")
+	if maxBody <= 0 || maxBody > 4*1024*1024 {
+		maxBody = 4 * 1024 * 1024
+	}
+	limited := io.LimitReader(resp.Body, int64(maxBody))
+	bodyBuf, _ := io.ReadAll(limited)
+	return string(bodyBuf)
+}
+
+func crawlLinks(doc *goquery.Document, rootPath string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) {
+	doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
+		href, _ := selector.Attr("href")
+		if href == "" {
+			return
+		}
+		normalizeUrl := Normalize(href, rootPath)
+		if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
+			Spider(rootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db, nil)
+		}
+	})
+	doc.Find("script, iframe").Each(func(i int, selector *goquery.Selection) {
+		src, _ := selector.Attr("src")
+		if src == "" {
+			return
+		}
+		normalizeUrl := Normalize(src, rootPath)
+		if goquery.NodeName(selector) == "script" {
+			probeSourceMap(rootPath, normalizeUrl, directory, sourceMapSeen, db)
+		}
+		if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
+			Spider(rootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db, nil)
+		}
+	})
+}
+
+func handleHTMLContent(rootPath, Url string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB, bodyStr string) error {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(bodyStr))
+	if err != nil {
+		Error("%s", err)
+		return err
+	}
+	// 尝试从脚本中收集 SourceMap 线索
+	doc.Find("script").Each(func(i int, selector *goquery.Selection) {
+		if src, ok := selector.Attr("src"); ok {
+			normalizeUrl := Normalize(src, rootPath)
+			probeSourceMap(rootPath, normalizeUrl, directory, sourceMapSeen, db)
+		}
+	})
+	if _, ok := sensitiveUrl.Load(Url); !ok {
+		sensitiveUrl.Store(Url, true)
+		SensitiveInfoCollect(db, Url, bodyStr, directory)
+	}
+	crawlLinks(doc, rootPath, depth, directory, myMap, sourceMapSeen, apiCounter, db)
 	return nil
 }
 
@@ -546,6 +577,23 @@ func IconDetect(Url string) (string, string, error) {
 	return ico, hunterIco, nil
 }
 
+// IconDetectAuto accepts either a direct favicon URL or a page URL and extracts the rel=icon href.
+func IconDetectAuto(target string) (string, string, error) {
+	u, err := url.Parse(target)
+	if err != nil {
+		return "", "", err
+	}
+	if strings.HasSuffix(strings.ToLower(u.Path), ".ico") {
+		return IconDetect(target)
+	}
+	// 直接复用页面解析逻辑（单次请求页面获取 rel=icon）
+	iconURL, err := FindFaviconURL(target)
+	if err != nil {
+		return "", "", err
+	}
+	return IconDetect(iconURL)
+}
+
 func FindFaviconURL(urlStr string) (string, error) {
 	// 解析基准URL
 	baseURL, err := url.Parse(urlStr)
@@ -562,13 +610,11 @@ func FindFaviconURL(urlStr string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	// 从响应中创建goquery文档
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return "", err
 	}
-
 	// 创建正则表达式，模糊匹配rel属性值
 	r := regexp.MustCompile(`icon`)
 
@@ -598,6 +644,39 @@ func FindFaviconURL(urlStr string) (string, error) {
 		return "", errors.New("favicon url not found, might used javascript, please find it manually and use `godscan icon -u` to calculate it")
 	}
 
+	return faviconURL, nil
+}
+
+// FindFaviconURLFromHTML tries to extract favicon from provided HTML; does not issue new GET.
+func FindFaviconURLFromHTML(rootURL string, htmlBody string) (string, error) {
+	baseURL, err := url.Parse(rootURL)
+	if err != nil {
+		return "", err
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(htmlBody))
+	if err != nil {
+		return "", err
+	}
+	r := regexp.MustCompile(`icon`)
+	var faviconURL string
+	doc.Find("link").Each(func(i int, s *goquery.Selection) {
+		rel, exists := s.Attr("rel")
+		if exists && r.MatchString(rel) {
+			href, exists := s.Attr("href")
+			if exists {
+				if strings.HasPrefix(href, "//") {
+					faviconURL = baseURL.Scheme + ":" + href
+				} else if isAbsoluteURL(href) {
+					faviconURL = href
+				} else {
+					faviconURL = baseURL.ResolveReference(&url.URL{Path: href}).String()
+				}
+			}
+		}
+	})
+	if faviconURL == "" {
+		return "", errors.New("favicon url not found in html")
+	}
 	return faviconURL, nil
 }
 
@@ -663,24 +742,24 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	finger, _, title, contentType, _, headers, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
-	out.Status = statusCode
-	out.Finger = finger
-	out.Title = title
-	out.ContentType = contentType
-	out.Length = len(respBody)
+	fres := FingerScan(FirstUrl, http.MethodGet, true)
+	out.Status = fres.Status
+	out.Finger = fres.Finger
+	out.Title = fres.Title
+	out.ContentType = fres.ContentType
+	out.Length = len(fres.Body)
 	_ = SavePageSnapshot(db, PageSnapshot{
 		RootURL:     RootPath,
 		URL:         FirstUrl,
-		Status:      statusCode,
-		ContentType: contentType,
-		Headers:     headers,
-		Body:        string(respBody),
-		Length:      len(respBody),
+		Status:      fres.Status,
+		ContentType: fres.ContentType,
+		Headers:     fres.HeadersJSON,
+		Body:        string(fres.Body),
+		Length:      len(fres.Body),
 	})
 
-	if statusCode != -1 {
-		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
+	if fres.Status != -1 {
+		result := CheckFinger(fres.Finger, fres.Title, Url, fres.ContentType, "", fres.Body, fres.Status)
 		if len(result) > 0 {
 			WriteToCsv("finger.csv", result)
 			out.Finger = result[2]
@@ -692,18 +771,17 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 		}
 	}
 
-	// 构造404 + POST
-	SecondUrl := RootPath + "/xxxxxx"
-	finger2, _, title2, contentType2, _, _, respBody2, statusCode2 := FingerScan(SecondUrl, http.MethodPost, true)
-	if statusCode2 != -1 {
-		result := CheckFinger(finger2, title2, Url, contentType2, "", respBody2, statusCode2)
-		if len(result) > 0 {
-			WriteToCsv("finger.csv", result)
-			// Prefer POST fingerprint if it has a real finger.
-			if result[2] != common.NoFinger {
+	// 当首个 GET 无有效指纹时，再补充 POST/404 探针以提高识别率
+	if out.Finger == "" || out.Finger == common.NoFinger {
+		SecondUrl := RootPath + "/xxxxxx"
+		fres2 := FingerScan(SecondUrl, http.MethodPost, true)
+		if fres2.Status != -1 {
+			result := CheckFinger(fres2.Finger, fres2.Title, Url, fres2.ContentType, "", fres2.Body, fres2.Status)
+			if len(result) > 0 && result[2] != common.NoFinger {
+				WriteToCsv("finger.csv", result)
 				out.Finger = result[2]
-				out.Title = title2
-				out.ContentType = result[3]
+				out.Title = fres2.Title
+				out.ContentType = fres2.ContentType
 				out.Status, _ = strconv.Atoi(result[4])
 				out.Length, _ = strconv.Atoi(result[6])
 				out.Keyword = result[7]
@@ -712,22 +790,18 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 		}
 	}
 
-	IconUrl, err := FindFaviconURL(RootPath)
-	if err == nil {
-		fofaHash, hunterHash, iconErr := IconDetect(IconUrl)
-		if iconErr == nil {
-			out.IconHash = fmt.Sprintf("fofa:%s hunter:%s", fofaHash, hunterHash)
+	// 仅用已获取的首页 HTML 提取 favicon，找不到则放弃，避免额外请求
+	if iconURL, iconErr := FindFaviconURLFromHTML(RootPath, string(fres.Body)); iconErr == nil {
+		if fofaHash, hunterHash, errHash := IconDetect(iconURL); errHash == nil {
+			out.IconHash = fmt.Sprintf("fofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"", fofaHash, hunterHash)
 			var icon_hash_map map[string]interface{}
 			json.Unmarshal([]byte(icon_json), &icon_hash_map)
-			tmp := icon_hash_map[fofaHash]
-			if tmp != nil {
-				Debug("icon_url=\"%s\" icon_finger=\"%s\"", IconUrl, tmp)
+			if tmp := icon_hash_map[fofaHash]; tmp != nil {
+				Debug("icon_url=\"%s\" icon_finger=\"%s\"", iconURL, tmp)
 			}
 		} else {
-			Debug("%s", iconErr)
+			Debug("%s", errHash)
 		}
-	} else {
-		Debug("%s", err)
 	}
 	// 爬虫递归爬
 	myMap := mapset.NewSet()
@@ -740,7 +814,10 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	}
 	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
 	apiCounter := 0
-	err = Spider(RootPath, Url, Depth, directory, myMap, sourceMapSeen, &apiCounter, db)
+	err = Spider(RootPath, Url, Depth, directory, myMap, sourceMapSeen, &apiCounter, db, &prefetchedPage{
+		body:        string(fres.Body),
+		contentType: fres.ContentType,
+	})
 	if err != nil {
 		Error("%s", err)
 		out.Err = err

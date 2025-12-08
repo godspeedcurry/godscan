@@ -69,6 +69,22 @@ func DeduplicateByContent(data []SensitiveData) []SensitiveData {
 	return uniqueData
 }
 
+// filterLowValue drops obvious noise like standalone "password"/"token" phrases.
+func filterLowValue(data []SensitiveData) []SensitiveData {
+	out := make([]SensitiveData, 0, len(data))
+	for _, d := range data {
+		lower := strings.ToLower(strings.TrimSpace(d.Content))
+		if lower == "" {
+			continue
+		}
+		if strings.Contains(lower, " password") || strings.Contains(lower, " token") {
+			continue
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
 func PrintTable(Url string, key string, data []SensitiveData) {
 	sort.Slice(data, func(i, j int) bool {
 		return data[i].Entropy > data[j].Entropy
@@ -113,6 +129,7 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 	sec := SecList()
 
 	infoMap := make(map[string]string)
+	// 简单词频匹配，降低误报：纯 token/password 词在正文高频出现时也记录
 	infoMap["Chinese Mobile Number"] = `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`
 	infoMap["Internal IP Address"] = `[^0-9]((10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`
 	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/%.]*)?)`
@@ -128,13 +145,14 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 		otherData := []string{}
 		if len(res) > 0 {
 			for _, tmp := range res {
-				if key == "security-rule-0" {
+				switch key {
+				case "security-rule-0":
 					entropy := calculateEntropy(tmp[3])
 					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
-				} else if key == "security-rule-1" {
+				case "security-rule-1":
 					entropy := calculateEntropy(tmp[2])
 					secData = append(secData, SensitiveData{Content: tmp[1], Entropy: entropy})
-				} else {
+				default:
 					otherData = append(otherData, tmp[0])
 				}
 			}
@@ -156,6 +174,7 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 			}
 			if len(secData) > 0 {
 				dedup := DeduplicateByContent(secData)
+				dedup = filterLowValue(dedup)
 				PrintTable(Url, key, dedup)
 				var hits []SensitiveHit
 				for _, d := range dedup {

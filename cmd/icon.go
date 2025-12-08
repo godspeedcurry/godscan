@@ -32,5 +32,15 @@ func (o *IconOptions) validateOptions() error {
 
 func (o *IconOptions) run() {
 	utils.InitHttp()
-	utils.IconDetect(GlobalOption.Url)
+	iconURL, err := utils.FindFaviconURL(GlobalOption.Url)
+	if err != nil {
+		utils.Error("%v", err)
+		return
+	}
+	fofa, hunter, err := utils.IconDetect(iconURL)
+	if err != nil {
+		utils.Error("%v", err)
+		return
+	}
+	utils.Info("icon_url: %s\nfofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"\n", iconURL, fofa, hunter)
 }
