@@ -1,6 +1,6 @@
 # godscan
 <h4 align="center">你的下一台扫描器，又何必是扫描器</h4>
-<h5 align="center">—— 主动API/敏感信息识别与弱口令生成工具。</h5>
+<h5 align="center">主动API/敏感信息识别与弱口令生成</h5>
 
 <p align="center">
   <a href="https://goreportcard.com/report/github.com/godspeedcurry/godscan">
