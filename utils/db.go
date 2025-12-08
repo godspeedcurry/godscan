@@ -117,6 +117,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_cdn_host ON cdn_hosts(root_url, host);
 CREATE INDEX IF NOT EXISTS idx_services_root ON services(root_url);
 CREATE INDEX IF NOT EXISTS idx_services_category ON services(category);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url, map_url);
+
+CREATE TABLE IF NOT EXISTS page_snapshots (
+	root_url TEXT PRIMARY KEY,
+	url TEXT,
+	status INTEGER,
+	content_type TEXT,
+	headers TEXT,
+	body TEXT,
+	length INTEGER,
+	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `
 	_, err := db.Exec(ddl)
 	if err != nil {
@@ -138,6 +149,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url
 	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_sensitive_unique ON sensitive_hits(source_url, category, content)`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS source_maps (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, js_url TEXT, map_url TEXT, status INTEGER, length INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
 	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url, map_url)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS page_snapshots (root_url TEXT PRIMARY KEY, url TEXT, status INTEGER, content_type TEXT, headers TEXT, body TEXT, length INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
 	return nil
 }
 
@@ -370,6 +382,16 @@ type SourceMapHit struct {
 	Length  int
 }
 
+type PageSnapshot struct {
+	RootURL     string
+	URL         string
+	Status      int
+	ContentType string
+	Headers     string
+	Body        string
+	Length      int
+}
+
 func SaveSourceMaps(db *sql.DB, hits []SourceMapHit) error {
 	if db == nil || len(hits) == 0 {
 		return nil
@@ -391,6 +413,15 @@ func SaveSourceMaps(db *sql.DB, hits []SourceMapHit) error {
 		}
 	}
 	return tx.Commit()
+}
+
+func SavePageSnapshot(db *sql.DB, snap PageSnapshot) error {
+	if db == nil {
+		return nil
+	}
+	_, err := db.Exec(`INSERT OR REPLACE INTO page_snapshots (root_url, url, status, content_type, headers, body, length, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+		snap.RootURL, snap.URL, snap.Status, snap.ContentType, snap.Headers, snap.Body, snap.Length)
+	return err
 }
 
 // Global DB handle used for mirroring.

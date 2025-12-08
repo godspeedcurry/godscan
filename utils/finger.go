@@ -164,8 +164,8 @@ func fetchSourceMap(mapURL string) (int, int, error) {
 		}
 		defer resp.Body.Close()
 		maxBody := viper.GetInt("max-body-bytes")
-		if maxBody <= 0 {
-			maxBody = 2 * 1024 * 1024
+		if maxBody <= 0 || maxBody > 4*1024*1024 {
+			maxBody = 4 * 1024 * 1024
 		}
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBody)))
 		length := len(body)
@@ -663,12 +663,21 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 
 	// 首页
 	FirstUrl := RootPath + Host.Path
-	finger, _, title, contentType, _, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
+	finger, _, title, contentType, _, headers, respBody, statusCode := FingerScan(FirstUrl, http.MethodGet, true)
 	out.Status = statusCode
 	out.Finger = finger
 	out.Title = title
 	out.ContentType = contentType
 	out.Length = len(respBody)
+	_ = SavePageSnapshot(db, PageSnapshot{
+		RootURL:     RootPath,
+		URL:         FirstUrl,
+		Status:      statusCode,
+		ContentType: contentType,
+		Headers:     headers,
+		Body:        string(respBody),
+		Length:      len(respBody),
+	})
 
 	if statusCode != -1 {
 		result := CheckFinger(finger, title, Url, contentType, "", respBody, statusCode)
@@ -685,7 +694,7 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 
 	// 构造404 + POST
 	SecondUrl := RootPath + "/xxxxxx"
-	finger2, _, title2, contentType2, _, respBody2, statusCode2 := FingerScan(SecondUrl, http.MethodPost, true)
+	finger2, _, title2, contentType2, _, _, respBody2, statusCode2 := FingerScan(SecondUrl, http.MethodPost, true)
 	if statusCode2 != -1 {
 		result := CheckFinger(finger2, title2, Url, contentType2, "", respBody2, statusCode2)
 		if len(result) > 0 {

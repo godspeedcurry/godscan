@@ -28,9 +28,9 @@ var searchOptions SearchOptions
 
 func init() {
 	searchCmd := &cobra.Command{
-		Use:     "search [pattern]",
-		Aliases: []string{"grep"},
-		Short:   "Regex search in spider.db (api_paths & sensitive_hits)",
+		Use:     "grep [pattern]",
+		Aliases: []string{"search"},
+		Short:   "Regex search in spider.db (api/sensitive/map/page)",
 		Run: func(cmd *cobra.Command, args []string) {
 			if searchOptions.Pattern == "" && len(args) > 0 {
 				searchOptions.Pattern = args[0]
@@ -45,7 +45,7 @@ func init() {
 	searchCmd.Flags().IntVar(&searchOptions.MaxResult, "limit", 200, "max results to display")
 	searchCmd.Flags().StringVar(&searchOptions.DbPath, "db", "spider.db", "path to spider.db")
 	searchCmd.Flags().BoolVarP(&searchOptions.IgnoreCase, "ignore-case", "i", false, "case-insensitive regex")
-	searchCmd.Flags().StringSliceVar(&searchOptions.Tables, "table", []string{"api", "sensitive", "map"}, "tables to search: api,sensitive,map")
+	searchCmd.Flags().StringSliceVar(&searchOptions.Tables, "table", []string{"api", "sensitive", "map", "page"}, "tables to search: api,sensitive,map,page")
 	rootCmd.AddCommand(searchCmd)
 }
 
@@ -74,6 +74,7 @@ func runSearch(opt SearchOptions) error {
 	searchAPI := false
 	searchSensitive := false
 	searchMaps := false
+	searchPages := false
 	for _, t := range opt.Tables {
 		t = strings.ToLower(strings.TrimSpace(t))
 		if t == "api" {
@@ -85,9 +86,12 @@ func runSearch(opt SearchOptions) error {
 		if t == "map" || t == "sourcemap" || t == "sourcemaps" {
 			searchMaps = true
 		}
+		if t == "page" || t == "body" || t == "header" {
+			searchPages = true
+		}
 	}
-	if !searchAPI && !searchSensitive && !searchMaps {
-		searchAPI, searchSensitive, searchMaps = true, true, true
+	if !searchAPI && !searchSensitive && !searchMaps && !searchPages {
+		searchAPI, searchSensitive, searchMaps, searchPages = true, true, true, true
 	}
 
 	apiRows := []apiRow{}
@@ -107,6 +111,13 @@ func runSearch(opt SearchOptions) error {
 	mapRows := []sourceMapRow{}
 	if searchMaps {
 		mapRows, err = querySourceMaps(db, opt.UrlLike)
+		if err != nil {
+			return err
+		}
+	}
+	pageRows := []pageRow{}
+	if searchPages {
+		pageRows, err = queryPages(db, opt.UrlLike)
 		if err != nil {
 			return err
 		}
@@ -140,6 +151,14 @@ func runSearch(opt SearchOptions) error {
 		}
 		if re.MatchString(r.JSURL) {
 			addHit(hit{Source: r.Root, Field: "source_map.js", Value: r.JSURL})
+		}
+	}
+	for _, r := range pageRows {
+		if re.MatchString(r.Body) {
+			addHit(hit{Source: r.Root, Field: "page.body", Value: r.Body})
+		}
+		if re.MatchString(r.Headers) {
+			addHit(hit{Source: r.Root, Field: "page.header", Value: r.Headers})
 		}
 	}
 
@@ -191,6 +210,13 @@ type sourceMapRow struct {
 	Root   string
 	JSURL  string
 	MapURL string
+}
+
+type pageRow struct {
+	Root    string
+	URL     string
+	Headers string
+	Body    string
 }
 
 func queryAPIPaths(db *sql.DB, like string) ([]apiRow, error) {
@@ -261,6 +287,31 @@ func querySourceMaps(db *sql.DB, like string) ([]sourceMapRow, error) {
 	for rows.Next() {
 		var r sourceMapRow
 		if err := rows.Scan(&r.Root, &r.JSURL, &r.MapURL); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func queryPages(db *sql.DB, like string) ([]pageRow, error) {
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if like != "" {
+		rows, err = db.Query(`SELECT root_url, url, headers, body FROM page_snapshots WHERE root_url LIKE ? OR url LIKE ?`, "%"+like+"%", "%"+like+"%")
+	} else {
+		rows, err = db.Query(`SELECT root_url, url, headers, body FROM page_snapshots`)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []pageRow
+	for rows.Next() {
+		var r pageRow
+		if err := rows.Scan(&r.Root, &r.URL, &r.Headers, &r.Body); err != nil {
 			return nil, err
 		}
 		out = append(out, r)

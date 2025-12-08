@@ -1,5 +1,6 @@
 # godscan
 <h4 align="center">你的下一台扫描器，又何必是扫描器</h4>
+<h5 align="center">—— 主动API/敏感信息识别与弱口令生成工具。</h5>
 
 <p align="center">
   <a href="https://goreportcard.com/report/github.com/godspeedcurry/godscan">
@@ -13,112 +14,48 @@
   </a>
 </p>
 
+
+
+## 定位
+- API 识别：多探针指纹 + JS/Vue 解析，结果写入 `spider.db` / `report.xlsx`。
+- 敏感信息识别：HTML/JS 扫描 + 熵值高亮 + SourceMap 解析，落盘 `spider.db` 与 `sourcemaps.txt`。
+- 弱口令生成：关键词组合、变异、阴历模式，直接可用于爆破/字典。
+
 ## 亮点
-- Web 指纹 + API 抽取：GET/POST/404 多探针、favicon hash（fofa/hunter）、SimHash/关键词辅助识别。
-- 爬虫情报：DFS 深度可调，自动存档 `spider.db`/`report.xlsx`，敏感信息 + 熵值高亮，CDN/OSS 提取。
-- SourceMap 发现：从 JS/脚本标签自动探测同源 `.map`，记录到 `spider.db`/`sourcemaps.txt`，少量请求高命中。
-- 端口服务识别：nmap 样式探针 + JDWP/HTTP 自定义规则，域名/IP/CIDR/范围混合输入。
-- 弱口令生成：基础/变异/阴历模式，支持前后缀、分隔符；可直接喂在线爆破或 hashcat。
-- 纯 Go，默认 `CGO_ENABLED=0`，提供 linux/windows/macos/freebsd 多平台包。
+- 指纹 + API 抽取：GET/POST/404 探针、favicon hash（fofa/hunter）、SimHash/关键词。
+- 爬虫情报：DFS 深度可调，存档 `spider.db`/`report.xlsx`，敏感/熵值/CDN/OSS 一并收集。
+- SourceMap 发现：脚本同源 `.map` 自动探测，低请求量高命中。
+- 首页快照：保存首页 HTML/响应头，支持 body/header 类似 fofa 语法检索。
+- 端口服务识别：nmap 样式探针 + 自定义 HTTP/JDWP 规则。
+- 弱口令生成：基础/变异/阴历，前后缀/分隔符可配。
+- 纯 Go，`CGO_ENABLED=0`，多平台构建。
 
 ## 快速上手
 ```bash
-# 单域名爬虫（指纹+API）
-godscan sp -u https://example.com           # 简写：sp, ss
-godscan sp -f urls.txt                      # 简写：--url-file/-f/-uf
+# 爬虫（指纹 + API + 敏感信息）
+godscan sp -u https://example.com           # 简写 sp, ss
+godscan sp -f urls.txt                      # 支持 -f/-uf 文件
 
-# 目录扫描
-godscan dir -u https://example.com          # 简写：dir, dirb, dd
+# SourceMap/敏感数据/首页快照搜索
+godscan grep "js.map" --table map
+godscan grep "elastic" --table page   # body/header 查询
 
-# 端口扫描（支持域名/IP/CIDR/范围）
+# 目录/端口/弱口令
+godscan dir -u https://example.com
 godscan port -i '1.2.3.4/28,example.com' -p 80,443
-
-# 图标 hash
-godscan icon -u https://example.com/favicon.ico
-
-# 弱口令生成
 godscan weak -k "foo,bar" --full
-
-# 数据检索（正则）
-godscan search --pattern "/api/v1" --db spider.db   # 去重搜索 api_paths/sensitive_hits，结果保存到 output/search_results.json
-
-# 进度与输出
-- 爬虫默认打印进度（10% 阶梯）和每个 URL 的开始日志，可用 `--progress-log=false` 关闭。
-- 所有日志/产物写入 `--output-dir`（默认 output），包括 result.log、service.txt、spider_summary.json、search_results.json。
 ```
 
-### 主要命令
+## 输出
+- `spider.db` / `report.xlsx`：指纹、API、敏感信息、CDN、SourceMap、首页快照。
+- `output/` 目录：`result.log`、`spider_summary.json`、`sourcemaps.txt` 等。
 
-```
-Usage:
-  godscan [flags]
-  godscan [command]
-
-Available Commands:
-  clean       clean logs (Aliases: cc)
-  completion  Generate the autocompletion script for the specified shell
-  dirbrute    Dirbrute on sensitive file (Aliases: dir, dirb, dd)
-  help        Help about any command
-  icon        Calculate hash of an icon, eg: godscan icon -u http://example.com/favicon.ico (Aliases: ico)
-  port        port scanner (Aliases: pp)
-  spider      Analyze website using DFS, quick usage: -u (Aliases: sp, ss)
-  weakpass    Start the application (Aliases: weak, wp, wk, ww)
-
-Flags:
-  -e, --filter stringArray    Filter url, eg: -e 'abc.com'
-  -H, --headers stringArray   Custom headers, eg: -H 'Cookie: 123'
-  -h, --help                  help for godscan
-      --host string           singel host
-      --host-file string      host file
--v, --loglevel int          level of your log (default 2)
--o, --output string         output file to write log and results (default "result.log")
--O, --output-dir string     directory to write logs/results/json (default "output")
-      --private-ip            scan private ip
-      --proxy string          proxy
-      --ua string             set user agent (default "user agent")
-  -u, --url string            singel url
-  -f, --url-file string       url file (也接受 -uf file)
-
-Use "godscan [command] --help" for more information about a command.
-```
+## 最近更新
+- SourceMap 探测：同源 `.map` 优先 HEAD，命中即入库。
+- 首页快照入库：保存 body/header，可用 `search --table page` 直接检索。
+- 搜索扩展：`search --table map/page` 支持 SourceMap、首页内容查询。
 
 
-
-### 命令自动补全
-```
-./godscan completion zsh > /tmp/x
-source /tmp/x
-```
-
-### 发布与版本
-- 只要打新 tag，GitHub Actions + GoReleaser 会自动打包发布，覆盖 linux/windows/macos/freebsd (amd64/arm64/386/armv7)。
-- 归档命名：`godscan_<version>_<os>_<arch>`，macOS 显示为 `macos`，windows 用 zip。
-- 版本号从 tag 注入，手动本地构建默认显示 `dev`，如需本地指定版本：`go build -ldflags="-X github.com/godspeedcurry/godscan/cmd.version=vX.Y.Z"`。
-
-## 开发
-```bash
-# 提交改动
-git add . && git commit -m "fix bug" && git push -u origin main
-
-# 发布（打 tag 即触发 GitHub Actions + GoReleaser 构建发布包，版本号自动注入二进制）
-git tag -a v1.xx -m "v1.xx"
-git push -u origin v1.xx
-
-# 删除 tag（如需撤回发布）
-git tag -d v1.xx
-git push origin :refs/tags/v1.xx
-```
-### 日志清理
-```
-./godscan clean
-```
-### 基础功能一：目录扫描
-#### 单一目录扫描
-* `dirbrute`可简写为`dir`,`dirb`,`dd`
-```bash
-./godscan dirbrute --url http://www.example.com
-```
-1. 目录扫描数量较少，约50个，只针对渗透测试中容易造成数据泄漏、命令执行的几个点进行了探测
 2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜(删掉了，实际出现的太少)
 3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
 4. 基于相似哈希算法计算页面哈希，用于资产量较大的情况分辨重点资产

@@ -149,14 +149,14 @@ func preprocessAndEvaluate(input string, context map[string]string) (bool, error
 	return result.(bool), nil
 }
 
-func FingerScan(url string, method string, followRedirect bool) (string, string, string, string, string, []byte, int) {
+func FingerScan(url string, method string, followRedirect bool) (string, string, string, string, string, string, []byte, int) {
 	if !isValidUrl(url) {
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", "", nil, -1
 	}
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
 		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", "", nil, -1
 	}
 	req.Header.Set("Cookie", "rememberMe=me")
 	SetHeaders(req)
@@ -170,7 +170,7 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", "", nil, -1
 	}
 	defer resp.Body.Close()
 	ServerValue := resp.Header["Server"]
@@ -180,7 +180,7 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 	}
 
 	if resp.StatusCode == 301 || resp.StatusCode == 302 {
-		return common.NoFinger, retServerValue, "", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
+		return common.NoFinger, retServerValue, "", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), MapToJson(resp.Header), nil, resp.StatusCode
 	}
 	headers := MapToJson(resp.Header)
 
@@ -189,14 +189,14 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 	err = json.Unmarshal([]byte(eholeJson), &config)
 	if err != nil {
 		Fatal("%s %s unmarshal failed", url, err)
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", headers, nil, -1
 	}
 	ContentLengthStr := resp.Header.Get("Content-Length")
 	ServerContentType := resp.Header.Get("Content-Type")
 	var cms []string
 	maxBody := viper.GetInt("max-body-bytes")
-	if maxBody <= 0 {
-		maxBody = 2 * 1024 * 1024
+	if maxBody <= 0 || maxBody > 4*1024*1024 {
+		maxBody = 4 * 1024 * 1024
 	}
 	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, int64(maxBody)))
 	actualLen := len(bodyBytes)
@@ -207,19 +207,19 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 		}
 	}
 	if contentLength > 1024*1024*10 { // 10M
-		return "Large Data", retServerValue, "Large Data size = [" + strconv.Itoa(contentLength) + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), nil, resp.StatusCode
+		return "Large Data", retServerValue, "Large Data size = [" + strconv.Itoa(contentLength) + "]", resp.Header.Get("Content-Type"), resp.Header.Get("Location"), headers, nil, resp.StatusCode
 	}
 	_, DetermineContentType, _ := charset.DetermineEncoding(bodyBytes, ServerContentType)
 	reader, err := charset.NewReader(bytes.NewBuffer(bodyBytes), DetermineContentType)
 	if err != nil {
 		logRequestError(url, fmt.Errorf("%v (%s)", err, DetermineContentType))
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", headers, nil, -1
 	}
 	doc, err := goquery.NewDocumentFromReader(reader)
 
 	if err != nil {
 		logRequestError(url, err)
-		return common.NoFinger, "", "", "", "", nil, -1
+		return common.NoFinger, "", "", "", "", headers, nil, -1
 	}
 
 	// 查找标题元素并获取内容
@@ -257,5 +257,5 @@ func FingerScan(url string, method string, followRedirect bool) (string, string,
 		finger = strings.Join(cms, ",")
 	}
 
-	return finger, retServerValue, title, resp.Header.Get("Content-Type"), resp.Header.Get("Location"), []byte(bodyBytes), resp.StatusCode
+	return finger, retServerValue, title, resp.Header.Get("Content-Type"), resp.Header.Get("Location"), headers, bodyBytes, resp.StatusCode
 }
