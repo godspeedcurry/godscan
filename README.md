@@ -15,30 +15,23 @@
 </p>
 
 
-
-## 定位
-- API 识别：多探针指纹 + JS/Vue 解析，结果写入 `spider.db` / `report.xlsx`。
-- 敏感信息识别：HTML/JS 扫描 + 熵值高亮 + SourceMap 解析，落盘 `spider.db` 与 `sourcemaps.txt`。
-- 弱口令生成：关键词组合、变异、阴历模式，直接可用于爆破/字典。
-
-## 亮点
+## 1. 亮点
 - 指纹 + API 抽取：GET/POST/404 探针、favicon hash（fofa/hunter）、SimHash/关键词。
-- 爬虫情报：DFS 深度可调，存档 `spider.db`/`report.xlsx`，敏感/熵值/CDN/OSS 一并收集。
-- SourceMap 发现：脚本同源 `.map` 自动探测，低请求量高命中。
-- 首页快照：保存首页 HTML/响应头，支持 body/header 类似 fofa 语法检索。
+- 爬虫：基于深度优先搜索，输出 `spider.db`/`report.xlsx`，提取敏感信息如API/CREDENTIALS/OSS等。
+- SourceMap 发现：对 `.map` 自动探测
+- 首页快照：保存首页 HTML/响应头，使用grep快速检索。
 - 端口服务识别：nmap 样式探针 + 自定义 HTTP/JDWP 规则。
-- 弱口令生成：基础/变异/阴历，前后缀/分隔符可配。
-- 纯 Go，`CGO_ENABLED=0`，多平台构建。
+- 弱口令生成：基础/变异/阴历，前后缀/分隔符可自定义。
 
-## 快速上手
+## 2. 快速上手
 ```bash
 # 爬虫（指纹 + API + 敏感信息）
 godscan sp -u https://example.com           # 简写 sp, ss
 godscan sp -f urls.txt                      # 支持 -f/-uf 文件
 
-# SourceMap/敏感数据/首页快照搜索
-godscan grep "js.map" --table map
-godscan grep "elastic" --table page   # body/header 查询
+# 爬虫跑完后：SourceMap/敏感数据/首页快照搜索
+godscan grep "js.map"
+godscan grep "elastic"   # body/header 查询
 
 # 目录/端口/弱口令
 godscan dir -u https://example.com
@@ -46,41 +39,25 @@ godscan port -i '1.2.3.4/28,example.com' -p 80,443
 godscan weak -k "foo,bar" --full
 ```
 
-## 输出
-- `spider.db` / `report.xlsx`：指纹、API、敏感信息、CDN、SourceMap、首页快照。
-- `output/` 目录：`result.log`、`spider_summary.json`、`sourcemaps.txt` 等。
+## 3. 基础功能
 
-## 最近更新
-- SourceMap 探测：同源 `.map` 优先 HEAD，命中即入库。
-- 首页快照入库：保存 body/header，可用 `search --table page` 直接检索。
-- 搜索扩展：`search --table map/page` 支持 SourceMap、首页内容查询。
-
-
-2. 目录扫描会根据域名生成对应的备份文件路径，说不定会有意外之喜(删掉了，实际出现的太少)
-3. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
-4. 基于相似哈希算法计算页面哈希，用于资产量较大的情况分辨重点资产
-5. 基于高德猜想——四等分点算法提取`0,1/4,1/2,3/4,1`处的关键字 辅助识别页面内容 NLP暂时不考虑 还没找到golang下很成熟的主题识别框架
-6. 默认不跟随重定向，可使用`-L`跟随重定向
-
-#### 批量目录扫描+指纹识别(基于golang协程)
+### 批量目录扫描+指纹识别(基于golang协程)
 ```bash
 ./godscan dirbrute --url-file url.txt
 ```
 
-### 基础功能二：根据图标地址计算图标hash
-* 该hash为fofa的hash 本质是murmur3哈希
-* 新增了hunter的hash 本质是md5
+### 根据图标地址计算图标hash
+* fofa的hash 本质是murmur3哈希
+* hunter的hash 本质是md5哈希
 ```bash
 ./godscan icon --url http://www.example.com/ico.ico
 ```
-### 基础功能三：端口扫描
+### 端口扫描
 ```bash
 # 默认top 500
 ./godscan port -i '1.2.3.4/28'
 # 自定义端口
-./godscan port -i '1.2.3.4/28' -p '12312-12334,6379,22'
-# 也支持域名列表，自动解析
-# ./godscan port -i 'example.com,foo.bar'
+./godscan port -i '1.2.3.4/28,example.com' -p '12312-12334,6379,22'
 # 指定top端口 数字范围在20000以内
 ./godscan port -i '1.2.3.4/28' --top 1000
 # 第top100~第top200端口
@@ -94,13 +71,14 @@ godscan weak -k "foo,bar" --full
 Probe TCP myhttp q|GET / HTTP/1.1\r\n\r\n|
 match http m|^HTTP| p/HTTP Protocol/
 ```
-
-### 增强功能一：弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
+## 4. 增强功能
+### 弱口令生成、离线爆破 ⭐️⭐️⭐️⭐️⭐️
 * 默认基础模式，基础数量在数千级，可配合网络端在线使用或配合本地`hashcat`离线使用
 * `--full`模式，生成数量在万级，建议只配合本地`hashcat`离线使用
 * 会自动识别输入的身份证、电话号码，并根据常见的弱口令规则生成对应的弱口令
 * `weakpass`可简写为`weak`, `wp`, `wk`, `ww`
 * 新加入生日对应的阴历
+
 ```bash
 ./godscan weakpass -k "张三,110101199003070759,18288888888"
 # 中文会被转成英文，以一定格式生成弱口令，如干饭集团，需要自己去找一下他在网站中经常提到的一些叫法
@@ -129,8 +107,7 @@ match http m|^HTTP| p/HTTP Protocol/
 ./godscan weakpass -k "张三,110101199003070759,18288888888" | pbcopy
 ```
 
-
-### 增强功能二：使用爬虫，爬取各类地址并尝试获取重要信息 ⭐️⭐️⭐️⭐️
+### API资产推荐——使用爬虫，爬取各类地址并尝试获取重要信息 ⭐️⭐️⭐️⭐️⭐️
 * 目前会寻找url地址、密码、各类token
 * `spider`命令可简写为`sp`、`ss`
 ```bash
@@ -138,74 +115,30 @@ match http m|^HTTP| p/HTTP Protocol/
 # -d 1 可以指定爬虫的深度 默认为2 可以适当提高深度至3 
 # 从文件批量爬取 适合针对API型资产 url不建议太多
 ./godscan spider --url-file url.txt   # 简写：-f url.txt 或 -uf url.txt
+# 首页内容会被写入数据库，可以直接搜索
+./godscan grep 'xxxx' 
 ```
 注意：godscan默认不扫内网IP，来减少卡顿，如果要扫内网IP,使用`--private-ip`参数即可
 
-## 功能详细介绍
-### web应用指纹识别 
-- [x] HTTP响应 Server字段
-- [x] 构造404 报错 得到中间件的详情
-- [x] POST请求构造报错 
-- [x] 爬虫 递归访问
-- [x] 正则提取注释 注释里往往有版本 github仓库等信息(删了 误报太多)
-- [x] 版本识别并高亮（删了 误报太多）
-- [x] 对注释里的内容匹配到关键字并高亮(删了 误报太多)
-- [x] 识别接口 主要从js里提取
-- [x] url特征 人工看吧 有些组件的url是很有特征的 google: `inurl:/wh/servlet`
-- [x] vue.js 前端 识别`(app|index|main|config).xxxx.js` 并使用正则提取里面的path
-- [x] finger.txt来源
-  * [Ehole](https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json)
-  * [nemasis](https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf)
-  * [chunsou](https://github.com/Funsiooo/chunsou)
-  * [tide](https://github.com/TideSec/TideFinger)
-- [x] 图标哈希
-  - [x] 新增可直接根据图标地址计算hash的功能
-
-### 功能二：弱口令生成器
-- [x] 在fscan的基础上新增从实际渗透测试中获取到的弱口令
-- [x] 根据给定的关键词生成大量弱口令
-
-
-人工筛选时，可关注
-* 域名 
-  * 自身域名
-  * 非自身域名 如开发商 很多默认密码和域名有千丝万缕的联系
-* html注释
-
-
-## 功能三：敏感信息搜集
-参考： https://gh0st.cn/HaE/
+正则参考： https://gh0st.cn/HaE/
 这里面有很多现成的规则 挑了一下重点
 - [x] 国内手机号
 - [x] OSS accessKey accessId
 - [x] link 识别  
-
+基于字符串混乱度（熵值）排序，可快速发现AK/SK等随机字符串
 
 ---
+## 5. 输出
+* `spider.db` / `report.xlsx`：指纹、API、敏感信息、CDN、SourceMap、首页快照。
+* `output/` 目录：`result.log`、`spider_summary.json`、`sourcemaps.txt` 等。
 
-
-## 跨平台编译
+## 6. 跨平台编译 & 开发
 ```bash
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_linux_amd64 
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_win_amd64
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w " -trimpath -o godscan_darwin_amd64
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w " -trimpath -o godscan_darwin_arm64
-```
 
-
-## 功能截图
-* icon_hash计算、关键字识别
-![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.png)
-
-* 弱口令生成
-![image](https://github.com/godspeedcurry/godscan/blob/main/images/img2.png)
-
-* 敏感信息识别
-![image](https://github.com/godspeedcurry/godscan/blob/main/images/img3.png)
-
-
-## 开发
-```
 # develop && auto release
 git add . && git commit -m "fix bug" && git push -u origin main
 git tag -a v1.xx
@@ -217,8 +150,22 @@ git push origin :refs/tags/v1.xx
 ```
 
 
+## 7. 功能截图
+* icon_hash计算、关键字识别
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img1.png)
 
-## 更新说明
+* 弱口令生成
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img2.png)
+
+* 敏感信息识别
+![image](https://github.com/godspeedcurry/godscan/blob/main/images/img3.png)
+
+
+
+
+
+## 8. 更新说明
+* 2025-12-09 使用codex进行大面积重构和功能更新
 * 2024-08-21 支持带cookie访问
 * 2024-07-01 新增全球端口top20000列表，`-p`参数保持不变
   * `--top 500`
@@ -243,7 +190,23 @@ git push origin :refs/tags/v1.xx
 * 2022-06-09 修复了大小写导致不高亮的问题
 * 2022-06-08 修复了os.Open导致找不到文件的错误，改用packr库
 
+## 9. 被淘汰的功能
+1. 目录扫描根据域名生成对应的备份文件路径：实际出现的太少
+2. 要对单一url进行大线程、多文件探测，请使用[dirsearch](https://github.com/maurosoria/dirsearch)
+3. 正则提取注释 注释里往往有版本 github仓库等信息：误报太多
+4. 版本识别并高亮：误报太多
+5. 对注释里的内容匹配到关键字并高亮：误报太多
 
-## 免责声明
+## 10. 专利功能
+1. 基于相似哈希算法计算页面哈希，用于资产量较大的情况分辨重点资产
+2. 基于高德猜想——四等分点算法提取`0,1/4,1/2,3/4,1`处的关键字 辅助识别页面内容 NLP暂时不考虑 还没找到golang下很成熟的主题识别框架
+
+## 11. 致谢
+* finger.txt来源
+  * [Ehole](https://raw.githubusercontent.com/EdgeSecurityTeam/EHole/main/finger.json)
+  * [nemasis](https://www.nemasisva.com/resource-library/Nemasis-Supported-Applications-Hardware-and-Platforms.pdf)
+  * [chunsou](https://github.com/Funsiooo/chunsou)
+  * [tide](https://github.com/TideSec/TideFinger)
+## 12. 免责声明
 
 本工具仅面向合法授权的企业安全建设行为，如您需要测试本工具的可用性，请自行搭建靶机环境。 为避免被恶意使用，本项目所有技术均为理论方法，不存在任何漏洞利用过程，不会对目标发起真实攻击和漏洞利用。 在使用本工具进行检测时，您应确保该行为符合当地的法律法规，并且已经取得了足够的授权。请勿对非授权目标进行扫描。 如您在使用本工具的过程中存在任何非法行为，您需自行承担相应后果，我们将不承担任何法律及连带责任。

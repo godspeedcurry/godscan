@@ -171,7 +171,7 @@ func FingerScan(url string, method string, followRedirect bool) FingerResult {
 	}
 	defer resp.Body.Close()
 
-	if isRedirect(resp.StatusCode) {
+	if !followRedirect && isRedirect(resp.StatusCode) {
 		return FingerResult{
 			Finger:      common.NoFinger,
 			Server:      serverHeader,
@@ -228,9 +228,14 @@ func doHTTPRequest(url, method string, followRedirect bool) (*http.Response, str
 	}
 	req.Header.Set("Cookie", "rememberMe=me")
 	SetHeaders(req)
-	client := Client
-	if !followRedirect {
-		client = ClientNoRedirect
+	var client *http.Client
+	if followRedirect {
+		client = Client
+		if client == nil {
+			client = http.DefaultClient
+		}
+	} else {
+		client = enforceNoRedirectClient(ClientNoRedirect)
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -244,8 +249,19 @@ func doHTTPRequest(url, method string, followRedirect bool) (*http.Response, str
 	return resp, serverHeader, nil
 }
 
+func enforceNoRedirectClient(base *http.Client) *http.Client {
+	if base == nil {
+		return &http.Client{
+			CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
+		}
+	}
+	clone := *base
+	clone.CheckRedirect = func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }
+	return &clone
+}
+
 func isRedirect(status int) bool {
-	return status == 301 || status == 302
+	return status == 301 || status == 302 || status == 303 || status == 307 || status == 308
 }
 
 func loadFingerConfig(url string) (Packjson, error) {
@@ -273,6 +289,10 @@ func readResponseBody(resp *http.Response) ([]byte, int) {
 }
 
 func buildDocument(body []byte, serverContentType string) (*goquery.Document, string, error) {
+	if len(body) == 0 {
+		doc, _ := goquery.NewDocumentFromReader(strings.NewReader("<html></html>"))
+		return doc, "", nil
+	}
 	_, determineContentType, _ := charset.DetermineEncoding(body, serverContentType)
 	reader, err := charset.NewReader(bytes.NewBuffer(body), determineContentType)
 	if err != nil {

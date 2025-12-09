@@ -22,8 +22,8 @@ godscan sp -u https://example.com            # aliases: sp, ss
 godscan sp -f urls.txt                       # supports -f/-uf
 
 # SourceMap / sensitive / homepage search
-godscan grep "js.map" --table map
-godscan grep "elastic" --table page   # body/header
+godscan grep "js.map"
+godscan grep "elastic"   # body/header
 
 # Dir / port / weak passwords
 godscan dir -u https://example.com
@@ -37,5 +37,5 @@ godscan weak -k "foo,bar" --full
 
 ## Recent updates
 - Source map probing: same-origin `.map` via HEAD-first, saved into DB with fewer requests.
-- Search: `search --table map/page` can query SourceMap records and homepage body/header.
+- Search: `grep` queries api/sensitive/map/page by default; no table flag needed for SourceMap/homepage/body/header.
 - Homepage snapshots added; README focused on API/sensitive/password use cases.

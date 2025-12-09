@@ -17,3 +17,4 @@ dist/
 *.db
 .cache/
 output/
+*.bak

@@ -991,6 +991,6 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	}
 	servicePath := filepath.Join(outDir, "service.txt")
 	Success("Log at %s", servicePath)
-	FileWrite(servicePath, "%s", strings.Join(ServiceInfoResults, "\n"))
+	FileWrite(servicePath, "%s", strings.Join(ServiceInfoResults, "\n")+"\n")
 
 }

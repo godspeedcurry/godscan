@@ -98,9 +98,7 @@ func HttpGetServerHeader(Url string, NeedTitle bool, Method string) (string, str
 	return retServerValue, Status, title, nil
 }
 
-func IsVuePath(Path string) bool {
-	// reg := regexp.MustCompile(`(app|index|config|main|chunk)`)
-	// res := reg.FindAllString(Path, -1)
+func IsJavaScriptPath(Path string) bool {
 	return strings.HasSuffix(Path, ".js") && !strings.HasSuffix(Path, ".min.js")
 }
 
@@ -334,7 +332,7 @@ func filterOutUrl(Url string) bool {
 	return false
 }
 
-func parseVueUrl(Url string, RootPath string, doc string, directory string, apiCounter *int, db *sql.DB) {
+func ParseJavaScriptUrl(Url string, RootPath string, doc string, directory string, apiCounter *int, db *sql.DB) {
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
 
@@ -469,8 +467,8 @@ func handleJSAsset(rootPath, fullURL, path string, resp *http.Response, director
 	if sm := sourceMapFromContent(fullURL, bodyStr); sm != "" {
 		probeSourceMap(rootPath, sm, directory, sourceMapSeen, db)
 	}
-	if IsVuePath(path) {
-		parseVueUrl(fullURL, rootPath, bodyStr, directory, apiCounter, db)
+	if IsJavaScriptPath(path) {
+		ParseJavaScriptUrl(fullURL, rootPath, bodyStr, directory, apiCounter, db)
 	}
 	return nil
 }
@@ -740,17 +738,24 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 		RootPath = RootPath + ":" + Host.Port()
 	}
 
-	// 首页
-	FirstUrl := RootPath + Host.Path
-	fres := FingerScan(FirstUrl, http.MethodGet, true)
+	firstURL := RootPath + Host.Path
+	fres := FingerScan(firstURL, http.MethodGet, false)
+	applyFingerResult(&out, fres, Url, RootPath, firstURL, db)
+	trySecondaryFinger(&out, Url, RootPath)
+	handleFaviconFromBody(&out, RootPath, fres.Body)
+	runSpider(&out, RootPath, Url, Depth, db, fres)
+	return out
+}
+
+func applyFingerResult(out *SpiderSummary, fres FingerResult, origURL, rootPath, firstURL string, db *sql.DB) {
 	out.Status = fres.Status
 	out.Finger = fres.Finger
 	out.Title = fres.Title
 	out.ContentType = fres.ContentType
 	out.Length = len(fres.Body)
 	_ = SavePageSnapshot(db, PageSnapshot{
-		RootURL:     RootPath,
-		URL:         FirstUrl,
+		RootURL:     rootPath,
+		URL:         firstURL,
 		Status:      fres.Status,
 		ContentType: fres.ContentType,
 		Headers:     fres.HeadersJSON,
@@ -758,74 +763,84 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 		Length:      len(fres.Body),
 	})
 
-	if fres.Status != -1 {
-		result := CheckFinger(fres.Finger, fres.Title, Url, fres.ContentType, "", fres.Body, fres.Status)
-		if len(result) > 0 {
-			WriteToCsv("finger.csv", result)
-			out.Finger = result[2]
-			out.ContentType = result[3]
-			out.Status, _ = strconv.Atoi(result[4])
-			out.Length, _ = strconv.Atoi(result[6])
-			out.Keyword = result[7]
-			out.SimHash = result[8]
-		}
+	if fres.Status == -1 {
+		return
 	}
+	result := CheckFinger(fres.Finger, fres.Title, origURL, fres.ContentType, "", fres.Body, fres.Status)
+	if len(result) == 0 {
+		return
+	}
+	WriteToCsv("finger.csv", result)
+	out.Finger = result[2]
+	out.ContentType = result[3]
+	out.Status, _ = strconv.Atoi(result[4])
+	out.Length, _ = strconv.Atoi(result[6])
+	out.Keyword = result[7]
+	out.SimHash = result[8]
+}
 
-	// 当首个 GET 无有效指纹时，再补充 POST/404 探针以提高识别率
-	if out.Finger == "" || out.Finger == common.NoFinger {
-		SecondUrl := RootPath + "/xxxxxx"
-		fres2 := FingerScan(SecondUrl, http.MethodPost, true)
-		if fres2.Status != -1 {
-			result := CheckFinger(fres2.Finger, fres2.Title, Url, fres2.ContentType, "", fres2.Body, fres2.Status)
-			if len(result) > 0 && result[2] != common.NoFinger {
-				WriteToCsv("finger.csv", result)
-				out.Finger = result[2]
-				out.Title = fres2.Title
-				out.ContentType = fres2.ContentType
-				out.Status, _ = strconv.Atoi(result[4])
-				out.Length, _ = strconv.Atoi(result[6])
-				out.Keyword = result[7]
-				out.SimHash = result[8]
-			}
-		}
+func trySecondaryFinger(out *SpiderSummary, origURL, rootPath string) {
+	if out.Finger != "" && out.Finger != common.NoFinger {
+		return
 	}
+	fres := FingerScan(rootPath+"/xxxxxx", http.MethodPost, false)
+	if fres.Status == -1 {
+		return
+	}
+	result := CheckFinger(fres.Finger, fres.Title, origURL, fres.ContentType, "", fres.Body, fres.Status)
+	if len(result) == 0 || result[2] == common.NoFinger {
+		return
+	}
+	WriteToCsv("finger.csv", result)
+	out.Finger = result[2]
+	out.Title = fres.Title
+	out.ContentType = fres.ContentType
+	out.Status, _ = strconv.Atoi(result[4])
+	out.Length, _ = strconv.Atoi(result[6])
+	out.Keyword = result[7]
+	out.SimHash = result[8]
+}
 
-	// 仅用已获取的首页 HTML 提取 favicon，找不到则放弃，避免额外请求
-	if iconURL, iconErr := FindFaviconURLFromHTML(RootPath, string(fres.Body)); iconErr == nil {
-		if fofaHash, hunterHash, errHash := IconDetect(iconURL); errHash == nil {
-			out.IconHash = fmt.Sprintf("fofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"", fofaHash, hunterHash)
-			var icon_hash_map map[string]interface{}
-			json.Unmarshal([]byte(icon_json), &icon_hash_map)
-			if tmp := icon_hash_map[fofaHash]; tmp != nil {
-				Debug("icon_url=\"%s\" icon_finger=\"%s\"", iconURL, tmp)
-			}
-		} else {
-			Debug("%s", errHash)
-		}
+func handleFaviconFromBody(out *SpiderSummary, rootPath string, body []byte) {
+	iconURL, iconErr := FindFaviconURLFromHTML(rootPath, string(body))
+	if iconErr != nil {
+		return
 	}
-	// 爬虫递归爬
+	if fofaHash, hunterHash, errHash := IconDetect(iconURL); errHash == nil {
+		out.IconHash = fmt.Sprintf("fofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"", fofaHash, hunterHash)
+		var icon_hash_map map[string]interface{}
+		json.Unmarshal([]byte(icon_json), &icon_hash_map)
+		if tmp := icon_hash_map[fofaHash]; tmp != nil {
+			Debug("icon_url=\"%s\" icon_finger=\"%s\"", iconURL, tmp)
+		}
+	} else {
+		Debug("%s", errHash)
+	}
+}
+
+func runSpider(out *SpiderSummary, rootPath, origURL string, depth int, db *sql.DB, fres FingerResult) {
 	myMap := mapset.NewSet()
 	sourceMapSeen := mapset.NewSet()
-	host, err := url.Parse(RootPath)
+	host, err := url.Parse(rootPath)
 	if err != nil {
 		Error("%s", err)
 		out.Err = err
-		return out
+		return
 	}
 	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
 	apiCounter := 0
-	err = Spider(RootPath, Url, Depth, directory, myMap, sourceMapSeen, &apiCounter, db, &prefetchedPage{
+	err = Spider(rootPath, origURL, depth, directory, myMap, sourceMapSeen, &apiCounter, db, &prefetchedPage{
 		body:        string(fres.Body),
 		contentType: fres.ContentType,
 	})
 	if err != nil {
 		Error("%s", err)
 		out.Err = err
-		return out
+		return
 	}
 	out.SaveDir = directory
 	out.ApiCount = apiCounter
-	ApiDeDuplicate(RootPath, directory)
+	ApiDeDuplicate(rootPath, directory)
 
 	var myList []string
 	for item := range myMap.Iter() {
@@ -837,10 +852,9 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	out.CDNHosts = strings.Join(cdnHosts, ",")
 	if len(cdnHosts) > 0 {
 		FileWrite(directory+"cdn_hosts.txt", "%s\n", strings.Join(cdnHosts, "\n"))
-		SaveCDNHosts(db, RootPath, cdnHosts)
+		SaveCDNHosts(db, rootPath, cdnHosts)
 	}
 	FileWrite(directory+"spider.log", "%s\n", strings.Join(myList, "\n"))
-	return out
 }
 
 func collectCDNHosts(urls []string) []string {

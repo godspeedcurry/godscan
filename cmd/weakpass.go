@@ -44,7 +44,7 @@ func init() {
 
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Full, "full", "", false, "full mode")
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.ListFormat, "list", "l", false, "python list output")
-	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Variant, "variant", "", false, "if variant, eg: i -> 1")
+	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Variant, "variant", "", false, "enable leetspeak variants (a/@, s/5, o/0, i/1, l/!, S/$, plus table mix)")
 	weakpassCmd.PersistentFlags().BoolVarP(&weakPassOptions.Show, "show", "", false, "show the entire list")
 
 	viper.BindPFlag("keyword", weakpassCmd.PersistentFlags().Lookup("keyword"))

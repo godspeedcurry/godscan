@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strings"
 
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/spf13/cobra"
@@ -21,7 +20,6 @@ type SearchOptions struct {
 	MaxResult  int
 	DbPath     string
 	IgnoreCase bool
-	Tables     []string
 }
 
 var searchOptions SearchOptions
@@ -45,7 +43,6 @@ func init() {
 	searchCmd.Flags().IntVar(&searchOptions.MaxResult, "limit", 200, "max results to display")
 	searchCmd.Flags().StringVar(&searchOptions.DbPath, "db", "spider.db", "path to spider.db")
 	searchCmd.Flags().BoolVarP(&searchOptions.IgnoreCase, "ignore-case", "i", false, "case-insensitive regex")
-	searchCmd.Flags().StringSliceVar(&searchOptions.Tables, "table", []string{"api", "sensitive", "map", "page"}, "tables to search: api,sensitive,map,page")
 	rootCmd.AddCommand(searchCmd)
 }
 
@@ -64,7 +61,7 @@ func runSearch(opt SearchOptions) error {
 		return err
 	}
 
-	cfg := normalizeTables(opt.Tables)
+	cfg := searchTables{api: true, sensitive: true, maps: true, pages: true}
 	apiRows, sensRows, mapRows, pageRows, err := loadSearchRows(db, opt.UrlLike, cfg)
 	if err != nil {
 		return err
@@ -99,17 +96,17 @@ type pageRow struct {
 	Body    string
 }
 
+type hit struct {
+	Source string
+	Field  string
+	Value  string
+}
+
 type searchTables struct {
 	api       bool
 	sensitive bool
 	maps      bool
 	pages     bool
-}
-
-type hit struct {
-	Source string
-	Field  string
-	Value  string
 }
 
 func validateSearchOpts(opt SearchOptions) error {
@@ -128,27 +125,6 @@ func buildRegex(pattern string, ignoreCase bool) (*regexp.Regexp, error) {
 		flags = "(?i)"
 	}
 	return regexp.Compile(flags + pattern)
-}
-
-func normalizeTables(tbls []string) searchTables {
-	cfg := searchTables{}
-	for _, t := range tbls {
-		t = strings.ToLower(strings.TrimSpace(t))
-		switch t {
-		case "api":
-			cfg.api = true
-		case "sensitive":
-			cfg.sensitive = true
-		case "map", "sourcemap", "sourcemaps":
-			cfg.maps = true
-		case "page", "body", "header":
-			cfg.pages = true
-		}
-	}
-	if !cfg.api && !cfg.sensitive && !cfg.maps && !cfg.pages {
-		cfg = searchTables{api: true, sensitive: true, maps: true, pages: true}
-	}
-	return cfg
 }
 
 func loadSearchRows(db *sql.DB, like string, cfg searchTables) ([]apiRow, []utils.SensitiveHit, []sourceMapRow, []pageRow, error) {
