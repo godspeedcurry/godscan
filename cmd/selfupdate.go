@@ -20,7 +20,7 @@ var (
 
 var selfUpdateCmd = &cobra.Command{
 	Use:   "self-update",
-	Short: "下载并将 godscan 更新到最新发布版本（默认安全模式：校验 + 备份）",
+	Short: "Download and replace with the latest release (checksum + backup by default)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := context.Background()
 		tag, err := utils.SelfUpdate(ctx, utils.SelfUpdateOptions{
