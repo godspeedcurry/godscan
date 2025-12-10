@@ -75,27 +75,7 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "godscan",
 	Short: bannerText() + "Let's fight against the world.",
-	Long: `godscan - web recon, API extraction, weakpass generator, port fingerprint.
-
-Quick usage:
-  godscan sp -u https://example.com          # spider (alias: sp, ss)
-  godscan sp -f urls.txt                     # spider from file (alias: --url-file, -f, -uf)
-  godscan dir -u https://example.com         # dirbrute (alias: dirb, dd)
-  godscan port -i 1.2.3.4/28 -p 80,443       # port scan (alias: pp)
-  godscan icon -u https://example.com/ico.ico
-  godscan weak -k "foo,bar"                  # weakpass generator
-
-Global flags (common):
-  -u, --url            single target URL
-  -f, --url-file       file with URLs (also accepts -uf file)
-      --host / --host-file   IP/domain list for port scan
-  -e, --filter         filter substrings
-  -H, --headers        custom headers
-  -o, --output         log/result file (default result.log)
-      --proxy          HTTP(S)/SOCKS proxy
-      --private-ip     include private IP ranges
-      --ua             custom User-Agent
-      --loglevel       0=minimal, 2=default, 6=debug`,
+	Long:  `godscan - web recon, API extraction, weakpass generator, port fingerprint.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		maybeCheckForUpdate()
 	},
