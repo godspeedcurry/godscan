@@ -29,6 +29,9 @@ godscan grep "elastic"   # body/header
 godscan dir -u https://example.com
 godscan port -i '1.2.3.4/28,example.com' -p 80,443
 godscan weak -k "foo,bar" --full
+
+# Export offline HTML report (large tables with paging/search)
+godscan report --html report.html
 ```
 
 ## Output

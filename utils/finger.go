@@ -854,6 +854,7 @@ func runSpider(out *SpiderSummary, rootPath, origURL string, depth int, db *sql.
 		FileWrite(directory+"cdn_hosts.txt", "%s\n", strings.Join(cdnHosts, "\n"))
 		SaveCDNHosts(db, rootPath, cdnHosts)
 	}
+	myList = RemoveDuplicatesString(myList)
 	FileWrite(directory+"spider.log", "%s\n", strings.Join(myList, "\n"))
 }
 

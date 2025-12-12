@@ -37,6 +37,9 @@ godscan grep "elastic"   # body/header 查询
 godscan dir -u https://example.com
 godscan port -i '1.2.3.4/28,example.com' -p 80,443
 godscan weak -k "foo,bar" --full
+
+# 导出离线 HTML 报表（大规模表格，自带分页/搜索）
+godscan report --html report.html
 ```
 
 ## 3. 基础功能

@@ -292,17 +292,15 @@ func autoExportReport(db *sql.DB) {
 	if db == nil {
 		return
 	}
-	tmp := filepath.Join(".", "report.xlsx.tmp")
-	final := filepath.Join(".", "report.xlsx")
-	if err := exportXLSX(db, tmp); err != nil {
-		utils.Error("auto-export xlsx failed: %v", err)
+	now := time.Now()
+	outDir := "output"
+	_ = os.MkdirAll(outDir, 0o755)
+	final := filepath.Join(outDir, fmt.Sprintf("report-%04d-%02d-%02d.html", now.Year(), now.Month(), now.Day()))
+	if err := utils.ExportHTMLReport(db, final); err != nil {
+		utils.Error("auto-export html failed: %v", err)
 		return
 	}
-	if err := os.Rename(tmp, final); err != nil {
-		utils.Error("rename report.xlsx failed: %v", err)
-		return
-	}
-	utils.Success("report.xlsx updated")
+	utils.Success("HTML report updated: %s", final)
 }
 
 func writeSpiderJSONSummary(summaries []utils.SpiderSummary) {

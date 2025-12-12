@@ -10,14 +10,14 @@ import (
 )
 
 type SpiderRecord struct {
-	Url      string
-	IconHash string
-	ApiCount int
-	UrlCount int
-	CDNCount int
-	CDNHosts string
-	SaveDir  string
-	Status   int
+	Url      string `json:"Url"`
+	IconHash string `json:"IconHash"`
+	ApiCount int    `json:"ApiCount"`
+	UrlCount int    `json:"UrlCount"`
+	CDNCount int    `json:"CDNCount"`
+	CDNHosts string `json:"CDNHosts"`
+	SaveDir  string `json:"SaveDir"`
+	Status   int    `json:"Status"`
 }
 
 func InitSpiderDB(path string) (*sql.DB, error) {
@@ -280,8 +280,8 @@ func LoadCDNHosts(db *sql.DB) ([]CDNHostRow, error) {
 }
 
 type SensitiveCount struct {
-	Category string
-	Count    int
+	Category string `json:"category"`
+	Count    int    `json:"count"`
 }
 
 func LoadSensitiveCounts(db *sql.DB) ([]SensitiveCount, error) {
@@ -302,19 +302,19 @@ func LoadSensitiveCounts(db *sql.DB) ([]SensitiveCount, error) {
 }
 
 type EntropyHit struct {
-	SourceURL string
-	Category  string
-	Content   string
-	Entropy   float64
-	SaveDir   string
+	SourceURL string  `json:"source_url"`
+	Category  string  `json:"category"`
+	Content   string  `json:"content"`
+	Entropy   float64 `json:"entropy"`
+	SaveDir   string  `json:"save_dir"`
 }
 
 type SensitiveHit struct {
-	SourceURL string
-	Category  string
-	Content   string
-	Entropy   float64
-	SaveDir   string
+	SourceURL string  `json:"source_url"`
+	Category  string  `json:"category"`
+	Content   string  `json:"content"`
+	Entropy   float64 `json:"entropy"`
+	SaveDir   string  `json:"save_dir"`
 }
 
 func SaveSensitiveHits(db *sql.DB, hits []SensitiveHit) error {
@@ -374,22 +374,115 @@ func LoadSensitiveHits(db *sql.DB) ([]SensitiveHit, error) {
 	return out, rows.Err()
 }
 
+type APIPathRow struct {
+	RootURL   string `json:"root_url"`
+	SourceURL string `json:"source_url"`
+	Path      string `json:"path"`
+	SaveDir   string `json:"save_dir"`
+}
+
+func LoadAPIPaths(db *sql.DB) ([]APIPathRow, error) {
+	rows, err := db.Query(`SELECT root_url, source_url, path, save_dir FROM api_paths ORDER BY root_url, path`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []APIPathRow
+	for rows.Next() {
+		var r APIPathRow
+		if err := rows.Scan(&r.RootURL, &r.SourceURL, &r.Path, &r.SaveDir); err != nil {
+			return nil, err
+		}
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func LoadSourceMaps(db *sql.DB) ([]SourceMapHit, error) {
+	rows, err := db.Query(`SELECT root_url, js_url, map_url, status, length FROM source_maps ORDER BY root_url, map_url`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SourceMapHit
+	for rows.Next() {
+		var h SourceMapHit
+		if err := rows.Scan(&h.RootURL, &h.JSURL, &h.MapURL, &h.Status, &h.Length); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+func LoadPageSnapshotMeta(db *sql.DB) ([]PageSnapshotMeta, error) {
+	rows, err := db.Query(`SELECT root_url, url, status, content_type, length FROM page_snapshots ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PageSnapshotMeta
+	for rows.Next() {
+		var p PageSnapshotMeta
+		if err := rows.Scan(&p.RootURL, &p.URL, &p.Status, &p.ContentType, &p.Length); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func LoadPageSnapshotLite(db *sql.DB) ([]PageSnapshotLite, error) {
+	rows, err := db.Query(`SELECT root_url, url, status, content_type, length, headers, substr(body,1,800) FROM page_snapshots ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PageSnapshotLite
+	for rows.Next() {
+		var p PageSnapshotLite
+		if err := rows.Scan(&p.RootURL, &p.URL, &p.Status, &p.ContentType, &p.Length, &p.Headers, &p.Snippet); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 type SourceMapHit struct {
-	RootURL string
-	JSURL   string
-	MapURL  string
-	Status  int
-	Length  int
+	RootURL string `json:"root_url"`
+	JSURL   string `json:"js_url"`
+	MapURL  string `json:"map_url"`
+	Status  int    `json:"status"`
+	Length  int    `json:"length"`
 }
 
 type PageSnapshot struct {
-	RootURL     string
-	URL         string
-	Status      int
-	ContentType string
-	Headers     string
-	Body        string
-	Length      int
+	RootURL     string `json:"root_url"`
+	URL         string `json:"url"`
+	Status      int    `json:"status"`
+	ContentType string `json:"content_type"`
+	Headers     string `json:"headers"`
+	Body        string `json:"body"`
+	Length      int    `json:"length"`
+}
+type PageSnapshotMeta struct {
+	RootURL     string `json:"root_url"`
+	URL         string `json:"url"`
+	Status      int    `json:"status"`
+	ContentType string `json:"content_type"`
+	Length      int    `json:"length"`
+}
+
+// PageSnapshotLite includes a short body snippet and headers for drill-downs.
+type PageSnapshotLite struct {
+	RootURL     string `json:"root_url"`
+	URL         string `json:"url"`
+	Status      int    `json:"status"`
+	ContentType string `json:"content_type"`
+	Length      int    `json:"length"`
+	Headers     string `json:"headers"`
+	Snippet     string `json:"snippet"`
 }
 
 func SaveSourceMaps(db *sql.DB, hits []SourceMapHit) error {
