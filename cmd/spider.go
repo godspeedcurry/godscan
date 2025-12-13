@@ -48,14 +48,16 @@ func init() {
 	viper.SetDefault("spider-threads", 20)
 	viper.BindPFlag("spider-progress-log", spiderCmd.PersistentFlags().Lookup("progress-log"))
 	viper.SetDefault("spider-progress-log", true)
+	viper.SetDefault("spider-timeout-per-host", 90)
+	viper.SetDefault("spider-graph-max-edges", 5000)
+	viper.SetDefault("spider-max-urls-per-host", 2000)
 
 }
 
 type spiderContext struct {
-	started   int32
-	processed int32
-	finished  int32
-	doneCh    chan struct{}
+	started  int32
+	finished int32
+	doneCh   chan struct{}
 }
 
 func spawnSpiderWorkers(targets []string, depth int, db *sql.DB, progressLog bool) (*sync.WaitGroup, chan utils.SpiderSummary, *spiderContext) {
@@ -108,7 +110,7 @@ func heartbeat(progressLog bool, ctx *spiderContext, total int) {
 				return
 			case <-ticker.C:
 				curStart := atomic.LoadInt32(&ctx.started)
-				curDone := atomic.LoadInt32(&ctx.processed)
+				curDone := atomic.LoadInt32(&ctx.finished)
 				inflight := curStart - curDone
 				if inflight < 0 {
 					inflight = 0
@@ -217,12 +219,15 @@ func (c *spiderCollector) processResult(res utils.SpiderSummary) {
 	c.mu.Lock()
 	c.summaries = append(c.summaries, res)
 	if err := utils.SaveSpiderSummary(utils.GetSpiderDB(), utils.SpiderRecord{
-		Url:      res.URL,
-		IconHash: res.IconHash,
-		ApiCount: res.ApiCount,
-		UrlCount: res.UrlCount,
-		SaveDir:  res.SaveDir,
-		Status:   res.Status,
+		Url:        res.URL,
+		IconHash:   res.IconHash,
+		IconBase64: res.IconBase64,
+		ApiCount:   res.ApiCount,
+		UrlCount:   res.UrlCount,
+		CDNCount:   res.CDNCount,
+		CDNHosts:   res.CDNHosts,
+		SaveDir:    res.SaveDir,
+		Status:     res.Status,
 	}); err != nil {
 		utils.Error("db save failed: %v", err)
 	}
@@ -256,8 +261,15 @@ func (o *SpiderOptions) validateOptions() error {
 func (o *SpiderOptions) run() {
 	start := time.Now()
 	utils.InitHttp()
+	outDir := viper.GetString("output-dir")
+	if outDir == "" {
+		outDir = "output"
+	}
+	_ = os.MkdirAll(outDir, 0o755)
 	targets := GetTargetList()
 	utils.Info("Total: %d url(s)", len(targets))
+	utils.GetGraphCollector().Reset()
+	utils.GetGraphCollector().SetLimit(viper.GetInt("spider-graph-max-edges"))
 
 	db, err := utils.InitSpiderDB("spider.db")
 	if err != nil {
@@ -277,6 +289,7 @@ func (o *SpiderOptions) run() {
 	close(ctx.doneCh)
 	renderSpiderTable(table)
 	writeSpiderJSONSummary(summaries)
+	writeSpiderGraph(outDir, db)
 	utils.Info("Data persisted to spider.db (run `godscan report` to view)")
 	autoExportReport(db)
 
@@ -303,6 +316,26 @@ func autoExportReport(db *sql.DB) {
 	utils.Success("HTML report updated: %s", final)
 }
 
+func writeSpiderGraph(outDir string, db *sql.DB) {
+	edges := utils.GetGraphCollector().Snapshot()
+	if len(edges) == 0 {
+		return
+	}
+	if outDir == "" {
+		outDir = "."
+	}
+	path := filepath.Join(outDir, "graph.json")
+	if err := utils.SaveGraphJSON(path, edges); err != nil {
+		utils.Debug("failed to write graph.json: %v", err)
+	}
+	if err := utils.SaveGraphDB(db, edges); err != nil {
+		utils.Debug("failed to save graph_edges: %v", err)
+	} else {
+		utils.Debug("graph_edges saved (%d edges)", len(edges))
+	}
+	utils.Info("graph.json saved to %s (edges: %d)", path, len(edges))
+}
+
 func writeSpiderJSONSummary(summaries []utils.SpiderSummary) {
 	if len(summaries) == 0 {
 		return
@@ -317,6 +350,7 @@ func writeSpiderJSONSummary(summaries []utils.SpiderSummary) {
 		Keyword     string   `json:"keyword"`
 		SimHash     string   `json:"simhash"`
 		IconHash    string   `json:"icon_hash"`
+		IconBase64  string   `json:"icon_base64"`
 		ApiCount    int      `json:"api_count"`
 		UrlCount    int      `json:"url_count"`
 		CDNCount    int      `json:"cdn_count"`
@@ -344,6 +378,7 @@ func writeSpiderJSONSummary(summaries []utils.SpiderSummary) {
 			Keyword:     s.Keyword,
 			SimHash:     s.SimHash,
 			IconHash:    s.IconHash,
+			IconBase64:  s.IconBase64,
 			ApiCount:    s.ApiCount,
 			UrlCount:    s.UrlCount,
 			CDNCount:    s.CDNCount,

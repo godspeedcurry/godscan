@@ -6,8 +6,10 @@ import (
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/godspeedcurry/godscan/common"
+	"github.com/spf13/viper"
 )
 
 // TestIconDetectAutoPage ensures icon detection fetches page once and icon once.
@@ -37,12 +39,15 @@ func TestIconDetectAutoPage(t *testing.T) {
 		Client, ClientNoRedirect = oldClient, oldNoRedirect
 	}()
 
-	fofa, hunter, err := IconDetectAuto(srv.URL)
+	fofa, hunter, iconB64, err := IconDetectAuto(srv.URL)
 	if err != nil {
 		t.Fatalf("IconDetectAuto error: %v", err)
 	}
 	if fofa == "" || hunter == "" {
 		t.Fatalf("expected non-empty hashes, got fofa=%q hunter=%q", fofa, hunter)
+	}
+	if iconB64 == "" {
+		t.Fatalf("expected base64 icon content, got empty")
 	}
 	if got := atomic.LoadInt32(&pageHits); got != 1 {
 		t.Fatalf("page hits = %d, want 1", got)
@@ -108,6 +113,34 @@ func TestFingerScanFollowRedirect(t *testing.T) {
 	}
 	if res.Err != nil {
 		t.Fatalf("unexpected error: %v", res.Err)
+	}
+}
+
+// TestFingerSummaryTimeout ensures per-host timeout cancels slow targets.
+func TestFingerSummaryTimeout(t *testing.T) {
+	srv := mustTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(2 * time.Second)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	// Tight timeout to force cancellation.
+	oldTimeout := viper.GetInt("spider-timeout-per-host")
+	viper.Set("spider-timeout-per-host", 1)
+	t.Cleanup(func() { viper.Set("spider-timeout-per-host", oldTimeout) })
+
+	oldClient, oldNoRedirect := Client, ClientNoRedirect
+	Client, ClientNoRedirect = srv.Client(), srv.Client()
+	defer func() {
+		Client, ClientNoRedirect = oldClient, oldNoRedirect
+	}()
+
+	res := FingerSummary(srv.URL, 1, nil)
+	if res.Err == nil {
+		t.Fatalf("expected timeout error")
+	}
+	if res.Status != -1 {
+		t.Fatalf("status = %d, want -1 on timeout", res.Status)
 	}
 }
 

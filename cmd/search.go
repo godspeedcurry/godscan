@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/spf13/cobra"
@@ -20,6 +21,8 @@ type SearchOptions struct {
 	MaxResult  int
 	DbPath     string
 	IgnoreCase bool
+	Columns    []int
+	ColumnStr  string
 }
 
 var searchOptions SearchOptions
@@ -43,6 +46,7 @@ func init() {
 	searchCmd.Flags().IntVar(&searchOptions.MaxResult, "limit", 200, "max results to display")
 	searchCmd.Flags().StringVar(&searchOptions.DbPath, "db", "spider.db", "path to spider.db")
 	searchCmd.Flags().BoolVarP(&searchOptions.IgnoreCase, "ignore-case", "i", false, "case-insensitive regex")
+	searchCmd.Flags().StringVar(&searchOptions.ColumnStr, "columns", "1,2,3", "select output columns (1=source,2=field,3=value), e.g. --columns 1,3")
 	rootCmd.AddCommand(searchCmd)
 }
 
@@ -50,6 +54,11 @@ func runSearch(opt SearchOptions) error {
 	if err := validateSearchOpts(opt); err != nil {
 		return err
 	}
+	cols, err := parseColumns(opt.ColumnStr)
+	if err != nil {
+		return err
+	}
+	opt.Columns = cols
 	db, err := utils.InitSpiderDB(opt.DbPath)
 	if err != nil {
 		return fmt.Errorf("open db failed: %w", err)
@@ -73,7 +82,7 @@ func runSearch(opt SearchOptions) error {
 		return nil
 	}
 	hits = limitHits(hits, opt.MaxResult)
-	printHits(hits)
+	printHits(hits, opt.Columns)
 	writeHitsJSON(hits)
 	return nil
 }
@@ -125,6 +134,40 @@ func buildRegex(pattern string, ignoreCase bool) (*regexp.Regexp, error) {
 		flags = "(?i)"
 	}
 	return regexp.Compile(flags + pattern)
+}
+
+func parseColumns(colStr string) ([]int, error) {
+	if strings.TrimSpace(colStr) == "" {
+		return []int{1, 2, 3}, nil
+	}
+	parts := strings.Split(colStr, ",")
+	seen := make(map[int]struct{})
+	var cols []int
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		switch p {
+		case "1", "source":
+			seen[1] = struct{}{}
+		case "2", "field":
+			seen[2] = struct{}{}
+		case "3", "value":
+			seen[3] = struct{}{}
+		default:
+			return nil, fmt.Errorf("invalid column %q (use 1,2,3 or names source,field,value)", p)
+		}
+	}
+	for i := 1; i <= 3; i++ {
+		if _, ok := seen[i]; ok {
+			cols = append(cols, i)
+		}
+	}
+	if len(cols) == 0 {
+		cols = []int{1, 2, 3}
+	}
+	return cols, nil
 }
 
 func loadSearchRows(db *sql.DB, like string, cfg searchTables) ([]apiRow, []utils.SensitiveHit, []sourceMapRow, []pageRow, error) {
@@ -210,9 +253,20 @@ func limitHits(h []hit, max int) []hit {
 	return h[:max]
 }
 
-func printHits(hits []hit) {
+func printHits(hits []hit, cols []int) {
 	for _, h := range hits {
-		fmt.Printf("%s\t[%s]\t%s\n", h.Source, h.Field, h.Value)
+		parts := make([]string, 0, len(cols))
+		for _, c := range cols {
+			switch c {
+			case 1:
+				parts = append(parts, h.Source)
+			case 2:
+				parts = append(parts, "["+h.Field+"]")
+			case 3:
+				parts = append(parts, h.Value)
+			}
+		}
+		fmt.Println(strings.Join(parts, "\t"))
 	}
 }
 

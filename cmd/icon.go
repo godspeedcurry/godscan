@@ -37,10 +37,10 @@ func (o *IconOptions) run() {
 		utils.Error("%v", err)
 		return
 	}
-	fofa, hunter, err := utils.IconDetect(iconURL)
+	fofa, hunter, iconB64, err := utils.IconDetect(iconURL)
 	if err != nil {
 		utils.Error("%v", err)
 		return
 	}
-	utils.Info("icon_url: %s\nfofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"\n", iconURL, fofa, hunter)
+	utils.Info("icon_url: %s\nfofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"\nbase64 (len=%d): %s\n", iconURL, fofa, hunter, len(iconB64), iconB64)
 }

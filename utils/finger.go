@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	"database/sql"
 	_ "embed"
@@ -50,6 +51,7 @@ type SpiderSummary struct {
 	Keyword     string
 	SimHash     string
 	IconHash    string
+	IconBase64  string
 	ApiCount    int
 	UrlCount    int
 	CDNCount    int
@@ -332,6 +334,14 @@ func filterOutUrl(Url string) bool {
 	return false
 }
 
+func isUsefulAPIPath(path string) bool {
+	lp := strings.ToLower(path)
+	if strings.HasPrefix(lp, "/vnd.") || strings.HasPrefix(lp, "/dd") || strings.HasPrefix(lp, "/mm") || strings.HasPrefix(lp, "/yy") || strings.HasPrefix(lp, "/x-") {
+		return false
+	}
+	return true
+}
+
 func ParseJavaScriptUrl(Url string, RootPath string, doc string, directory string, apiCounter *int, db *sql.DB) {
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
@@ -340,7 +350,11 @@ func ParseJavaScriptUrl(Url string, RootPath string, doc string, directory strin
 	ApiResult := []string{}
 
 	for _, tmp := range ApiResultTuple {
-		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+tmp[1])
+		apiPath := tmp[1]
+		if !isUsefulAPIPath(apiPath) {
+			continue
+		}
+		ApiResult = append(ApiResult, viper.GetString("ApiPrefix")+apiPath)
 	}
 	ApiResult = RemoveDuplicatesString(ApiResult)
 	ApiResultLen := len(ApiResult)
@@ -423,6 +437,11 @@ type prefetchedPage struct {
 }
 
 func Spider(RootPath string, Url string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB, cached *prefetchedPage) error {
+	maxURLs := viper.GetInt("spider-max-urls-per-host")
+	if maxURLs > 0 && myMap.Cardinality() >= maxURLs {
+		Debug("quota reached (%d urls) for %s, skip %s", maxURLs, RootPath, Url)
+		return nil
+	}
 	if uselessUrl(Url, depth) || filterOutUrl(Url) {
 		return nil
 	}
@@ -483,7 +502,7 @@ func readBodyString(resp *http.Response) string {
 	return string(bodyBuf)
 }
 
-func crawlLinks(doc *goquery.Document, rootPath string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) {
+func crawlLinks(doc *goquery.Document, rootPath string, currentURL string, depth int, directory string, myMap mapset.Set, sourceMapSeen mapset.Set, apiCounter *int, db *sql.DB) {
 	doc.Find("a, link").Each(func(i int, selector *goquery.Selection) {
 		href, _ := selector.Attr("href")
 		if href == "" {
@@ -491,6 +510,7 @@ func crawlLinks(doc *goquery.Document, rootPath string, depth int, directory str
 		}
 		normalizeUrl := Normalize(href, rootPath)
 		if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
+			GetGraphCollector().AddEdge(rootPath, currentURL, normalizeUrl, depth)
 			Spider(rootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db, nil)
 		}
 	})
@@ -504,6 +524,7 @@ func crawlLinks(doc *goquery.Document, rootPath string, depth int, directory str
 			probeSourceMap(rootPath, normalizeUrl, directory, sourceMapSeen, db)
 		}
 		if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
+			GetGraphCollector().AddEdge(rootPath, currentURL, normalizeUrl, depth)
 			Spider(rootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db, nil)
 		}
 	})
@@ -526,7 +547,7 @@ func handleHTMLContent(rootPath, Url string, depth int, directory string, myMap 
 		sensitiveUrl.Store(Url, true)
 		SensitiveInfoCollect(db, Url, bodyStr, directory)
 	}
-	crawlLinks(doc, rootPath, depth, directory, myMap, sourceMapSeen, apiCounter, db)
+	crawlLinks(doc, rootPath, Url, depth, directory, myMap, sourceMapSeen, apiCounter, db)
 	return nil
 }
 
@@ -556,14 +577,14 @@ func StandBase64(braw []byte) []byte {
 //go:embed icon.json
 var icon_json string
 
-func IconDetect(Url string) (string, string, error) {
+func IconDetect(Url string) (string, string, string, error) {
 	req, _ := http.NewRequest(http.MethodGet, Url, nil)
 	SetHeaders(req)
 	resp, err := Client.Do(req)
 
 	if err != nil {
 		logRequestError(Url, err)
-		return "", "", err
+		return "", "", "", err
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := io.ReadAll(resp.Body)
@@ -572,14 +593,14 @@ func IconDetect(Url string) (string, string, error) {
 	hash := md5.Sum(bodyBytes)
 	hunterIco := hex.EncodeToString(hash[:])
 
-	return ico, hunterIco, nil
+	return ico, hunterIco, b64.StdEncoding.EncodeToString(bodyBytes), nil
 }
 
 // IconDetectAuto accepts either a direct favicon URL or a page URL and extracts the rel=icon href.
-func IconDetectAuto(target string) (string, string, error) {
+func IconDetectAuto(target string) (string, string, string, error) {
 	u, err := url.Parse(target)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	if strings.HasSuffix(strings.ToLower(u.Path), ".ico") {
 		return IconDetect(target)
@@ -587,7 +608,7 @@ func IconDetectAuto(target string) (string, string, error) {
 	// 直接复用页面解析逻辑（单次请求页面获取 rel=icon）
 	iconURL, err := FindFaviconURL(target)
 	if err != nil {
-		return "", "", err
+		return "", "", "", err
 	}
 	return IconDetect(iconURL)
 }
@@ -739,11 +760,36 @@ func FingerSummary(Url string, Depth int, db *sql.DB) SpiderSummary {
 	}
 
 	firstURL := RootPath + Host.Path
+	timeout := viper.GetInt("spider-timeout-per-host")
+	if timeout <= 0 {
+		timeout = 90
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
+	defer cancel()
+	type res struct {
+		summary SpiderSummary
+	}
+	done := make(chan res, 1)
+	go func() {
+		f := runFingerSummary(firstURL, Url, RootPath, Depth, db)
+		done <- res{summary: f}
+	}()
+	select {
+	case r := <-done:
+		return r.summary
+	case <-ctx.Done():
+		out.Err = fmt.Errorf("timeout after %ds", timeout)
+		return out
+	}
+}
+
+func runFingerSummary(firstURL, origURL, rootPath string, Depth int, db *sql.DB) SpiderSummary {
+	out := SpiderSummary{URL: origURL, Status: -1}
 	fres := FingerScan(firstURL, http.MethodGet, false)
-	applyFingerResult(&out, fres, Url, RootPath, firstURL, db)
-	trySecondaryFinger(&out, Url, RootPath)
-	handleFaviconFromBody(&out, RootPath, fres.Body)
-	runSpider(&out, RootPath, Url, Depth, db, fres)
+	applyFingerResult(&out, fres, origURL, rootPath, firstURL, db)
+	trySecondaryFinger(&out, origURL, rootPath)
+	handleFaviconFromBody(&out, rootPath, fres.Body)
+	runSpider(&out, rootPath, origURL, Depth, db, fres)
 	return out
 }
 
@@ -806,8 +852,9 @@ func handleFaviconFromBody(out *SpiderSummary, rootPath string, body []byte) {
 	if iconErr != nil {
 		return
 	}
-	if fofaHash, hunterHash, errHash := IconDetect(iconURL); errHash == nil {
+	if fofaHash, hunterHash, iconB64, errHash := IconDetect(iconURL); errHash == nil {
 		out.IconHash = fmt.Sprintf("fofa: icon_hash=\"%s\"\nhunter: web.icon=\"%s\"", fofaHash, hunterHash)
+		out.IconBase64 = iconB64
 		var icon_hash_map map[string]interface{}
 		json.Unmarshal([]byte(icon_json), &icon_hash_map)
 		if tmp := icon_hash_map[fofaHash]; tmp != nil {

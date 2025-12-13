@@ -7,31 +7,39 @@ import (
 	"html/template"
 	"net/url"
 	"os"
+	"strings"
 	"time"
+
+	"github.com/godspeedcurry/godscan/common"
+	"path/filepath"
 )
 
 type HTMLReportData struct {
-	GeneratedAt string
-	Summary     []SpiderRecord
-	APIs        []APIPathRow
-	Sensitive   []SensitiveHit
-	SourceMaps  []SourceMapHit
-	Pages       []PageSnapshotMeta
-	PageBodies  []PageSnapshotLite
-	Scores      []ScoredRow
-	CDNHosts    []CDNHostRow
+	GeneratedAt   string
+	Summary       []SpiderRecord
+	APIs          []APIPathRow
+	Sensitive     []SensitiveHit
+	SourceMaps    []SourceMapHit
+	Pages         []PageSnapshotMeta
+	PageBodies    []PageSnapshotLite
+	Scores        []ScoredRow
+	CDNHosts      []CDNHostRow
+	Graph         []GraphEdge
+	ImportantAPIs []string
 }
 
 type ScoredRow struct {
-	RootURL   string   `json:"root_url"`
-	Score     int      `json:"score"`
-	Status    int      `json:"status"`
-	ApiCount  int      `json:"api_count"`
-	UrlCount  int      `json:"url_count"`
-	CDNCount  int      `json:"cdn_count"`
-	SaveDir   string   `json:"save_dir"`
-	Reasons   []string `json:"reasons"`
-	RiskFlags []string `json:"risk_flags"`
+	RootURL   string         `json:"root_url"`
+	Score     int            `json:"score"`
+	Status    int            `json:"status"`
+	ApiCount  int            `json:"api_count"`
+	Important int            `json:"important_api"`
+	UrlCount  int            `json:"url_count"`
+	CDNCount  int            `json:"cdn_count"`
+	SaveDir   string         `json:"save_dir"`
+	Reasons   []string       `json:"reasons"`
+	RiskFlags []string       `json:"risk_flags"`
+	DebugMeta map[string]any `json:"debug_meta"`
 }
 
 func ExportHTMLReport(db *sql.DB, outputPath string) error {
@@ -64,24 +72,62 @@ func ExportHTMLReport(db *sql.DB, outputPath string) error {
 		return err
 	}
 
+	graph, _ := LoadGraphDB(db, 2000)
+	if len(graph) == 0 {
+		graph, _ = LoadGraphJSON(defaultGraphPath(outputPath))
+	}
+
 	data := HTMLReportData{
-		GeneratedAt: time.Now().Format(time.RFC3339),
-		Summary:     summary,
-		APIs:        apis,
-		Sensitive:   sens,
-		SourceMaps:  smaps,
-		Pages:       pages,
-		PageBodies:  pageBodies,
-		CDNHosts:    cdns,
+		GeneratedAt:   time.Now().Format(time.RFC3339),
+		Summary:       summary,
+		APIs:          apis,
+		Sensitive:     sens,
+		SourceMaps:    smaps,
+		Pages:         pages,
+		PageBodies:    pageBodies,
+		CDNHosts:      cdns,
+		Graph:         graph,
+		ImportantAPIs: common.ImportantApi,
 	}
 	data.Scores = buildScores(data)
 	return renderHTMLReport(outputPath, data)
+}
+
+func defaultGraphPath(htmlPath string) string {
+	dir := "."
+	if htmlPath != "" {
+		dir = filepath.Dir(htmlPath)
+	}
+	return filepath.Join(dir, "graph.json")
+}
+
+func isImportantAPI(path string, patterns []string) bool {
+	p := strings.ToLower(path)
+	for _, pat := range patterns {
+		if pat == "" {
+			continue
+		}
+		if strings.Contains(p, strings.ToLower(pat)) {
+			return true
+		}
+	}
+	return false
 }
 
 func buildScores(data HTMLReportData) []ScoredRow {
 	mapCounts := make(map[string]int)
 	for _, m := range data.SourceMaps {
 		mapCounts[m.RootURL]++
+	}
+	importantCounts := make(map[string]int)
+	for _, api := range data.APIs {
+		if isImportantAPI(api.Path, data.ImportantAPIs) {
+			root := api.RootURL
+			if root == "" {
+				root = rootOf(api.SourceURL)
+			}
+			importantCounts[root]++
+		}
 	}
 	sensCounts := make(map[string]int)
 	for _, s := range data.Sensitive {
@@ -108,6 +154,19 @@ func buildScores(data HTMLReportData) []ScoredRow {
 		score := 50
 		var reasons []string
 		var risks []string
+		impCount := importantCounts[rec.Url]
+		debug := map[string]any{
+			"status":          rec.Status,
+			"api_count":       rec.ApiCount,
+			"url_count":       rec.UrlCount,
+			"cdn_count":       rec.CDNCount,
+			"icon_hash":       rec.IconHash,
+			"finger":          "", // filled if available in summary later
+			"map_count":       mapCounts[rec.Url],
+			"sensitive_count": sensCounts[rec.Url],
+			"page_length":     pageLengths[rec.Url],
+			"important_api":   impCount,
+		}
 
 		switch {
 		case rec.Status >= 200 && rec.Status < 300:
@@ -135,6 +194,10 @@ func buildScores(data HTMLReportData) []ScoredRow {
 			score += 20
 			reasons = append(reasons, "has sourcemap")
 		}
+		if imp := impCount; imp > 0 {
+			score += 15
+			reasons = append(reasons, "has important API")
+		}
 		if sens := sensCounts[rec.Url]; sens > 0 {
 			score += 10
 			reasons = append(reasons, "has sensitive hits")
@@ -156,11 +219,13 @@ func buildScores(data HTMLReportData) []ScoredRow {
 			Score:     score,
 			Status:    rec.Status,
 			ApiCount:  rec.ApiCount,
+			Important: impCount,
 			UrlCount:  rec.UrlCount,
 			CDNCount:  rec.CDNCount,
 			SaveDir:   rec.SaveDir,
 			Reasons:   reasons,
 			RiskFlags: risks,
+			DebugMeta: debug,
 		})
 	}
 	return out
@@ -237,9 +302,23 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
     .controls input[type="search"] { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.04); color: var(--text); min-width: 200px; }
     .controls select, .controls button { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.06); color: var(--text); }
+    .controls input[type="text"] { padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); background: rgba(93,228,199,0.1); color: var(--text); min-width: 200px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
     .ellipsis { max-width: 520px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+    .ellipsis-long { max-width: 420px; display: inline-block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+    .icon-thumb { width: 20px; height: 20px; object-fit: contain; border: 1px solid #1f2540; border-radius: 4px; padding: 2px; background: #0b1021; box-shadow: 0 0 0 1px rgba(93,228,199,0.08); }
+    .icon-cell { display:flex; align-items:center; gap:8px; }
+    .mini-copy { padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: var(--text); font-size: 10px; cursor: pointer; }
+    .mini-copy:hover { border-color: var(--accent); color: var(--accent); }
+    .hash-cell { position: relative; }
+    .hash-bubble { position: absolute; top: 100%; left: 0; margin-top: 4px; background: rgba(15,19,38,0.95); border: 1px solid rgba(93,228,199,0.25); box-shadow: 0 8px 30px rgba(0,0,0,0.4); padding: 8px; border-radius: 8px; display: none; z-index: 15; min-width: 280px; max-width: 560px; }
+    .hash-cell:hover .hash-bubble { display: block; }
+    .hash-bubble pre { margin: 0 0 6px 0; white-space: pre-wrap; font-family: inherit; font-size: 12px; color: var(--text); }
+    .copy-btn { padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: var(--text); cursor: pointer; font-size: 11px; }
+    .copy-icon { margin-left: 8px; cursor: pointer; color: var(--muted); font-size: 13px; user-select: none; }
+    .copy-icon:hover { color: var(--accent); }
+    .toast { position: fixed; bottom: 16px; right: 16px; background: rgba(17,21,43,0.9); color: var(--text); padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); display: none; z-index: 30; }
     th { text-align: left; color: var(--muted); font-weight: 600; cursor: pointer; }
     th[data-sort="asc"]::after { content: " ↑"; color: var(--accent); }
     th[data-sort="desc"]::after { content: " ↓"; color: var(--accent); }
@@ -254,6 +333,10 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     .pagination button { padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.05); color: var(--text); cursor: pointer; }
     .tag { display: inline-block; padding: 2px 6px; border-radius: 6px; background: rgba(255,255,255,0.06); font-size: 11px; color: var(--muted); }
     .btn { padding: 6px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); background: rgba(93,228,199,0.12); color: var(--accent); cursor: pointer; font-size: 12px; }
+    .tag-box { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .tag-item { background: rgba(93,228,199,0.16); color: var(--accent); border: 1px solid rgba(93,228,199,0.35); padding: 3px 6px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; box-shadow: 0 4px 18px rgba(0,0,0,0.2); }
+    .tag-remove { cursor: pointer; color: var(--muted); }
+    .tag-remove:hover { color: var(--accent); }
     .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 20; }
     .drawer { width: min(960px, 95vw); max-height: 90vh; overflow: auto; background: var(--panel); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 16px; box-shadow: 0 12px 60px rgba(0,0,0,0.4); }
     .drawer h3 { margin: 0 0 8px 0; color: var(--accent-2); }
@@ -261,6 +344,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     .drawer code { background: rgba(255,255,255,0.05); padding: 2px 4px; border-radius: 4px; }
     .list-block { margin: 8px 0; padding: 8px; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(255,255,255,0.03); }
     .list-block h4 { margin: 0 0 6px 0; font-size: 13px; color: var(--accent); }
+    .tooltip { position: fixed; background: rgba(10,14,28,0.95); color: var(--text); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.35); pointer-events: none; font-size: 12px; display: none; max-width: 520px; z-index: 40; }
   </style>
 </head>
 <body>
@@ -271,10 +355,12 @@ const reportHTMLTemplate = `<!DOCTYPE html>
   <nav class="tabs">
     <button class="active" data-target="section-score">Scores</button>
     <button data-target="section-summary">Summary</button>
+    <button data-target="section-important">Important APIs</button>
     <button data-target="section-api">APIs</button>
     <button data-target="section-sensitive">Sensitive</button>
     <button data-target="section-maps">SourceMaps</button>
     <button data-target="section-pages">Pages</button>
+    <button data-target="section-graph">Graph</button>
   </nav>
   <main>
     <section class="panel section active" id="section-score">
@@ -291,8 +377,8 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         </div>
       </header>
       <div style="overflow:auto">
-        <table>
-          <thead id="score-head"><tr><th data-col="root_url">Root</th><th data-col="score">Score</th><th data-col="status">Status</th><th data-col="api_count">API</th><th data-col="url_count">URLs</th><th data-col="cdn_count">CDN</th><th data-col="reasons">Reasons</th><th data-col="risk_flags">Risk</th><th data-col="save_dir">Save Dir</th><th>Detail</th></tr></thead>
+        <table data-table="scores">
+          <thead id="score-head"><tr><th data-col="root_url">Root</th><th data-col="score">Score</th><th data-col="status">Status</th><th data-col="api_count">API</th><th data-col="important_api">Important API</th><th data-col="url_count">URLs</th><th data-col="cdn_count">CDN</th><th data-col="reasons">Reasons</th><th data-col="risk_flags">Risk</th><th data-col="save_dir">Save Dir</th><th>Detail</th></tr></thead>
           <tbody id="score-body"></tbody>
         </table>
       </div>
@@ -308,13 +394,37 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       </header>
       <div class="stats" id="summary-stats"></div>
       <div style="overflow:auto">
-        <table>
+        <table data-table="summary">
           <thead id="summary-head">
             <tr>
-              <th data-col="Url">URL</th><th data-col="IconHash">Icon hash</th><th data-col="ApiCount">API</th><th data-col="UrlCount">URLs</th><th data-col="CDNCount">CDN URLs</th><th data-col="CDNHosts">CDN Hosts</th><th data-col="Status">Status</th><th data-col="SaveDir">Save Dir</th>
+              <th data-col="Url">URL</th><th data-col="IconBase64">Icon</th><th data-col="IconHash">Icon hash</th><th data-col="ApiCount">API</th><th data-col="UrlCount">URLs</th><th data-col="CDNCount">CDN URLs</th><th data-col="CDNHosts">CDN Hosts</th><th data-col="Status">Status</th><th data-col="SaveDir">Save Dir</th>
             </tr>
           </thead>
           <tbody id="summary-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    {{/* APIs */}}
+    <section class="panel section" id="section-important">
+      <header>
+        <h2>Important APIs</h2>
+        <div class="controls">
+          <input id="important-search" type="search" placeholder="Filter root/path/source">
+          <div class="tag-box" id="important-exclude-tags"></div>
+          <input id="important-exclude-input" type="text" placeholder="Exclude keywords (Enter to add)">
+          <select id="important-page-size">
+            <option value="200">200 / page</option>
+            <option value="500">500 / page</option>
+            <option value="1000">1000 / page</option>
+          </select>
+          <div class="pagination" id="important-pagination"></div>
+        </div>
+      </header>
+      <div style="overflow:auto">
+        <table data-table="important">
+          <thead id="important-head"><tr><th data-col="root_url">Root</th><th data-col="path">Path</th><th data-col="source_url">Source</th><th data-col="save_dir">Save Dir</th></tr></thead>
+          <tbody id="important-body"></tbody>
         </table>
       </div>
     </section>
@@ -325,6 +435,8 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         <h2>APIs</h2>
         <div class="controls">
           <input id="api-search" type="search" placeholder="Filter root/path/source">
+          <div class="tag-box" id="api-exclude-tags"></div>
+          <input id="api-exclude-input" type="text" placeholder="Exclude keywords (Enter to add)">
           <select id="api-page-size">
             <option value="200">200 / page</option>
             <option value="500">500 / page</option>
@@ -334,7 +446,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         </div>
       </header>
       <div style="overflow:auto">
-        <table>
+        <table data-table="api">
           <thead id="api-head"><tr><th data-col="root_url">Root</th><th data-col="path">Path</th><th data-col="source_url">Source</th><th data-col="save_dir">Save Dir</th></tr></thead>
           <tbody id="api-body"></tbody>
         </table>
@@ -345,21 +457,46 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     <section class="panel section" id="section-sensitive">
       <header>
         <h2>Sensitive</h2>
-        <div class="controls">
-          <input id="sens-search" type="search" placeholder="Filter category/content/source">
-          <select id="sens-page-size">
-            <option value="200">200 / page</option>
-            <option value="500">500 / page</option>
-            <option value="1000">1000 / page</option>
-          </select>
-          <div class="pagination" id="sens-pagination"></div>
-        </div>
       </header>
-      <div style="overflow:auto">
-        <table>
-          <thead id="sens-head"><tr><th data-col="category">Category</th><th data-col="content">Content</th><th data-col="source_url">Source</th><th data-col="entropy">Entropy</th><th data-col="save_dir">Save Dir</th></tr></thead>
-          <tbody id="sens-body"></tbody>
-        </table>
+      <div class="panel" style="margin-bottom:12px;">
+        <header>
+          <h3 style="margin:0;font-size:14px;color:var(--accent-2);">security-rule-* (high risk)</h3>
+          <div class="controls">
+            <input id="sens-rule-search" type="search" placeholder="Filter category/content/source">
+            <select id="sens-rule-page-size">
+              <option value="200">200 / page</option>
+              <option value="500">500 / page</option>
+              <option value="1000">1000 / page</option>
+            </select>
+            <div class="pagination" id="sens-rule-pagination"></div>
+          </div>
+        </header>
+        <div style="overflow:auto">
+          <table data-table="sensitive_rules">
+            <thead id="sens-rule-head"><tr><th data-col="category">Category</th><th data-col="content">Content</th><th data-col="source_url">Source</th><th data-col="entropy">Entropy</th><th data-col="save_dir">Save Dir</th></tr></thead>
+            <tbody id="sens-rule-body"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <header>
+          <h3 style="margin:0;font-size:14px;color:var(--accent-2);">Other sensitive</h3>
+          <div class="controls">
+            <input id="sens-other-search" type="search" placeholder="Filter category/content/source">
+            <select id="sens-other-page-size">
+              <option value="200">200 / page</option>
+              <option value="500">500 / page</option>
+              <option value="1000">1000 / page</option>
+            </select>
+            <div class="pagination" id="sens-other-pagination"></div>
+          </div>
+        </header>
+        <div style="overflow:auto">
+          <table data-table="sensitive_other">
+            <thead id="sens-other-head"><tr><th data-col="category">Category</th><th data-col="content">Content</th><th data-col="source_url">Source</th><th data-col="entropy">Entropy</th><th data-col="save_dir">Save Dir</th></tr></thead>
+          <tbody id="sens-other-body"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -378,7 +515,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         </div>
       </header>
       <div style="overflow:auto">
-        <table>
+        <table data-table="maps">
           <thead id="map-head"><tr><th data-col="root_url">Root</th><th data-col="js_url">JS</th><th data-col="map_url">Map</th><th data-col="status">Status</th><th data-col="length">Length</th></tr></thead>
           <tbody id="map-body"></tbody>
         </table>
@@ -400,26 +537,61 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         </div>
       </header>
       <div style="overflow:auto">
-        <table>
+        <table data-table="pages">
           <thead id="page-head"><tr><th data-col="root_url">Root</th><th data-col="url">URL</th><th data-col="status">Status</th><th data-col="content_type">Type</th><th data-col="length">Length</th><th data-col="save_dir">Save Dir</th></tr></thead>
           <tbody id="page-body"></tbody>
         </table>
       </div>
     </section>
+
+    {{/* Graph */}}
+    <section class="panel section" id="section-graph">
+      <header>
+        <h2>Graph (sampled)</h2>
+        <div class="controls">
+          <span class="small">最多显示 2000 条边 · 颜色=状态 (绿/橙/红/灰) · 形状=类型 (● 页, ▢ 资源, ◆ API, ✚ Map)</span>
+        </div>
+      </header>
+      <div style="display:grid;grid-template-columns:1fr 260px;gap:12px;align-items:start;">
+        <div id="graph-container" style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:8px; overflow:auto;">
+          <svg id="graph-svg" width="100%" height="640"></svg>
+        </div>
+        <div class="panel" style="background:rgba(255,255,255,0.03);">
+          <h3 style="margin-top:0;">Legend</h3>
+          <div class="small">颜色：绿=2xx 橙=3xx 红=4xx/5xx 灰=未知</div>
+          <div class="small" style="margin-bottom:8px;">形状：● 页面 ▢ 资源 ◆ API ✚ Map</div>
+          <div id="graph-stats" class="small"></div>
+          <div id="graph-top" class="small" style="margin-top:8px;"></div>
+        </div>
+      </div>
+    </section>
   </main>
 
-  <div class="drawer-overlay" id="detail-overlay">
-    <div class="drawer" id="detail-drawer">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <h3 id="detail-title">Details</h3>
-        <button class="btn" id="detail-close">Close</button>
+    <div class="drawer-overlay" id="detail-overlay">
+      <div class="drawer" id="detail-drawer">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <h3 id="detail-title">Details</h3>
+          <button class="btn" id="detail-close">Close</button>
+        </div>
+        <div id="detail-body"></div>
       </div>
-      <div id="detail-body"></div>
     </div>
-  </div>
+  <div class="toast" id="toast"></div>
+  <div class="tooltip" id="graph-tip"></div>
 
   <script>
     const data = {{.DataJSON}};
+    const importantApis = (data.ImportantAPIs || []).map(s => (s || "").toLowerCase());
+    const importantAPIData = (data.APIs || []).filter(a => isImportant(a.path));
+    const graphEdges = (data.Graph || []).slice(0, 2000);
+    const pageMeta = {};
+    (data.Pages || []).forEach(p => {
+      if (p.url) {
+        pageMeta[p.url] = {status:p.status, type:p.content_type};
+      }
+    });
+    const sensitiveRules = (data.Sensitive||[]).filter(s => (s.category||"").toLowerCase().startsWith("security-rule"));
+    const sensitiveOther = (data.Sensitive||[]).filter(s => !(s.category||"").toLowerCase().startsWith("security-rule"));
     const fmt = {
       esc: (s) => String(s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
       num: (n) => isFinite(n) ? n.toLocaleString() : n
@@ -429,7 +601,73 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       try { const x = new URL(u); return x.protocol + "//" + x.host; } catch { return ""; }
     }
 
-    function setupTable({data, columns, tbodyId, searchId, pagerId, pageSizeId, headId, defaultSize=200, initialSortKey=null, initialSortDir="asc"}) {
+    function isImportant(path) {
+      const p = (path || "").toLowerCase();
+      return importantApis.some(k => k && p.includes(k));
+    }
+
+    function matchesExcludeRow(row, set, keys) {
+      const cols = keys || ["path"];
+      for (const k of set) {
+        const kw = (k || "").toLowerCase();
+        if (!kw) continue;
+        for (const col of cols) {
+          const v = (row[col] || "").toString().toLowerCase();
+          if (v.includes(kw)) return true;
+        }
+      }
+      return false;
+    }
+
+    function setupExcludeUI(inputId, tagBoxId, onChange) {
+      const input = document.getElementById(inputId);
+      const box = document.getElementById(tagBoxId);
+      const tags = [];
+      const set = new Set();
+      function renderTags() {
+        if (!box) return;
+        box.innerHTML = tags.map((t,i)=> '<span class="tag-item">'+fmt.esc(t)+' <span class="tag-remove" data-idx="'+i+'">×</span></span>').join("");
+      }
+      function addTag(raw) {
+        const v = (raw || "").trim().toLowerCase();
+        if (!v) return;
+        if (!set.has(v)) {
+          set.add(v);
+          tags.push(v);
+          renderTags();
+          onChange && onChange(Array.from(set));
+        }
+        if (input) input.value = "";
+      }
+      function removeIdx(idx) {
+        const t = tags[idx];
+        tags.splice(idx,1);
+        set.delete(t);
+        renderTags();
+        onChange && onChange(Array.from(set));
+      }
+      if (input) {
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            addTag(input.value);
+          }
+        });
+        input.addEventListener("blur", () => addTag(input.value));
+      }
+      if (box) {
+        box.addEventListener("click", (e) => {
+          const rm = e.target.closest(".tag-remove");
+          if (!rm) return;
+          const idx = parseInt(rm.dataset.idx, 10);
+          if (!isNaN(idx)) removeIdx(idx);
+        });
+      }
+      renderTags();
+      return {set, tags, addTag};
+    }
+
+    function setupTable({data, columns, tbodyId, searchId, pagerId, pageSizeId, headId, defaultSize=200, initialSortKey=null, initialSortDir="asc", extraFilter=null}) {
       const tbody = document.getElementById(tbodyId);
       const searchInput = document.getElementById(searchId);
       const pager = document.getElementById(pagerId);
@@ -444,9 +682,15 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       columns.forEach(c => { colMap[c.key] = c; });
 
       function filterRows() {
-        if (!filter) return data;
         const f = filter.toLowerCase();
-        return data.filter(row => columns.some(col => (row[col.key] || "").toString().toLowerCase().includes(f)));
+        return data.filter(row => {
+          if (f) {
+            const match = columns.some(col => (row[col.key] || "").toString().toLowerCase().includes(f));
+            if (!match) return false;
+          }
+          if (extraFilter && !extraFilter(row)) return false;
+          return true;
+        });
       }
 
       function sortRows(rows) {
@@ -518,6 +762,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         });
       }
       render();
+      return { rerender: render };
     }
 
     function renderStats(summary) {
@@ -540,7 +785,16 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       data: data.Summary || [],
       columns: [
         {key:"Url", render:(r)=> '<span class="ellipsis" title="'+fmt.esc(r.Url||"")+'">'+fmt.esc(r.Url||"")+'</span>', raw:true},
-        {key:"IconHash"},
+        {key:"IconBase64", render:(r)=> {
+          if (!r.IconBase64) return '<span class="small">-</span>';
+          return '<div class="icon-cell" title="'+fmt.esc(r.IconHash||"")+'"><img class="icon-thumb" src="data:image/x-icon;base64,'+fmt.esc(r.IconBase64)+'" alt="icon"><button class="mini-copy" data-hash="'+fmt.esc(r.IconHash||"")+'">copy</button></div>';
+        }, raw:true},
+        {key:"IconHash", render:(r)=> {
+          const hash = r.IconHash || "";
+          if (!hash) return '<span class="small">-</span>';
+          const esc = fmt.esc(hash);
+          return '<div class="hash-cell"><span class="ellipsis-long">'+esc+'</span><div class="hash-bubble"><pre>'+esc+'</pre><button class="mini-copy" data-hash="'+esc+'">copy</button></div></div>';
+        }, raw:true},
         {key:"ApiCount"},
         {key:"UrlCount"},
         {key:"CDNCount"},
@@ -564,11 +818,12 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         {key:"score"},
         {key:"status"},
         {key:"api_count"},
+        {key:"important_api"},
         {key:"url_count"},
         {key:"cdn_count"},
         {key:"findings", render:(r)=> {
           const s = findStats[r.root_url] || {};
-          return "API:"+ (s.api||0)+" / Sensitive:"+ (s.sens||0)+" / Maps:"+ (s.maps||0)+" / Pages:"+ (s.pages||0)+" / CDN:"+ (s.cdn||0);
+          return "API:"+ (s.api||0)+" / Important:"+ (s.important||0)+" / Sensitive:"+ (s.sens||0)+" / Maps:"+ (s.maps||0)+" / Pages:"+ (s.pages||0)+" / CDN:"+ (s.cdn||0);
         }},
         {key:"reasons", render:(r)=> (r.reasons||[]).join(" | ")},
         {key:"risk_flags", render:(r)=> (r.risk_flags||[]).join(" | ")},
@@ -584,11 +839,22 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       initialSortDir:"desc",
     });
 
-    setupTable({
+    const apiExclude = setupExcludeUI("api-exclude-input", "api-exclude-tags", () => {
+      apiTable?.rerender();
+      importantTable?.rerender();
+    });
+    const importantExclude = setupExcludeUI("important-exclude-input", "important-exclude-tags", () => {
+      importantTable?.rerender();
+    });
+
+    const apiTable = setupTable({
       data: data.APIs || [],
       columns: [
         {key:"root_url"},
-        {key:"path"},
+        {key:"path", render:(r)=> {
+          const mark = isImportant(r.path) ? '<span class="tag" style="color:#ff9f43;border-color:rgba(255,159,67,0.4);background:rgba(255,159,67,0.08)">important</span> ' : '';
+          return mark + '<span class="ellipsis" title="'+fmt.esc(r.path||"")+'">'+fmt.esc(r.path||"")+'</span>';
+        }, raw:true},
         {key:"source_url"},
         {key:"save_dir"},
       ],
@@ -597,22 +863,56 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       pagerId:"api-pagination",
       pageSizeId:"api-page-size",
       headId:"api-head",
+      extraFilter:(row)=> !matchesExcludeRow(row, apiExclude.set, ["path","root_url","source_url"]),
+    });
+
+    const importantTable = setupTable({
+      data: importantAPIData,
+      columns: [
+        {key:"root_url"},
+        {key:"path", render:(r)=> '<span class="ellipsis" title="'+fmt.esc(r.path||"")+'">'+fmt.esc(r.path||"")+'</span>', raw:true},
+        {key:"source_url"},
+        {key:"save_dir"},
+      ],
+      tbodyId:"important-body",
+      searchId:"important-search",
+      pagerId:"important-pagination",
+      pageSizeId:"important-page-size",
+      headId:"important-head",
+      initialSortKey:"root_url",
+      extraFilter:(row)=> !matchesExcludeRow(row, importantExclude.set, ["path","root_url","source_url"]) && !matchesExcludeRow(row, apiExclude.set, ["path","root_url","source_url"]),
     });
 
     setupTable({
-      data: data.Sensitive || [],
+      data: sensitiveRules,
       columns: [
         {key:"category"},
-        {key:"content"},
-        {key:"source_url"},
+        {key:"content", render:(r)=> '<span class="ellipsis-long" title="'+fmt.esc(r.content||"")+'">'+fmt.esc(r.content||"")+'</span>', raw:true},
+        {key:"source_url", render:(r)=> '<span class="ellipsis-long" title="'+fmt.esc(r.source_url||"")+'">'+fmt.esc(r.source_url||"")+'</span>', raw:true},
         {key:"entropy", render:(r)=>r.entropy?.toFixed? r.entropy.toFixed(2): r.entropy},
         {key:"save_dir"},
       ],
-      tbodyId:"sens-body",
-      searchId:"sens-search",
-      pagerId:"sens-pagination",
-      pageSizeId:"sens-page-size",
-      headId:"sens-head",
+      tbodyId:"sens-rule-body",
+      searchId:"sens-rule-search",
+      pagerId:"sens-rule-pagination",
+      pageSizeId:"sens-rule-page-size",
+      headId:"sens-rule-head",
+    });
+
+    setupTable({
+      data: sensitiveOther,
+      columns: [
+        {key:"category"},
+        {key:"content", render:(r)=> '<span class="ellipsis-long" title="'+fmt.esc(r.content||"")+'">'+fmt.esc(r.content||"")+'</span>', raw:true},
+        {key:"source_url", render:(r)=> '<span class="ellipsis-long" title="'+fmt.esc(r.source_url||"")+'">'+fmt.esc(r.source_url||"")+'</span>', raw:true},
+        {key:"entropy", render:(r)=>r.entropy?.toFixed? r.entropy.toFixed(2): r.entropy},
+        {key:"save_dir"},
+      ],
+      tbodyId:"sens-other-body",
+      searchId:"sens-other-search",
+      pagerId:"sens-other-pagination",
+      pageSizeId:"sens-other-page-size",
+      headId:"sens-other-head",
     });
 
     setupTable({
@@ -652,10 +952,14 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       const m = {};
       const inc = (root, key) => {
         if (!root) return;
-        m[root] = m[root] || {api:0,sens:0,maps:0,pages:0,cdn:0};
+        m[root] = m[root] || {api:0,important:0,sens:0,maps:0,pages:0,cdn:0};
         m[root][key] += 1;
       };
-      (data.APIs||[]).forEach(a => inc(a.root_url || rootOf(a.source_url), "api"));
+      (data.APIs||[]).forEach(a => {
+        const root = a.root_url || rootOf(a.source_url);
+        inc(root, "api");
+        if (isImportant(a.path)) inc(root, "important");
+      });
       (data.Sensitive||[]).forEach(s => inc(rootOf(s.source_url), "sens"));
       (data.SourceMaps||[]).forEach(sm => inc(sm.root_url, "maps"));
       (data.Pages||[]).forEach(p => inc(p.root_url || rootOf(p.url), "pages"));
@@ -683,20 +987,39 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       renderDetail(root);
     });
 
+    document.getElementById("summary-body").addEventListener("click", (e) => {
+      const btn = e.target.closest(".mini-copy");
+      if (!btn) return;
+      const hash = btn.getAttribute("data-hash") || "";
+      if (!hash) return;
+      copyText(hash, "icon hash");
+    });
+
+    detailBody.addEventListener("click", (e) => {
+      const btn = e.target.closest(".mini-copy");
+      if (!btn) return;
+      const hash = btn.getAttribute("data-hash") || "";
+      if (!hash) return;
+      copyText(hash, "icon hash");
+    });
+
+
     function renderDetail(root) {
       if (!root) return;
       detailTitle.textContent = root;
       const summary = (data.Summary||[]).find(r => r.Url === root);
       const apis = (data.APIs||[]).filter(a => a.root_url === root);
+      const importantAPIs = apis.filter(a => isImportant(a.path));
       const sens = (data.Sensitive||[]).filter(s => rootOf(s.source_url) === root);
       const maps = (data.SourceMaps||[]).filter(m => m.root_url === root);
       const pages = (data.Pages||[]).filter(p => p.root_url === root || rootOf(p.url) === root);
       const pageBodies = (data.PageBodies||[]).filter(p => p.root_url === root || rootOf(p.url) === root);
       const cdns = (data.CDNHosts||[]).filter(c => c.Root === root);
-      const stats = findStats[root] || {api:0,sens:0,maps:0,pages:0,cdn:0};
+      const stats = findStats[root] || {api:0,important:0,sens:0,maps:0,pages:0,cdn:0};
 
+      const iconHtml = summary && summary.IconBase64 ? '<img class="icon-thumb" src="data:image/x-icon;base64,'+fmt.esc(summary.IconBase64)+'" alt="icon" title="'+fmt.esc(summary.IconHash||"")+'">' : '<span class="small">-</span>';
       const info = summary ? ''
-        + '<div class="row">Status: <code>'+fmt.esc(summary.Status)+'</code> | Icon: <code>'+fmt.esc(summary.IconHash || "-")+'</code></div>'
+        + '<div class="row">Status: <code>'+fmt.esc(summary.Status)+'</code> | Icon: '+iconHtml+' <button class="mini-copy" data-hash="'+fmt.esc(summary.IconHash||"")+'">copy</button> <span class="small">'+fmt.esc(summary.IconHash || "-")+'</span></div>'
         + '<div class="row">API: '+fmt.num(summary.ApiCount||0)+' | URLs: '+fmt.num(summary.UrlCount||0)+' | CDN: '+fmt.num(summary.CDNCount||0)+'</div>'
         + '<div class="row">SaveDir: <code>'+fmt.esc(summary.SaveDir||"")+'</code></div>'
         : '<div class="row">No summary info</div>';
@@ -704,7 +1027,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       const findingsSummary =
         '<div class="list-block">'
         + '<h4>Findings overview</h4>'
-        + '<div class="row">API '+fmt.num(stats.api)+' · Sensitive '+fmt.num(stats.sens)+' · SourceMaps '+fmt.num(stats.maps)+' · Pages '+fmt.num(stats.pages)+' · CDN '+fmt.num(stats.cdn)+'</div>'
+        + '<div class="row">API '+fmt.num(stats.api)+' · Important '+fmt.num(stats.important)+' · Sensitive '+fmt.num(stats.sens)+' · SourceMaps '+fmt.num(stats.maps)+' · Pages '+fmt.num(stats.pages)+' · CDN '+fmt.num(stats.cdn)+'</div>'
         + '</div>';
 
       const block = (title, arr, renderFn) => ''
@@ -716,6 +1039,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       detailBody.innerHTML = ''
         + info
         + findingsSummary
+        + block("Important APIs", importantAPIs, a => "<li><code>"+fmt.esc(a.path)+"</code> <span class='small'>src "+fmt.esc(a.source_url||"")+"</span></li>")
         + block("APIs", apis, a => "<li><code>"+fmt.esc(a.path)+"</code> <span class='small'>src "+fmt.esc(a.source_url||"")+"</span></li>")
         + block("Sensitive", sens, s => "<li><code>"+fmt.esc(s.category||"")+"</code>: "+fmt.esc(s.content||"")+"</li>")
         + block("SourceMaps", maps, m => "<li><code>"+fmt.esc(m.map_url||"")+"</code> <span class='small'>js "+fmt.esc(m.js_url||"")+"</span></li>")
@@ -732,9 +1056,192 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       tabButtons.forEach(b => b.classList.toggle("active", b.dataset.target === id));
     }
     tabButtons.forEach(btn => {
-      btn.addEventListener("click", () => showSection(btn.dataset.target));
+      btn.addEventListener("click", () => {
+        detailOverlay.style.display = "none";
+        showSection(btn.dataset.target);
+      });
     });
     showSection("section-score");
+
+    const tableData = {
+      scores: data.Scores || [],
+      summary: data.Summary || [],
+      api: data.APIs || [],
+      important: importantAPIData,
+      sensitive_rules: sensitiveRules,
+      sensitive_other: sensitiveOther,
+      maps: data.SourceMaps || [],
+      pages: data.Pages || [],
+    };
+
+    document.querySelectorAll("table[data-table] thead th[data-col]").forEach(th => {
+      const tableEl = th.closest("table");
+      const tbl = tableEl ? tableEl.dataset.table : "";
+      const col = th.dataset.col;
+      if (!tbl || !col) return;
+      const icon = document.createElement("span");
+      icon.className = "copy-icon";
+      icon.textContent = "⧉";
+      icon.title = "Copy column (unique)";
+      icon.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rows = tableData[tbl] || [];
+        const vals = Array.from(new Set(rows.map(r => (r && r[col]) ? String(r[col]) : "").filter(Boolean)));
+        copyText(vals.join("\n"), col);
+      });
+      th.appendChild(icon);
+    });
+
+    function copyText(text, label) {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast("Copied "+label+" ("+text.split(/\n/).length+" lines)");
+        }).catch(() => fallbackCopy(text, label));
+      } else {
+        fallbackCopy(text, label);
+      }
+    }
+
+    function fallbackCopy(text, label) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      try { document.execCommand("copy"); showToast("Copied "+label); } catch (e) {}
+      document.body.removeChild(textarea);
+    }
+
+    const toast = document.getElementById("toast");
+    let toastTimer = null;
+    function showToast(msg) {
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.style.display = "block";
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { toast.style.display = "none"; }, 1800);
+    }
+
+    // graph render
+    function renderGraph() {
+      const svg = document.getElementById("graph-svg");
+      if (!svg) return;
+      const edges = [];
+      const seenEdge = new Set();
+      graphEdges.forEach(e => {
+        const key = (e.from||"")+"->"+(e.to||"");
+        if (seenEdge.has(key)) return;
+        seenEdge.add(key);
+        edges.push(e);
+      });
+      if (!edges.length) {
+        svg.innerHTML = '<text x="20" y="30" fill="#8aa0c2">No graph data</text>';
+        return;
+      }
+      const nodes = {};
+      edges.forEach(e => {
+        if (!nodes[e.from]) nodes[e.from] = {id:e.from, depth:e.depth, root:e.root};
+        if (!nodes[e.to]) nodes[e.to] = {id:e.to, depth: Math.max(0, e.depth-1), root:e.root};
+      });
+      const depthGroups = {};
+      Object.values(nodes).forEach(n => {
+        const d = n.depth || 0;
+        depthGroups[d] = depthGroups[d] || [];
+        depthGroups[d].push(n);
+      });
+      const width = svg.clientWidth || 1200;
+      const height = 640;
+      const maxDepth = Math.max(...Object.keys(depthGroups).map(k => parseInt(k,10)), 1);
+      const columnWidth = width / (maxDepth + 1);
+      Object.entries(depthGroups).forEach(([d, arr]) => {
+        arr.forEach((n, i) => {
+          n.x = columnWidth * (parseInt(d,10) + 0.5);
+          n.y = 40 + i * (height - 80) / Math.max(1, arr.length);
+        });
+      });
+      function colorByStatus(n) {
+        const meta = pageMeta[n.id] || {};
+        const s = parseInt(meta.status,10);
+        if (s >=200 && s <300) return "#5de4c7";
+        if (s >=300 && s <400) return "#f9c74f";
+        if (s >=400) return "#ff6b81";
+        return "#8aa0c2";
+      }
+      function shapeByType(n) {
+        const meta = pageMeta[n.id] || {};
+        const t = (meta.type || "").toLowerCase();
+        if (t.includes("javascript") || t.includes("css") || t.includes("image") || t.includes("font")) return "resource";
+        if (n.id.endsWith(".map")) return "map";
+        if (n.id.includes("/api/") || n.id.includes("/graphql")) return "api";
+        return "page";
+      }
+      function iconPath(type, color, x, y) {
+        const r = 7;
+        switch (type) {
+          case "resource":
+            return '<rect x="'+(x-r)+'" y="'+(y-r)+'" width="'+(2*r)+'" height="'+(2*r)+'" rx="2" ry="2" fill="'+color+'" opacity="0.9"/>';
+          case "api":
+            return '<polygon points="'+x+','+(y-r)+' '+(x+r)+','+y+' '+x+','+(y+r)+' '+(x-r)+','+y+'" fill="'+color+'" opacity="0.9"/>';
+          case "map":
+            return '<line x1="'+(x-r)+'" y1="'+y+'" x2="'+(x+r)+'" y2="'+y+'" stroke="'+color+'" stroke-width="3" opacity="0.9"/><line x1="'+x+'" y1="'+(y-r)+'" x2="'+x+'" y2="'+(y+r)+'" stroke="'+color+'" stroke-width="3" opacity="0.9"/>';
+          default:
+            return '<circle cx="'+x+'" cy="'+y+'" r="6" fill="'+color+'" opacity="0.9"/>';
+        }
+      }
+      let html = '';
+      const stats = {page:0, resource:0, api:0, map:0};
+      edges.forEach(e => {
+        const from = nodes[e.from]; const to = nodes[e.to];
+        if (!from || !to) return;
+        html += '<line x1="'+from.x+'" y1="'+from.y+'" x2="'+to.x+'" y2="'+to.y+'" stroke="rgba(173,215,255,0.25)" stroke-width="1"/>';
+      });
+      Object.values(nodes).forEach(n => {
+        const meta = pageMeta[n.id] || {};
+        const color = colorByStatus(n);
+        const tip = fmt.esc(n.id) + "\\n" + (meta.status !== undefined ? ("status: "+meta.status+" "+(meta.type||"")) : "");
+        const shape = shapeByType(n);
+        stats[shape] = (stats[shape]||0)+1;
+        html += '<g class="graph-node" data-tip="'+tip.replace(/"/g,'&quot;')+'">'+iconPath(shape, color, n.x, n.y)+'</g>';
+      });
+      svg.setAttribute("height", height);
+      svg.innerHTML = html;
+      const statEl = document.getElementById("graph-stats");
+      if (statEl) {
+        statEl.innerHTML = '节点统计：page '+(stats.page||0)+' · resource '+(stats.resource||0)+' · api '+(stats.api||0)+' · map '+(stats.map||0)+' · 边 '+edges.length;
+      }
+      const topEl = document.getElementById("graph-top");
+      if (topEl) {
+        const degrees = {};
+        edges.forEach(e => { degrees[e.from]=(degrees[e.from]||0)+1; });
+        const top = Object.entries(degrees).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        topEl.innerHTML = top.length ? ('高出度节点:<br>'+top.map(([u,c])=>fmt.esc(u)+' ('+c+')').join('<br>')) : '';
+      }
+
+      const tipEl = document.getElementById("graph-tip");
+      if (tipEl) {
+        const showTip = (txt, x, y) => {
+          tipEl.textContent = txt;
+          tipEl.style.display = "block";
+          tipEl.style.left = (x + 12) + "px";
+          tipEl.style.top = (y + 12) + "px";
+        };
+        const hideTip = () => { tipEl.style.display = "none"; };
+        svg.querySelectorAll(".graph-node").forEach(node => {
+          node.addEventListener("mousemove", (e) => {
+            const txt = node.dataset.tip || "";
+            showTip(txt, e.clientX, e.clientY);
+          });
+          node.addEventListener("mouseleave", hideTip);
+        });
+      }
+    }
+    renderGraph();
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        detailOverlay.style.display = "none";
+      }
+    });
   </script>
 </body>
 </html>`

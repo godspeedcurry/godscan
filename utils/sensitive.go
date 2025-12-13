@@ -77,7 +77,7 @@ func filterLowValue(data []SensitiveData) []SensitiveData {
 		if lower == "" {
 			continue
 		}
-		if strings.Contains(lower, " password") || strings.Contains(lower, " token") {
+		if strings.Contains(lower, " password") || strings.Contains(lower, " token") || strings.Contains(lower, " input") || strings.Contains(lower, " length") || strings.Contains(lower, "require") {
 			continue
 		}
 		out = append(out, d)

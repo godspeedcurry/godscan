@@ -10,14 +10,15 @@ import (
 )
 
 type SpiderRecord struct {
-	Url      string `json:"Url"`
-	IconHash string `json:"IconHash"`
-	ApiCount int    `json:"ApiCount"`
-	UrlCount int    `json:"UrlCount"`
-	CDNCount int    `json:"CDNCount"`
-	CDNHosts string `json:"CDNHosts"`
-	SaveDir  string `json:"SaveDir"`
-	Status   int    `json:"Status"`
+	Url        string `json:"Url"`
+	IconHash   string `json:"IconHash"`
+	IconBase64 string `json:"IconBase64"`
+	ApiCount   int    `json:"ApiCount"`
+	UrlCount   int    `json:"UrlCount"`
+	CDNCount   int    `json:"CDNCount"`
+	CDNHosts   string `json:"CDNHosts"`
+	SaveDir    string `json:"SaveDir"`
+	Status     int    `json:"Status"`
 }
 
 func InitSpiderDB(path string) (*sql.DB, error) {
@@ -38,6 +39,7 @@ func createSpiderTable(db *sql.DB) error {
 CREATE TABLE IF NOT EXISTS spider_summary (
 	url TEXT PRIMARY KEY,
 	icon_hash TEXT,
+	icon_data TEXT,
 	api_count INTEGER,
 	url_count INTEGER,
 	cdn_count INTEGER,
@@ -136,6 +138,7 @@ CREATE TABLE IF NOT EXISTS page_snapshots (
 	// best-effort migrations for older databases
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_count INTEGER DEFAULT 0`)
 	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN cdn_hosts TEXT DEFAULT ''`)
+	_, _ = db.Exec(`ALTER TABLE spider_summary ADD COLUMN icon_data TEXT DEFAULT ''`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS cdn_hosts (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, host TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
 	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_api_paths_root ON api_paths(root_url)`)
 	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_api_paths_root_path ON api_paths(root_url, path)`)
@@ -150,6 +153,9 @@ CREATE TABLE IF NOT EXISTS page_snapshots (
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS source_maps (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, js_url TEXT, map_url TEXT, status INTEGER, length INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
 	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_source_maps_unique ON source_maps(root_url, map_url)`)
 	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS page_snapshots (root_url TEXT PRIMARY KEY, url TEXT, status INTEGER, content_type TEXT, headers TEXT, body TEXT, length INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
+	_, _ = db.Exec(`CREATE TABLE IF NOT EXISTS graph_edges (id INTEGER PRIMARY KEY AUTOINCREMENT, root_url TEXT, from_url TEXT, to_url TEXT, depth INTEGER, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`)
+	_, _ = db.Exec(`CREATE INDEX IF NOT EXISTS idx_graph_root ON graph_edges(root_url)`)
+	_, _ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_graph_unique ON graph_edges(root_url, from_url, to_url)`)
 	return nil
 }
 
@@ -157,10 +163,11 @@ func SaveSpiderSummary(db *sql.DB, rec SpiderRecord) error {
 	if db == nil {
 		return fmt.Errorf("db is nil")
 	}
-	_, err := db.Exec(`INSERT INTO spider_summary (url, icon_hash, api_count, url_count, cdn_count, cdn_hosts, save_dir, status, updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	_, err := db.Exec(`INSERT INTO spider_summary (url, icon_hash, icon_data, api_count, url_count, cdn_count, cdn_hosts, save_dir, status, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(url) DO UPDATE SET
   icon_hash=excluded.icon_hash,
+  icon_data=excluded.icon_data,
   api_count=excluded.api_count,
   url_count=excluded.url_count,
   cdn_count=excluded.cdn_count,
@@ -168,7 +175,7 @@ ON CONFLICT(url) DO UPDATE SET
   save_dir=excluded.save_dir,
   status=excluded.status,
   updated_at=excluded.updated_at
-`, rec.Url, rec.IconHash, rec.ApiCount, rec.UrlCount, rec.CDNCount, rec.CDNHosts, rec.SaveDir, rec.Status, time.Now().UTC())
+`, rec.Url, rec.IconHash, rec.IconBase64, rec.ApiCount, rec.UrlCount, rec.CDNCount, rec.CDNHosts, rec.SaveDir, rec.Status, time.Now().UTC())
 	return err
 }
 
@@ -219,7 +226,7 @@ func SaveCDNHosts(db *sql.DB, rootURL string, hosts []string) error {
 }
 
 func LoadSpiderSummaries(db *sql.DB) ([]SpiderRecord, error) {
-	rows, err := db.Query(`SELECT url, icon_hash, api_count, url_count, cdn_count, cdn_hosts, save_dir, status FROM spider_summary ORDER BY updated_at DESC`)
+	rows, err := db.Query(`SELECT url, icon_hash, icon_data, api_count, url_count, cdn_count, cdn_hosts, save_dir, status FROM spider_summary ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +234,7 @@ func LoadSpiderSummaries(db *sql.DB) ([]SpiderRecord, error) {
 	var out []SpiderRecord
 	for rows.Next() {
 		var r SpiderRecord
-		if err := rows.Scan(&r.Url, &r.IconHash, &r.ApiCount, &r.UrlCount, &r.CDNCount, &r.CDNHosts, &r.SaveDir, &r.Status); err != nil {
+		if err := rows.Scan(&r.Url, &r.IconHash, &r.IconBase64, &r.ApiCount, &r.UrlCount, &r.CDNCount, &r.CDNHosts, &r.SaveDir, &r.Status); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
