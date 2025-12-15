@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/malfunkt/iprange"
+	"golang.org/x/net/proxy"
 )
 
 type ProtocolInfo struct {
@@ -60,6 +63,93 @@ func parsePorts(portsStr string) ([]int, error) {
 	}
 	uniquePorts, _ := RemoveDuplicateElement(ports)
 	return uniquePorts.([]int), nil
+}
+
+// ParsePortsString exports port parser for reuse.
+func ParsePortsString(portsStr string) ([]int, error) {
+	return parsePorts(portsStr)
+}
+
+// QuickPortScan scans a single IP for the given TCP ports, returning open ports.
+func QuickPortScan(ip string, ports []int, workers int, dialTimeout time.Duration) []int {
+	type job struct{ port int }
+	type res struct{ port int }
+	jobs := make(chan job, len(ports))
+	results := make(chan res, len(ports))
+	if workers <= 0 {
+		workers = 200
+	}
+	if dialTimeout <= 0 {
+		dialTimeout = 2 * time.Second
+	}
+	dialFn := buildPortDialer(dialTimeout)
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				addr := net.JoinHostPort(ip, fmt.Sprintf("%d", j.port))
+				var conn net.Conn
+				var err error
+				if dialFn != nil {
+					conn, err = dialFn.Dial("tcp", addr)
+				} else {
+					conn, err = net.DialTimeout("tcp", addr, dialTimeout)
+				}
+				if err == nil {
+					conn.Close()
+					results <- res{port: j.port}
+				} else {
+					results <- res{port: -j.port}
+				}
+			}
+		}()
+	}
+	go func() {
+		for _, p := range ports {
+			jobs <- job{port: p}
+		}
+		close(jobs)
+	}()
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	open := []int{}
+	for r := range results {
+		if r.port > 0 {
+			open = append(open, r.port)
+		}
+	}
+	sort.Ints(open)
+	return open
+}
+
+func buildPortDialer(timeout time.Duration) proxy.Dialer {
+	raw := os.Getenv("ALL_PROXY")
+	if raw == "" {
+		raw = os.Getenv("all_proxy")
+	}
+	if raw == "" {
+		raw = viper.GetString("port-proxy")
+	}
+	if raw == "" {
+		return nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return nil
+	}
+	if !strings.HasPrefix(strings.ToLower(u.Scheme), "socks") {
+		return nil
+	}
+	dialer, err := proxy.SOCKS5("tcp", u.Host, nil, &net.Dialer{Timeout: timeout, KeepAlive: timeout})
+	if err != nil {
+		return nil
+	}
+	return dialer
 }
 
 // convertTargetListToPool accepts IPs, IP ranges/CIDRs, or domain names.

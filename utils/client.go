@@ -84,3 +84,31 @@ func InitHttpClient(threadsNum int, downProxy string, timeout time.Duration) err
 	}
 	return nil
 }
+
+// CloneDefaultTransport returns a shallow clone of the default transport used by InitHttp/InitHttpClient.
+func CloneDefaultTransport() *http.Transport {
+	dialer := &net.Dialer{
+		Timeout:   dialTimout,
+		KeepAlive: keepAlive,
+	}
+	tr := &http.Transport{
+		DialContext:         dialer.DialContext,
+		MaxConnsPerHost:     10,
+		MaxIdleConns:        20,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     keepAlive,
+		TLSClientConfig:     &tls.Config{InsecureSkipVerify: viper.GetBool("insecure")},
+		TLSHandshakeTimeout: 5 * time.Second,
+		DisableKeepAlives:   false,
+	}
+	if v := viper.GetInt("conn-per-host"); v > 0 {
+		tr.MaxConnsPerHost = v
+		tr.MaxIdleConnsPerHost = v
+	}
+	if proxy := viper.GetString("proxy"); proxy != "" {
+		if u, err := url.Parse(proxy); err == nil {
+			tr.Proxy = http.ProxyURL(u)
+		}
+	}
+	return tr
+}
