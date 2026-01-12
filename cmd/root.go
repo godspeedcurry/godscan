@@ -97,7 +97,7 @@ func newCommandWithAliases(use, shortDesc string, aliases []string, opts Command
 		Run: func(cmd *cobra.Command, args []string) {
 			if err := opts.validateOptions(); err != nil {
 				cmd.Help()
-				os.Exit(0)
+				return
 			}
 			opts.run()
 
@@ -161,7 +161,7 @@ func init() {
 
 	rootCmd.PersistentFlags().Bool("json", false, "enable json log output")
 	rootCmd.PersistentFlags().Bool("quiet", false, "suppress console output")
-	rootCmd.PersistentFlags().Bool("insecure", true, "skip TLS verification")
+	rootCmd.PersistentFlags().Bool("insecure", false, "skip TLS verification (WARNING: reduces security)")
 	rootCmd.PersistentFlags().Int("http-timeout", 10, "http client timeout (seconds)")
 	rootCmd.PersistentFlags().Int("conn-per-host", 0, "max connections per host (0=auto)")
 	rootCmd.PersistentFlags().Int("max-body-bytes", 2*1024*1024, "max response body bytes to read")
@@ -183,6 +183,13 @@ func init() {
 func Execute() {
 	os.Args = expandUF(os.Args)
 	normalizeOutputPaths()
+
+	// Initialize global log file
+	if err := utils.InitLog(viper.GetString("output")); err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to init log: %v\n", err)
+	}
+	defer utils.CloseLog()
+
 	if viper.GetString("proxy") != "" {
 		utils.Info("Proxy is %s", viper.GetString("proxy"))
 	} else {

@@ -343,6 +343,7 @@ func isUsefulAPIPath(path string) bool {
 }
 
 func ParseJavaScriptUrl(Url string, RootPath string, doc string, directory string, apiCounter *int, db *sql.DB) {
+	Debug("Parsing JavaScript for API paths: %s", Url)
 	quote := "['\"`]"
 	ApiReg := regexp.MustCompile(quote + `[\w\$\{\}]*(?P<path>/[\w/\-\|_=@\?\:.]+?)` + quote)
 
@@ -486,6 +487,10 @@ func handleJSAsset(rootPath, fullURL, path string, resp *http.Response, director
 	if sm := sourceMapFromContent(fullURL, bodyStr); sm != "" {
 		probeSourceMap(rootPath, sm, directory, sourceMapSeen, db)
 	}
+	if _, ok := sensitiveUrl.Load(fullURL); !ok {
+		sensitiveUrl.Store(fullURL, true)
+		SensitiveInfoCollect(db, fullURL, bodyStr, directory)
+	}
 	if IsJavaScriptPath(path) {
 		ParseJavaScriptUrl(fullURL, rootPath, bodyStr, directory, apiCounter, db)
 	}
@@ -508,7 +513,7 @@ func crawlLinks(doc *goquery.Document, rootPath string, currentURL string, depth
 		if href == "" {
 			return
 		}
-		normalizeUrl := Normalize(href, rootPath)
+		normalizeUrl := Normalize(href, currentURL)
 		if normalizeUrl != "" && !myMap.Contains(normalizeUrl) {
 			GetGraphCollector().AddEdge(rootPath, currentURL, normalizeUrl, depth)
 			Spider(rootPath, normalizeUrl, depth-1, directory, myMap, sourceMapSeen, apiCounter, db, nil)
@@ -519,7 +524,7 @@ func crawlLinks(doc *goquery.Document, rootPath string, currentURL string, depth
 		if src == "" {
 			return
 		}
-		normalizeUrl := Normalize(src, rootPath)
+		normalizeUrl := Normalize(src, currentURL)
 		if goquery.NodeName(selector) == "script" {
 			probeSourceMap(rootPath, normalizeUrl, directory, sourceMapSeen, db)
 		}
@@ -539,7 +544,7 @@ func handleHTMLContent(rootPath, Url string, depth int, directory string, myMap 
 	// 尝试从脚本中收集 SourceMap 线索
 	doc.Find("script").Each(func(i int, selector *goquery.Selection) {
 		if src, ok := selector.Attr("src"); ok {
-			normalizeUrl := Normalize(src, rootPath)
+			normalizeUrl := Normalize(src, Url)
 			probeSourceMap(rootPath, normalizeUrl, directory, sourceMapSeen, db)
 		}
 	})

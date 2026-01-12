@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -10,8 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/godspeedcurry/godscan/common"
 	"path/filepath"
+
+	"github.com/godspeedcurry/godscan/common"
 )
 
 type HTMLReportData struct {
@@ -26,6 +28,7 @@ type HTMLReportData struct {
 	CDNHosts      []CDNHostRow
 	Graph         []GraphEdge
 	ImportantAPIs []string
+	LLMSummary    *LLMSummary
 }
 
 type ScoredRow struct {
@@ -42,7 +45,7 @@ type ScoredRow struct {
 	DebugMeta map[string]any `json:"debug_meta"`
 }
 
-func ExportHTMLReport(db *sql.DB, outputPath string) error {
+func ExportHTMLReport(ctx context.Context, db *sql.DB, outputPath string, llmCfg *LLMConfig) error {
 	summary, err := LoadSpiderSummaries(db)
 	if err != nil {
 		return err
@@ -90,6 +93,10 @@ func ExportHTMLReport(db *sql.DB, outputPath string) error {
 		ImportantAPIs: common.ImportantApi,
 	}
 	data.Scores = buildScores(data)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	data.LLMSummary = SummarizeReport(ctx, data, llmCfg)
 	return renderHTMLReport(outputPath, data)
 }
 
@@ -345,6 +352,21 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     .list-block { margin: 8px 0; padding: 8px; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(255,255,255,0.03); }
     .list-block h4 { margin: 0 0 6px 0; font-size: 13px; color: var(--accent); }
     .tooltip { position: fixed; background: rgba(10,14,28,0.95); color: var(--text); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.35); pointer-events: none; font-size: 12px; display: none; max-width: 520px; z-index: 40; }
+    .llm-hero { background: linear-gradient(120deg, rgba(93,228,199,0.35) 0%, rgba(173,215,255,0.3) 45%, rgba(93,228,199,0.28) 100%); border: 1px solid rgba(173,215,255,0.6); padding: 16px; border-radius: 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow: 0 18px 60px rgba(0,0,0,0.45); color: var(--bg); }
+    .llm-title { font-size: 20px; font-weight: 700; margin: 0 0 6px 0; color: var(--bg); text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
+    .llm-kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: #0b1021; opacity: 0.8; }
+    .llm-meta { color: var(--bg); opacity: 0.9; font-size: 13px; }
+    .llm-grid { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px; margin-top: 12px; }
+    .llm-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); }
+    .llm-card-head { font-size: 14px; color: var(--accent-2); margin-bottom: 6px; font-weight: 600; }
+    .llm-output { white-space: pre-wrap; line-height: 1.6; font-size: 13px; color: var(--text); }
+    .llm-pre { white-space: pre-wrap; background: rgba(255,255,255,0.04); padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); color: var(--muted); font-size: 12px; }
+    .llm-subhead { color: var(--muted); font-size: 12px; margin: 6px 0 4px; }
+    .llm-error { margin-top: 8px; background: rgba(255,107,129,0.12); border: 1px solid rgba(255,107,129,0.4); color: var(--text); padding: 10px; border-radius: 10px; font-size: 12px; }
+    .md-table { width:100%; border-collapse:collapse; margin-top:6px; }
+    .md-table th, .md-table td { padding:6px 8px; border:1px solid rgba(255,255,255,0.12); font-size:12px; }
+    .md-table th { background: rgba(255,255,255,0.05); color: var(--accent-2); text-align:left; }
+    @media(max-width: 900px) { .llm-grid { grid-template-columns: 1fr; } .llm-hero { flex-direction: column; align-items: flex-start; } }
   </style>
 </head>
 <body>
@@ -353,6 +375,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     <div class="pill">Generated at <span id="generated-at"></span></div>
   </header>
   <nav class="tabs">
+    <button data-target="section-llm">LLM Output</button>
     <button class="active" data-target="section-score">Scores</button>
     <button data-target="section-summary">Summary</button>
     <button data-target="section-important">Important APIs</button>
@@ -363,6 +386,31 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     <button data-target="section-graph">Graph</button>
   </nav>
   <main>
+    <section class="panel section" id="section-llm">
+      <div class="llm-hero">
+        <div>
+          <div class="llm-kicker">LLM Briefing</div>
+          <div class="llm-title" data-llm-status>模型摘要未启用</div>
+          <div class="llm-meta" data-llm-meta>提示：生成报表时提供 --llm-key 或环境变量 GODSCAN_LLM_KEY</div>
+        </div>
+        <div class="pill" data-llm-stamp>离线报表</div>
+      </div>
+      <div class="llm-grid">
+        <div class="llm-card">
+          <div class="llm-card-head">简洁问题摘要</div>
+          <div class="llm-output" data-llm-output>暂无摘要，生成报表时携带 LLM key 后自动生成。</div>
+        </div>
+        <div class="llm-card">
+          <div class="llm-card-head">Prompt & 输入片段</div>
+          <div class="llm-subhead">Prompt</div>
+          <pre class="llm-pre" data-llm-prompt></pre>
+          <div class="llm-subhead">输入（截断预览）</div>
+          <pre class="llm-pre" data-llm-input>生成报表时会截取爬虫文本拼接到此处。</pre>
+        </div>
+      </div>
+      <div class="llm-error" data-llm-error style="display:none;"></div>
+    </section>
+
     <section class="panel section active" id="section-score">
       <header>
         <h2>Scores (rule-based)</h2>
@@ -581,6 +629,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
 
   <script>
     const data = {{.DataJSON}};
+    const defaultLLMPrompt = "请分析如下爬虫爬到的长文本内容，用简洁的语言输出潜在的问题，优先输出安全风险、认证/调试入口、敏感数据暴露。使用中文分点总结，避免重复。";
     const importantApis = (data.ImportantAPIs || []).map(s => (s || "").toLowerCase());
     const importantAPIData = (data.APIs || []).filter(a => isImportant(a.path));
     const graphEdges = (data.Graph || []).slice(0, 2000);
@@ -596,6 +645,151 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       esc: (s) => String(s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
       num: (n) => isFinite(n) ? n.toLocaleString() : n
     };
+
+    function escapeHTML(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    function renderInline(md) {
+      return escapeHTML(md)
+        .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+        .replace(/\x60([^\x60]+)\x60/g, "<code>$1</code>");
+    }
+
+    function markdownToHTML(md) {
+      if (!md) return "<p>暂无摘要，提供 LLM key 后会自动生成，或检查爬虫是否抓到有效内容。</p>";
+      const lines = String(md).split(/\r?\n/);
+      let html = "";
+      let inUl = false, inOl = false;
+      const closeLists = () => {
+        if (inUl) { html += "</ul>"; inUl = false; }
+        if (inOl) { html += "</ol>"; inOl = false; }
+      };
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) { closeLists(); continue; }
+
+        const heading = line.match(/^(#{1,6})\s+(.*)$/);
+        if (heading) {
+          closeLists();
+          html += "<h"+heading[1].length+">"+renderInline(heading[2])+"</h"+heading[1].length+">";
+          continue;
+        }
+
+        if (line.startsWith("|")) {
+          const parsed = parseTable(lines, i);
+          if (parsed) {
+            closeLists();
+            html += parsed.html;
+            i = parsed.nextIdx;
+            continue;
+          }
+        }
+
+        const ul = line.match(/^(\*|-)\s+(.*)$/);
+        if (ul) {
+          if (inOl) { html += "</ol>"; inOl = false; }
+          if (!inUl) { html += "<ul>"; inUl = true; }
+          html += "<li>"+renderInline(ul[2])+"</li>";
+          continue;
+        }
+        const ol = line.match(/^\d+\.\s+(.*)$/);
+        if (ol) {
+          if (inUl) { html += "</ul>"; inUl = false; }
+          if (!inOl) { html += "<ol>"; inOl = true; }
+          html += "<li>"+renderInline(ol[1])+"</li>";
+          continue;
+        }
+        closeLists();
+        html += "<p>"+renderInline(line)+"</p>";
+      }
+      closeLists();
+      return html || "<p>"+renderInline(md)+"</p>";
+    }
+
+    function parseTable(lines, startIdx) {
+      const rows = [];
+      let idx = startIdx;
+      while (idx < lines.length && lines[idx].trim().startsWith("|")) {
+        rows.push(lines[idx].trim());
+        idx++;
+      }
+      if (rows.length < 2) return null;
+      const header = splitRow(rows[0]);
+      const sep = splitRow(rows[1]);
+      if (!header.length || header.length !== sep.length || !sep.every(c => /^:?-{3,}:?$/.test(c))) {
+        return null;
+      }
+      const bodyRows = rows.slice(2).map(splitRow).filter(r => r.length);
+      const headHtml = header.map(c => "<th>"+renderInline(c)+"</th>").join("");
+      const bodyHtml = bodyRows.map(r => "<tr>"+r.map(c => "<td>"+renderInline(c)+"</td>").join("")+"</tr>").join("");
+      return {html: '<table class="md-table"><thead><tr>'+headHtml+'</tr></thead><tbody>'+bodyHtml+'</tbody></table>', nextIdx: idx-1};
+    }
+
+    function splitRow(row) {
+      const trimmed = row.replace(/^\|/, "").replace(/\|$/, "");
+      return trimmed.split("|").map(c => c.trim());
+    }
+
+    function renderLLM(llm) {
+      const section = document.getElementById("section-llm");
+      if (!section) return;
+      const status = section.querySelector("[data-llm-status]");
+      const meta = section.querySelector("[data-llm-meta]");
+      const stamp = section.querySelector("[data-llm-stamp]");
+      const outEl = section.querySelector("[data-llm-output]");
+      const inputEl = section.querySelector("[data-llm-input]");
+      const promptEl = section.querySelector("[data-llm-prompt]");
+      const errEl = section.querySelector("[data-llm-error]");
+      const enabled = !!(llm && (llm.enabled || llm.output || llm.error));
+      const provider = (llm && llm.provider) ? llm.provider : "google";
+      const model = (llm && llm.model) ? llm.model : "gemini-2.5-flash";
+      const outText = (llm && llm.output) ? llm.output : "";
+      const prompt = (llm && llm.prompt) ? llm.prompt : defaultLLMPrompt;
+      const inputPreview = (llm && llm.input_preview) ? llm.input_preview : "生成报表时会截取爬虫文本拼接后发送给模型，预览会显示在此处。";
+      const limitIn = llm && llm.input_limit ? llm.input_limit : null;
+      const limitOut = llm && llm.output_limit ? llm.output_limit : null;
+      if (status) {
+        if (outText) status.textContent = "模型摘要";
+        else if (llm && llm.error) status.textContent = "LLM 摘要失败";
+        else status.textContent = "LLM 摘要未启用";
+      }
+      if (meta) {
+        if (enabled) {
+          const ts = llm && llm.generated_at ? ("生成于 " + llm.generated_at) : "离线渲染";
+          let limits = "";
+          if (limitIn || limitOut) {
+            limits = " · 输入上限 " + (limitIn || "?") + " 字符";
+            if (limitOut) limits += " · 输出上限 " + limitOut + " tokens";
+          }
+          meta.textContent = "Provider " + provider + " · Model " + model + " · " + ts + limits;
+        } else {
+          meta.textContent = "提示：运行 godscan report --llm-key <token> 或设置 GODSCAN_LLM_KEY 可在报表内生成摘要。";
+        }
+      }
+      if (stamp) {
+        stamp.textContent = (llm && llm.generated_at) ? llm.generated_at : "离线报表";
+      }
+      if (outEl) {
+        outEl.innerHTML = markdownToHTML(outText);
+      }
+      if (promptEl) {
+        promptEl.textContent = prompt;
+      }
+      if (inputEl) {
+        inputEl.textContent = inputPreview || "无可用内容";
+      }
+      if (errEl) {
+        if (llm && llm.error) {
+          errEl.style.display = "block";
+          errEl.textContent = llm.error;
+        } else {
+          errEl.style.display = "none";
+        }
+      }
+    }
+
+    renderLLM(data.LLMSummary || {});
 
     function rootOf(u) {
       try { const x = new URL(u); return x.protocol + "//" + x.host; } catch { return ""; }
@@ -1061,7 +1255,11 @@ const reportHTMLTemplate = `<!DOCTYPE html>
         showSection(btn.dataset.target);
       });
     });
-    showSection("section-score");
+    if ((data.LLMSummary && data.LLMSummary.output) ? true : false) {
+      showSection("section-llm");
+    } else {
+      showSection("section-score");
+    }
 
     const tableData = {
       scores: data.Scores || [],

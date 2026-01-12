@@ -40,6 +40,10 @@ godscan weak -k "foo,bar" --full
 
 # 导出离线 HTML 报表（大规模表格，自带分页/搜索）
 godscan report --html report.html
+# (optional) Generate LLM summary inside the HTML report（通过 profile 或 dry-run）
+godscan llm -i                       # 交互式保存加密 profile（name 作为密钥）
+godscan report --llm-profile prod    # 使用已保存的 profile 生成 LLM 摘要
+godscan report --llm-dry-run         # 仅生成摘要预览（不调用模型）
 ```
 
 ## 3. 基础功能
@@ -136,9 +140,19 @@ match http m|^HTTP| p/HTTP Protocol/
 - [x] link 识别  
 基于字符串混乱度（熵值）排序，可快速发现AK/SK等随机字符串
 
+### 基于大模型进行文本总结 - Beta
+gemini3每日有20次额度，可使用[API配置](https://aistudio.google.com/api-keys)获取key
+```
+# 配置ak，使用Profile Name为密钥进行加密存储
+godscan llm 
+# 基于已有报告或者爬虫现爬
+godscan report
+```
 ---
 ## 5. 输出
 * `spider.db` / `report.xlsx`：指纹、API、敏感信息、CDN、SourceMap、首页快照。
+* HTML 报表：离线可分页检索，可选 `--llm-key` 生成 “LLM Summary” 卡片，自动压缩爬虫长文本并输出潜在问题。
+* LLM Profile：`output/config/llm_profiles.json.enc`，使用 `GODSCAN_LLM_SECRET` 加密存储 provider/model/key，命令 `godscan llm --name <n> --key ...`，生成报表时用 `--llm-profile <n>` 复用。
 * `output/` 目录：`result.log`、`spider_summary.json`、`sourcemaps.txt` 等。
 
 ## 6. 跨平台编译 & 开发

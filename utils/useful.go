@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"bufio"
 	"fmt"
 	"html"
 	"net/http"
@@ -20,19 +21,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-const (
-	INT_MAX = int(^uint(0) >> 1)
-	INT_MIN = ^INT_MAX
-)
-
-func Max(nums ...int) int {
-	var maxNum int = INT_MIN
-	for _, num := range nums {
-		if num > maxNum {
-			maxNum = num
+// Deduplicate returns a new slice with duplicate elements removed, preserving the original order.
+func Deduplicate[T comparable](slice []T) []T {
+	seen := make(map[T]struct{})
+	result := make([]T, 0, len(slice))
+	for _, item := range slice {
+		if _, ok := seen[item]; !ok {
+			seen[item] = struct{}{}
+			result = append(result, item)
 		}
 	}
-	return maxNum
+	return result
 }
 
 func StringListToInterfaceList(tmpList []string) []interface{} {
@@ -61,22 +60,20 @@ func StatusColorTransformer(val interface{}) string {
 	}
 }
 
-func Normalize(Path string, RootPath string) string {
-	if strings.Contains(Path, "javascript:") {
+func Normalize(raw string, base string) string {
+	if raw == "" || strings.Contains(raw, "javascript:") {
 		return ""
-	} else if strings.HasPrefix(Path, "http://") {
-		return Path
-	} else if strings.HasPrefix(Path, "https://") {
-		return Path
-	} else if strings.HasPrefix(Path, "./") {
-		return RootPath + Path[1:]
-	} else if strings.HasPrefix(Path, "//") {
-		return "https://" + strings.Replace(Path, "//", "", 1)
-	} else if strings.HasPrefix(Path, "/") {
-		return RootPath + Path
-	} else {
-		return RootPath + "/" + Path
 	}
+	baseURL, err := url.Parse(base)
+	if err != nil {
+		return ""
+	}
+	ref, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	resolved := baseURL.ResolveReference(ref)
+	return resolved.String()
 }
 
 type sliceError struct {
@@ -93,38 +90,13 @@ func Errorf(format string, args ...interface{}) error {
 }
 
 func RemoveDuplicateElement(originals interface{}) (interface{}, error) {
-	temp := map[string]struct{}{}
 	switch slice := originals.(type) {
 	case []string:
-		result := make([]string, 0, len(originals.([]string)))
-		for _, item := range slice {
-			key := fmt.Sprint(item)
-			if _, ok := temp[key]; !ok {
-				temp[key] = struct{}{}
-				result = append(result, item)
-			}
-		}
-		return result, nil
+		return Deduplicate(slice), nil
 	case []int64:
-		result := make([]int64, 0, len(originals.([]int64)))
-		for _, item := range slice {
-			key := fmt.Sprint(item)
-			if _, ok := temp[key]; !ok {
-				temp[key] = struct{}{}
-				result = append(result, item)
-			}
-		}
-		return result, nil
+		return Deduplicate(slice), nil
 	case []int:
-		result := make([]int, 0, len(originals.([]int)))
-		for _, item := range slice {
-			key := fmt.Sprint(item)
-			if _, ok := temp[key]; !ok {
-				temp[key] = struct{}{}
-				result = append(result, item)
-			}
-		}
-		return result, nil
+		return Deduplicate(slice), nil
 	default:
 		err := Errorf("Unknown type: %T", slice)
 		return nil, err
@@ -137,20 +109,18 @@ func ShowInfo() {
 	Info("--sep '%s'", strings.Join(common.SeparatorTop, ","))
 	Info("-k '%s'", strings.Join(common.KeywordTop, ","))
 }
-func RemoveDuplicatesString(arr []string) []string {
-	// 创建一个空的map，用于存储唯一的元素
-	uniqueMap := make(map[string]bool)
-	result := []string{}
 
-	// 遍历数组中的每个元素
+func RemoveDuplicatesString(arr []string) []string {
+	seen := make(map[string]struct{})
+	result := make([]string, 0, len(arr))
+
 	for _, ele := range arr {
 		ele := strings.TrimSpace(ele)
 		if strings.HasPrefix(ele, "====") {
 			continue
 		}
-		// 将元素添加到map中，键为元素的值，值为true
-		if !uniqueMap[ele] {
-			uniqueMap[ele] = true
+		if _, ok := seen[ele]; !ok {
+			seen[ele] = struct{}{}
 			result = append(result, ele)
 		}
 	}
@@ -184,12 +154,22 @@ func UrlFormated(lines []string) []string {
 }
 
 func FileReadLine(filename string) []string {
-	data, err := os.ReadFile(filename)
+	file, err := os.Open(filename)
 	if err != nil {
 		Debug("Skip reading file %s: %v", filename, err)
 		return []string{}
 	}
-	lines := strings.Split(strings.Trim(string(data), "\n"), "\n")
+	defer file.Close()
+
+	var lines []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		Debug("Error reading file %s: %v", filename, err)
+	}
+
 	return RemoveDuplicatesString(lines)
 }
 

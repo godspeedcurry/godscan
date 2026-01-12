@@ -77,12 +77,37 @@ func filterLowValue(data []SensitiveData) []SensitiveData {
 		if lower == "" {
 			continue
 		}
-		if strings.Contains(lower, " password") || strings.Contains(lower, " token") || strings.Contains(lower, " input") || strings.Contains(lower, " length") || strings.Contains(lower, "require") {
+		if isEmptyBearer(lower) {
+			continue
+		}
+		if strings.Contains(lower, " bearer") && !hasBearerPayload(lower) {
+			continue
+		}
+		if strings.Contains(lower, " token") && !hasBearerPayload(lower) {
+			continue
+		}
+		if strings.Contains(lower, " password") {
+			if calculateEntropy(lower) < 2.0 && len(lower) < 16 {
+				continue
+			}
+		}
+		if strings.Contains(lower, " input") || strings.Contains(lower, " length") || strings.Contains(lower, "require") || strings.Contains(lower, "clientsecret") {
 			continue
 		}
 		out = append(out, d)
 	}
 	return out
+}
+
+// isEmptyBearer drops Authorization Bearer entries without a token payload.
+func isEmptyBearer(content string) bool {
+	re := regexp.MustCompile(`(?i)authorization[^a-z0-9]{0,5}bearer\s*["']?\s*$`)
+	return re.MatchString(content)
+}
+
+func hasBearerPayload(content string) bool {
+	re := regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._\-]{4,}`)
+	return re.MatchString(content)
 }
 
 func PrintTable(Url string, key string, data []SensitiveData) {
@@ -118,6 +143,7 @@ func UrlFilter(Url string) bool {
 	return false
 }
 func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory string) {
+	Info("Checking sensitive info in %s", Url)
 	space := `[\s]{0,30}`
 	mustQuote := "['\"`]"
 	quote := "['\"`]?"
@@ -129,7 +155,7 @@ func SensitiveInfoCollect(db *sql.DB, Url string, Content string, directory stri
 	sec := SecList()
 
 	infoMap := make(map[string]string)
-	// 简单词频匹配，降低误报：纯 token/password 词在正文高频出现时也记录
+
 	infoMap["Chinese Mobile Number"] = `[^\d]((?:(?:\+|00)86)?1(?:(?:3[\d])|(?:4[5-79])|(?:5[0-35-9])|(?:6[5-7])|(?:7[0-8])|(?:8[\d])|(?:9[189]))\d{8})[^\d]`
 	infoMap["Internal IP Address"] = `[^0-9]((10\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(172\.((1[6-9]|2[0-9]|3[0-1]))\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5]))|(192\.168\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])\.([0-1]?[0-9]{1,2}|2[0-4][0-9]|25[0-5])))`
 	infoMap["Url"] = `((https?|ftp)://(?:[^\s:@/]+(?::[^\s:@/]*)?@)?[\w_\-\.]{5,256}(?::\d+)?(?:[/?][\w_\-\&\#/%.]*)?)`

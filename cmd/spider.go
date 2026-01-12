@@ -4,6 +4,7 @@ Copyright © 2023 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -33,6 +34,8 @@ var (
 	spiderOptions SpiderOptions
 )
 
+var spiderLLMOpts LLMCLIOptions
+
 func init() {
 
 	spiderCmd := newCommandWithAliases("spider", "Analyze website using DFS, quick usage: -u", []string{"sp", "ss"}, &spiderOptions)
@@ -51,6 +54,8 @@ func init() {
 	viper.SetDefault("spider-timeout-per-host", 90)
 	viper.SetDefault("spider-graph-max-edges", 5000)
 	viper.SetDefault("spider-max-urls-per-host", 2000)
+
+	addLLMFlags(spiderCmd, &spiderLLMOpts)
 
 }
 
@@ -72,6 +77,7 @@ func spawnSpiderWorkers(targets []string, depth int, db *sql.DB, progressLog boo
 		go func(url string) {
 			defer wg.Done()
 			defer func() { <-sem }()
+			utils.Debug("spider debug: start target %s", url)
 			if progressLog {
 				curStart := atomic.AddInt32(&ctx.started, 1)
 				remaining := int32(len(targets)) - curStart
@@ -161,7 +167,7 @@ func cdnHostColor(val interface{}) string {
 func newSpiderCollector(total int, progressLog bool) *spiderCollector {
 	table := prettytable.NewWriter()
 	table.SetOutputMirror(os.Stdout)
-	table.AppendHeader(prettytable.Row{"Url", "IconHash (fofa/hunter)", "API Count", "CDN URLs", "CDN Hosts"})
+	table.AppendHeader(prettytable.Row{"Url", "IconHash", "API Count", "CDN URLs", "CDN Hosts"})
 	table.SetStyle(prettytable.StyleRounded)
 	table.SetColumnConfigs([]prettytable.ColumnConfig{
 		{Number: 1, WidthMax: 64},
@@ -291,7 +297,11 @@ func (o *SpiderOptions) run() {
 	writeSpiderJSONSummary(summaries)
 	writeSpiderGraph(outDir, db)
 	utils.Info("Data persisted to spider.db (run `godscan report` to view)")
-	autoExportReport(db)
+	llmCfg := spiderLLMOpts.ToConfig()
+	if llmCfg != nil {
+		utils.Info("LLM Abstract provider=%s model=%s", llmCfg.Provider, llmCfg.Model)
+	}
+	autoExportReport(db, llmCfg)
 
 	hostErrs := utils.CollectHostErrorStats(true)
 	for host, stat := range hostErrs {
@@ -301,7 +311,7 @@ func (o *SpiderOptions) run() {
 
 }
 
-func autoExportReport(db *sql.DB) {
+func autoExportReport(db *sql.DB, llmCfg *utils.LLMConfig) {
 	if db == nil {
 		return
 	}
@@ -309,7 +319,7 @@ func autoExportReport(db *sql.DB) {
 	outDir := "output"
 	_ = os.MkdirAll(outDir, 0o755)
 	final := filepath.Join(outDir, fmt.Sprintf("report-%04d-%02d-%02d.html", now.Year(), now.Month(), now.Day()))
-	if err := utils.ExportHTMLReport(db, final); err != nil {
+	if err := utils.ExportHTMLReport(context.Background(), db, final, llmCfg); err != nil {
 		utils.Error("auto-export html failed: %v", err)
 		return
 	}

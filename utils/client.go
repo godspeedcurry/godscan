@@ -44,7 +44,7 @@ func InitHttpClient(threadsNum int, downProxy string, timeout time.Duration) err
 
 	tr := &http.Transport{
 		DialContext:         dialer.DialContext,
-		MaxConnsPerHost:     Max(5, threadsNum),
+		MaxConnsPerHost:     max(5, threadsNum),
 		MaxIdleConns:        threadsNum * 2,
 		MaxIdleConnsPerHost: threadsNum * 2,
 		IdleConnTimeout:     keepAlive,
