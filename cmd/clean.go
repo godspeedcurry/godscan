@@ -47,6 +47,14 @@ func (o *CleanOptions) run() {
 			return err
 		}
 
+		// Skip source directories to prevent accidental deletion of assets
+		if info.IsDir() {
+			name := info.Name()
+			if name == "utils" || name == "cmd" || name == "common" || name == ".git" || name == ".agent" || name == ".github" {
+				return filepath.SkipDir
+			}
+		}
+
 		if info.IsDir() && dateDirRegex.MatchString(info.Name()) {
 			// 检查是否删除目录
 			utils.Info("Do you want to delete directory: %s? (y/N)", path)
@@ -60,11 +68,14 @@ func (o *CleanOptions) run() {
 			}
 			return filepath.SkipDir
 		} else if !info.IsDir() {
-			if strings.HasSuffix(info.Name(), ".log") || strings.HasSuffix(info.Name(), ".csv") {
+			// Update: include html (reports), json (graph/summary), db (spider)
+			ext := strings.ToLower(filepath.Ext(info.Name()))
+			if ext == ".log" || ext == ".csv" || ext == ".html" || ext == ".json" || ext == ".db" {
 				// 检查是否删除文件
 				utils.Info("Do you want to delete file: %s? (y/N)", path)
 				response, _ := reader.ReadString('\n')
-				if strings.TrimSpace(response) == "y" || strings.TrimSpace(response) == "" {
+				// Fix: Default to No for safety
+				if strings.TrimSpace(strings.ToLower(response)) == "y" {
 					if err := os.Remove(path); err != nil {
 						utils.Error("Error deleting file: %v", err)
 					} else {

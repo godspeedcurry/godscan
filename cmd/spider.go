@@ -269,6 +269,12 @@ func (o *SpiderOptions) validateOptions() error {
 func (o *SpiderOptions) run() {
 	start := time.Now()
 	utils.InitHttp()
+
+	// Prompt LLM if needed (interactive only)
+	if llmCfg := promptLLMIfNeeded(rootCmd, &spiderLLMOpts); llmCfg != nil {
+		utils.Info("LLM summary enabled: provider=%s model=%s", llmCfg.Provider, llmCfg.Model)
+	}
+
 	outDir := viper.GetString("output-dir")
 	if outDir == "" {
 		outDir = "output"

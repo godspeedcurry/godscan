@@ -17,7 +17,7 @@ import (
 const (
 	DefaultLLMProvider = "google"
 	DefaultLLMModel    = "gemini-2.5-flash"
-	DefaultLLMPrompt   = "你是安全分析助手。请以表格形式输出，按 root_url 逐条输出风险评分(0-10)、关键证据（敏感命中/高熵/重要API/CDN暴露等）、以及明显的误报要排除。要求：\\n- 不要泛泛而谈，只引用输入里给出的内容；\\n- 先列高风险，再列中低风险；\\n- 误报要明确标记；\\n- 简短中文要点。"
+	DefaultLLMPrompt   = "你是安全分析助手。请以Markdown表格形式输出，按 root_url 逐条输出风险评分(0-10)、关键证据（敏感命中/高熵/重要API/CDN暴露等）、以及明显的误报要排除。要求：\n- 不要泛泛而谈，只引用输入里给出的内容；\n- 先列高风险，再列中低风险；\n- 误报要明确标记；\n- 简短中文要点。"
 	DefaultLLMMaxChars = 128000
 )
 
@@ -159,6 +159,22 @@ func buildLLMInput(data HTMLReportData, maxChars int) string {
 		}
 	}
 
+	mapsByRoot := map[string]int{}
+	for _, m := range data.SourceMaps {
+		mapsByRoot[m.RootURL]++
+	}
+
+	bodiesByRoot := map[string][]PageSnapshotLite{}
+	for _, p := range data.PageBodies {
+		r := p.RootURL
+		if r == "" {
+			r = rootOf(p.URL)
+		}
+		if r != "" {
+			bodiesByRoot[r] = append(bodiesByRoot[r], p)
+		}
+	}
+
 	writeLine("# Per-root findings (focused on sensitive/high-entropy/CDN/important APIs)")
 	type rootScore struct {
 		rec   SpiderRecord
@@ -204,8 +220,20 @@ func buildLLMInput(data HTMLReportData, maxChars int) string {
 			break
 		}
 
-		if home := homepageSnippet(s.Url, data.PageBodies); home != "" {
-			writeLine("Homepage snippet: " + home)
+		bodies := bodiesByRoot[s.Url]
+		if home := homepageSnippet(s.Url, bodies); home != "" {
+			if title := extractTitle(home); title != "" {
+				writeLine("Title: " + title)
+			}
+			writeLine("Snippet: " + home)
+		}
+
+		if kw := extractHomepageKeywords(bodies); len(kw) > 0 {
+			writeLine("Keywords: " + strings.Join(kw, ", "))
+		}
+
+		if mc := mapsByRoot[s.Url]; mc > 0 {
+			writeLine(fmt.Sprintf("SourceMaps: %d found", mc))
 		}
 
 		if sens := sensByRoot[s.Url]; len(sens) > 0 {
@@ -306,11 +334,26 @@ func homepageSnippet(root string, pages []PageSnapshotLite) string {
 	if bestLen == 0 {
 		return ""
 	}
-	snip := compactText(best.Snippet)
-	if snip == "" {
-		snip = compactText(best.Headers)
+	// Compress: strip HTML tags to save tokens but keep content
+	text := stripHTML(best.Snippet)
+	if text == "" {
+		text = compactText(best.Headers)
 	}
-	return truncate(snip, 140)
+	return truncate(compactText(text), 1200)
+}
+
+func stripHTML(html string) string {
+	// Remove script/style blocks (handle truncated content with $)
+	reScript := regexp.MustCompile(`(?si)<script[^>]*>.*?(?:</script>|$)|(?si)<style[^>]*>.*?(?:</style>|$)`)
+	html = reScript.ReplaceAllString(html, " ")
+	// Remove tags
+	reTag := regexp.MustCompile(`<[^>]+>`)
+	html = reTag.ReplaceAllString(html, " ")
+	// Remove truncated tag at the end (e.g. "<div c")
+	reTruncatedTag := regexp.MustCompile(`<[^>]*$`)
+	html = reTruncatedTag.ReplaceAllString(html, " ")
+	// Compact whitespace
+	return compactText(html)
 }
 
 var wordSplit = regexp.MustCompile(`[A-Za-z0-9_]+`)
@@ -371,6 +414,15 @@ func extractHomepageKeywords(pages []PageSnapshotLite) []string {
 		out = append(out, items[i].word)
 	}
 	return out
+}
+
+func extractTitle(html string) string {
+	re := regexp.MustCompile(`(?i)<title>(.*?)</title>`)
+	m := re.FindStringSubmatch(html)
+	if len(m) > 1 {
+		return compactText(m[1])
+	}
+	return ""
 }
 
 func callGoogleLLM(ctx context.Context, cfg *LLMConfig, input string) (string, error) {

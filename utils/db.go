@@ -440,7 +440,7 @@ func LoadPageSnapshotMeta(db *sql.DB) ([]PageSnapshotMeta, error) {
 }
 
 func LoadPageSnapshotLite(db *sql.DB) ([]PageSnapshotLite, error) {
-	rows, err := db.Query(`SELECT root_url, url, status, content_type, length, headers, substr(body,1,800) FROM page_snapshots ORDER BY created_at DESC`)
+	rows, err := db.Query(`SELECT root_url, url, status, content_type, length, headers, substr(body,1,4096) FROM page_snapshots ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}

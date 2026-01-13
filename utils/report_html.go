@@ -351,7 +351,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
     .drawer code { background: rgba(255,255,255,0.05); padding: 2px 4px; border-radius: 4px; }
     .list-block { margin: 8px 0; padding: 8px; border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; background: rgba(255,255,255,0.03); }
     .list-block h4 { margin: 0 0 6px 0; font-size: 13px; color: var(--accent); }
-    .tooltip { position: fixed; background: rgba(10,14,28,0.95); color: var(--text); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.35); pointer-events: none; font-size: 12px; display: none; max-width: 520px; z-index: 40; }
+    .tooltip { position: fixed; background: rgba(10,14,28,0.95); color: var(--text); padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(93,228,199,0.25); box-shadow: 0 10px 30px rgba(0,0,0,0.35); pointer-events: none; font-size: 12px; display: none; max-width: 520px; z-index: 40; white-space: pre-wrap; }
     .llm-hero { background: linear-gradient(120deg, rgba(93,228,199,0.35) 0%, rgba(173,215,255,0.3) 45%, rgba(93,228,199,0.28) 100%); border: 1px solid rgba(173,215,255,0.6); padding: 16px; border-radius: 14px; display:flex; align-items:center; justify-content:space-between; gap:12px; box-shadow: 0 18px 60px rgba(0,0,0,0.45); color: var(--bg); }
     .llm-title { font-size: 20px; font-weight: 700; margin: 0 0 6px 0; color: var(--bg); text-shadow: 0 1px 0 rgba(255,255,255,0.3); }
     .llm-kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; color: #0b1021; opacity: 0.8; }
@@ -652,6 +652,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
 
     function renderInline(md) {
       return escapeHTML(md)
+        .replace(/&lt;br\s*\/?&gt;/gi, "<br>") // Restore <br> tags for table formatting
         .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
         .replace(/\x60([^\x60]+)\x60/g, "<code>$1</code>");
     }
@@ -1396,7 +1397,7 @@ const reportHTMLTemplate = `<!DOCTYPE html>
       Object.values(nodes).forEach(n => {
         const meta = pageMeta[n.id] || {};
         const color = colorByStatus(n);
-        const tip = fmt.esc(n.id) + "\\n" + (meta.status !== undefined ? ("status: "+meta.status+" "+(meta.type||"")) : "");
+        const tip = fmt.esc(n.id) + "\n" + (meta.status !== undefined ? ("status: "+meta.status+" "+(meta.type||"")) : "");
         const shape = shapeByType(n);
         stats[shape] = (stats[shape]||0)+1;
         html += '<g class="graph-node" data-tip="'+tip.replace(/"/g,'&quot;')+'">'+iconPath(shape, color, n.x, n.y)+'</g>';
