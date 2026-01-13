@@ -55,7 +55,7 @@ func init() {
 }
 
 func promptLLMIfNeeded(cmd *cobra.Command, opts *LLMCLIOptions) *utils.LLMConfig {
-	if cmd.Flags().NFlag() > 0 || opts == nil || opts.Profile != "" || opts.DryRun {
+	if cmd.Flags().NFlag() > 0 || opts == nil || opts.Profile != "" || opts.APIKey != "" || opts.DryRun {
 		return opts.ToConfig()
 	}
 	if !stdinIsTTY() {

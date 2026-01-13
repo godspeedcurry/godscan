@@ -15,6 +15,7 @@ var (
 	profileKey         string
 	profileModel       string
 	profileProvider    string
+	profileBaseURL     string
 	profileDelete      string
 	profileList        bool
 	profileInteractive bool
@@ -68,6 +69,7 @@ var llmCmd = &cobra.Command{
 				Provider: firstNonEmpty(profileProvider, utils.DefaultLLMProvider),
 				Model:    firstNonEmpty(profileModel, utils.DefaultLLMModel),
 				APIKey:   strings.TrimSpace(profileKey),
+				BaseURL:  strings.TrimSpace(profileBaseURL),
 			}
 			if p.APIKey == "" {
 				utils.Error("profile key is empty, use --key")
@@ -92,6 +94,7 @@ func init() {
 	llmCmd.Flags().StringVar(&profileKey, "key", "", "API key for profile (required for save)")
 	llmCmd.Flags().StringVar(&profileModel, "model", "", "Model id, e.g. gemini-3-flash-preview")
 	llmCmd.Flags().StringVar(&profileProvider, "provider", "", "LLM provider, default google")
+	llmCmd.Flags().StringVar(&profileBaseURL, "base-url", "", "Custom LLM API base URL")
 	llmCmd.Flags().BoolVar(&profileList, "list", false, "List saved profiles")
 	llmCmd.Flags().StringVar(&profileDelete, "delete", "", "Delete profile by name")
 	llmCmd.Flags().BoolVarP(&profileInteractive, "interactive", "i", false, "Interactive mode: prompt for name/model/key")
@@ -119,7 +122,13 @@ func runInteractiveProfile() {
 	defaultProvider := utils.DefaultLLMProvider
 	defaultModel := utils.DefaultLLMModel
 	defaultKey := ""
-	provider := strings.TrimSpace(prompt(reader, fmt.Sprintf("Provider [%s]: ", defaultProvider), defaultProvider))
+
+	baseURL := strings.TrimSpace(prompt(reader, "Base URL (optional): ", ""))
+	provider := defaultProvider
+	if baseURL != "" {
+		provider = "openai"
+	}
+
 	model := strings.TrimSpace(promptModel(reader, defaultModel))
 	key := strings.TrimSpace(prompt(reader, "API key (leave blank to keep existing): ", defaultKey))
 	if key == "" {
@@ -131,6 +140,7 @@ func runInteractiveProfile() {
 		Provider: provider,
 		Model:    model,
 		APIKey:   key,
+		BaseURL:  baseURL,
 	}
 	profiles = utils.UpsertProfile(profiles, p)
 	if err := utils.SaveLLMProfiles(path, secret, profiles); err != nil {
@@ -151,24 +161,41 @@ func prompt(r *bufio.Reader, msg, def string) string {
 }
 
 func promptModel(r *bufio.Reader, def string) string {
-	options := []string{"gemini-2.5-flash", "gemini-3-flash-preview"}
-	fmt.Printf("Model options:\n")
-	for i, opt := range options {
-		fmt.Printf(" %d) %s\n", i+1, opt)
+	models := []struct {
+		Label string
+		ID    string
+	}{
+		{"Gemini 3 Flash", "gemini-3-flash"},
+		{"Gemini 3 Pro High", "gemini-3-pro-high"},
+		{"Gemini 3 Pro Low", "gemini-3-pro-low"},
+		{"Gemini 2.5 Flash", "gemini-2.5-flash"},
+		{"Gemini 2.5 Pro", "gemini-2.5-pro"},
+		{"Gemini 2.5 Flash Thinking", "gemini-2.5-flash-thinking"},
+		{"Claude 4.5 Sonnet", "claude-sonnet-4-5"},
+		{"Claude 4.5 Sonnet Thinking", "claude-sonnet-4-5-thinking"},
+		{"GPT-4o", "gpt-4o"},
 	}
-	fmt.Printf("Choose model [default %s]: ", def)
+
+	fmt.Printf("Model options:\n")
+	for i, m := range models {
+		fmt.Printf(" %d) %s (%s)\n", i+1, m.Label, m.ID)
+	}
+	fmt.Printf("Choose model (enter number or custom ID) [default %s]: ", def)
 	text, _ := r.ReadString('\n')
 	text = strings.TrimSpace(text)
-	switch text {
-	case "1":
-		return options[0]
-	case "2":
-		return options[1]
-	case "":
+	if text == "" {
 		return def
-	default:
-		return text
 	}
+
+	// Try to parse as index
+	var idx int
+	if _, err := fmt.Sscanf(text, "%d", &idx); err == nil {
+		if idx >= 1 && idx <= len(models) {
+			return models[idx-1].ID
+		}
+	}
+	// Fallback: assume user typed custom model ID
+	return text
 }
 
 func getOrPromptSecret(allowPrompt bool) string {

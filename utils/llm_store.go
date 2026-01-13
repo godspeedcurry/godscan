@@ -18,6 +18,7 @@ type LLMProfile struct {
 	Provider string `json:"provider"`
 	Model    string `json:"model"`
 	APIKey   string `json:"api_key"`
+	BaseURL  string `json:"base_url,omitempty"`
 }
 
 const (

@@ -26,6 +26,7 @@ type LLMConfig struct {
 	Model         string
 	Prompt        string
 	APIKey        string
+	BaseURL       string
 	MaxInputChars int
 	MaxOutputTok  int
 	DryRun        bool
@@ -91,7 +92,22 @@ func SummarizeReport(ctx context.Context, data HTMLReportData, cfg *LLMConfig) *
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	out, err := callGoogleLLM(ctx, cfg, input)
+
+	var out string
+	var err error
+
+	// Dispatch based on config
+	if cfg.BaseURL != "" || strings.ToLower(cfg.Provider) == "openai" {
+		out, err = callOpenAI(ctx, cfg, input)
+	} else if strings.ToLower(cfg.Provider) == "google" {
+		out, err = callGoogleLLM(ctx, cfg, input)
+	} else {
+		// Default or unknown -> try generic/OpenAI if we have a BaseURL, else Google?
+		// Actually if provider is not "google" (default) but BaseURL is empty, it's an error unless we default to OpenAI for non-google providers.
+		// For now, assume unconfigured means Google defaults.
+		out, err = callGoogleLLM(ctx, cfg, input)
+	}
+
 	if err != nil {
 		Warning("LLM request failed: %v", err)
 		res.Error = err.Error()
@@ -429,6 +445,75 @@ func callGoogleLLM(ctx context.Context, cfg *LLMConfig, input string) (string, e
 		}
 	}
 	return "", fmt.Errorf("llm response empty")
+}
+
+func callOpenAI(ctx context.Context, cfg *LLMConfig, input string) (string, error) {
+	if cfg == nil {
+		return "", fmt.Errorf("llm config missing")
+	}
+	baseURL := strings.TrimRight(cfg.BaseURL, "/")
+	if baseURL == "" {
+		baseURL = "https://api.openai.com/v1"
+	}
+	// If the user didn't include /v1 or /chat/completions, we need to be careful.
+	// Standard OpenAI client takes a base URL that usually ends in /v1.
+	// We will append /chat/completions.
+	endpoint := baseURL + "/chat/completions"
+
+	model := cfg.Model
+	if model == "" {
+		model = "gpt-3.5-turbo" // Fallback if no model specified for OpenAI
+	}
+	prompt := cfg.Prompt
+	if prompt == "" {
+		prompt = DefaultLLMPrompt
+	}
+
+	payload := map[string]any{
+		"model": model,
+		"messages": []map[string]string{
+			{"role": "system", "content": prompt},
+			{"role": "user", "content": input},
+		},
+		"temperature": 0.3,
+		"max_tokens":  maxOutputTokens(cfg),
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if cfg.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	}
+
+	client := &http.Client{Timeout: 90 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 300 {
+		return "", fmt.Errorf("openai http %d: %s", resp.StatusCode, truncate(compactText(string(respBody)), 240))
+	}
+
+	var parsed struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	if err := json.Unmarshal(respBody, &parsed); err != nil {
+		return "", fmt.Errorf("decode openai response: %w", err)
+	}
+	if len(parsed.Choices) > 0 {
+		return parsed.Choices[0].Message.Content, nil
+	}
+	return "", fmt.Errorf("openai response empty")
 }
 
 func maxOutputTokens(cfg *LLMConfig) int {

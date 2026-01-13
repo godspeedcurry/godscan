@@ -14,6 +14,8 @@ type LLMCLIOptions struct {
 	MaxChars int
 	DryRun   bool
 	Profile  string
+	APIKey   string
+	BaseURL  string
 }
 
 func addLLMFlags(cmd *cobra.Command, target *LLMCLIOptions) {
@@ -24,6 +26,8 @@ func addLLMFlags(cmd *cobra.Command, target *LLMCLIOptions) {
 	cmd.Flags().IntVar(&target.MaxChars, "llm-max-chars", utils.DefaultLLMMaxChars, "Max characters sent to LLM (after trimming)")
 	cmd.Flags().BoolVar(&target.DryRun, "llm-dry-run", false, "Do not call LLM; embed the would-be request preview in report for debugging")
 	cmd.Flags().StringVar(&target.Profile, "llm-profile", "", "Load provider/model/key from encrypted profile")
+	cmd.Flags().StringVar(&target.APIKey, "llm-key", "", "Directly provide API key (skips profile loading)")
+	cmd.Flags().StringVar(&target.BaseURL, "llm-base-url", "", "Custom LLM API base URL (e.g. http://localhost:8080/v1)")
 }
 
 // ToConfig converts CLI flags + env into runtime config. Returns nil when disabled/no key.
@@ -32,8 +36,14 @@ func (o *LLMCLIOptions) ToConfig() *utils.LLMConfig {
 		return nil
 	}
 	secret := strings.TrimSpace(o.Profile)
-	key := ""
 	var profile *utils.LLMProfile
+
+	// Move defaults to top scope
+	provider := utils.DefaultLLMProvider
+	model := utils.DefaultLLMModel
+	key := strings.TrimSpace(o.APIKey)
+	baseURL := strings.TrimSpace(o.BaseURL)
+
 	if o.Profile != "" {
 		path := utils.DefaultLLMProfilePath(viper.GetString("output-dir"))
 		if profs, err := utils.LoadLLMProfiles(path, secret); err == nil {
@@ -47,19 +57,6 @@ func (o *LLMCLIOptions) ToConfig() *utils.LLMConfig {
 			utils.Warning("load llm profile failed (use profile name as secret): %v", err)
 		}
 	}
-	if profile != nil && key == "" {
-		key = profile.APIKey
-	}
-	enabled := o.DryRun || profile != nil
-	if !enabled {
-		return nil
-	}
-	if !o.DryRun && key == "" {
-		utils.Warning("LLM skipped: no profile/key provided (set --llm-profile or use --llm-dry-run)")
-		return nil
-	}
-	provider := utils.DefaultLLMProvider
-	model := utils.DefaultLLMModel
 	if profile != nil {
 		if strings.TrimSpace(profile.Provider) != "" {
 			provider = strings.TrimSpace(profile.Provider)
@@ -67,7 +64,23 @@ func (o *LLMCLIOptions) ToConfig() *utils.LLMConfig {
 		if strings.TrimSpace(profile.Model) != "" {
 			model = strings.TrimSpace(profile.Model)
 		}
+		if key == "" {
+			key = profile.APIKey
+		}
+		if baseURL == "" {
+			baseURL = profile.BaseURL
+		}
 	}
+
+	enabled := o.DryRun || key != ""
+	if !enabled {
+		return nil
+	}
+	if !o.DryRun && key == "" {
+		utils.Warning("LLM skipped: no key provided (use --llm-key, --llm-profile or --llm-dry-run)")
+		return nil
+	}
+
 	prompt := strings.TrimSpace(o.Prompt)
 	if prompt == "" {
 		prompt = utils.DefaultLLMPrompt
@@ -78,12 +91,15 @@ func (o *LLMCLIOptions) ToConfig() *utils.LLMConfig {
 	}
 	if profile != nil {
 		utils.Info("LLM profile loaded: name=%s provider=%s model=%s", profile.Name, provider, model)
+	} else if key != "" {
+		utils.Info("LLM using ephemeral key (provider=%s model=%s)", provider, model)
 	}
 	return &utils.LLMConfig{
 		Provider:      strings.ToLower(provider),
 		Model:         model,
 		Prompt:        prompt,
 		APIKey:        key,
+		BaseURL:       baseURL,
 		MaxInputChars: maxChars,
 		DryRun:        o.DryRun,
 	}
