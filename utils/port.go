@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/cheggaaa/pb/v3"
+	"github.com/fatih/color"
 	"github.com/spf13/viper"
 
 	"github.com/malfunkt/iprange"
@@ -244,6 +245,10 @@ func PortScan(IpRange string, PortRange string) {
 	Info("Total Threads(s): %d", viper.GetInt("threads"))
 
 	bar := pb.StartNew(len(ports_list) * len(ips))
+	bar.SetMaxWidth(90)
+	bar.Set("prefix", color.CyanString("port"))
+	bar.SetTemplateString(`{{string . "prefix"}} {{counters . }} {{bar . "|" "█" "█" "░" "|"}} {{percent . }} | {{etime . }}`)
+	bar.SetRefreshRate(200 * time.Millisecond)
 
 	taskChan := make(chan ProtocolInfo, viper.GetInt("threads"))
 	results := make(chan ProtocolInfo)

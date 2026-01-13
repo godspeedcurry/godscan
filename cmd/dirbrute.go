@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/cheggaaa/pb/v3"
+	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	prettytable "github.com/jedib0t/go-pretty/v6/table"
@@ -54,6 +56,10 @@ func (o *DirbruteOptions) run() {
 	}
 
 	bar := pb.StartNew(totalTasks)
+	bar.SetMaxWidth(90)
+	bar.Set("prefix", color.CyanString("dirbrute"))
+	bar.SetTemplateString(`{{string . "prefix"}} {{counters . }} {{bar . "|" "█" "█" "░" "|"}} {{percent . }} | {{etime . }}`)
+	bar.SetRefreshRate(200 * time.Millisecond)
 
 	table := prettytable.NewWriter()
 	table.SetOutputMirror(os.Stdout)

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/cheggaaa/pb/v3"
+	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/common"
 	"github.com/godspeedcurry/godscan/utils"
 	prettytable "github.com/jedib0t/go-pretty/v6/table"
@@ -50,7 +51,7 @@ func init() {
 	viper.BindPFlag("spider-threads", spiderCmd.PersistentFlags().Lookup("threads"))
 	viper.SetDefault("spider-threads", 20)
 	viper.BindPFlag("spider-progress-log", spiderCmd.PersistentFlags().Lookup("progress-log"))
-	viper.SetDefault("spider-progress-log", true)
+	viper.SetDefault("spider-progress-log", false)
 	viper.SetDefault("spider-timeout-per-host", 90)
 	viper.SetDefault("spider-graph-max-edges", 5000)
 	viper.SetDefault("spider-max-urls-per-host", 2000)
@@ -181,8 +182,9 @@ func newSpiderCollector(total int, progressLog bool) *spiderCollector {
 	if !viper.GetBool("quiet") {
 		bar = pb.StartNew(total)
 		bar.SetMaxWidth(90)
-		bar.Set("prefix", "spider")
-		bar.SetTemplateString(`{{string . "prefix"}} {{counters .}} {{bar . "[" "=" ">" " " "]"}} {{percent .}} | elapsed: {{etime .}} | eta: {{rtime .}}`)
+		bar.Set("prefix", color.CyanString("spider"))
+		// Modern block style
+		bar.SetTemplateString(`{{string . "prefix"}} {{counters . }} {{bar . "|" "█" "█" "░" "|"}} {{percent . }} | {{etime . }}`)
 		bar.SetRefreshRate(200 * time.Millisecond)
 	}
 
@@ -198,16 +200,16 @@ func newSpiderCollector(total int, progressLog bool) *spiderCollector {
 func (c *spiderCollector) updateProgress() {
 	if c.bar != nil {
 		c.bar.Increment()
-		cur := atomic.AddInt32(&c.processed, 1)
-		c.bar.Set("prefix", fmt.Sprintf("spider %d/%d", cur, c.total))
+		_ = atomic.AddInt32(&c.processed, 1)
 		if !c.progressLog || c.total == 0 {
 			return
 		}
-		percent := int(cur) * 100 / c.total
-		if percent >= c.progressMilestone {
-			utils.Info("spider progress: %d/%d (%d%%)", cur, c.total, percent)
-			c.progressMilestone += 10
-		}
+		// Redundant log removed
+		// percent := int(cur) * 100 / c.total
+		// if percent >= c.progressMilestone {
+		// 	utils.Info("spider progress: %d/%d (%d%%)", cur, c.total, percent)
+		// 	c.progressMilestone += 10
+		// }
 	}
 }
 

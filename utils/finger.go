@@ -317,7 +317,6 @@ func ImportantApiJudge(ApiResult string, Url string) {
 			Success("Import Api found %s @ %s", key, Url)
 			if key == "/api/blade-user" {
 				Success("Might related to SpringBlade CVE-2021-44910")
-				FileWrite("cve.log", "[%s] Might related to SpringBlade CVE-2021-44910", Url)
 			}
 		}
 	}
@@ -364,7 +363,7 @@ func ParseJavaScriptUrl(Url string, RootPath string, doc string, directory strin
 		*apiCounter += ApiResultLen
 		var totalResult = strings.Join(ApiResult, "\n")
 		ImportantApiJudge(totalResult, Url)
-		FileWrite(directory+"api_raw.txt", "==== %s ====\n# total: %d\n%s\n", Url, ApiResultLen, totalResult)
+		FileWrite(directory+"api_trace.log", "==== %s ====\n# total: %d\n%s\n", Url, ApiResultLen, totalResult)
 		SaveAPIPaths(db, RootPath, Url, ApiResult, directory)
 	}
 
@@ -714,15 +713,14 @@ func isAbsoluteURL(urlStr string) bool {
 }
 
 func ApiDeDuplicate(RootPath string, directory string) {
-	rawApi := FileReadLine(directory + "api_raw.txt")
+	rawApi := FileReadLine(directory + "api_trace.log")
 	fullPaths := []string{}
 	if len(rawApi) > 0 {
-		FileWrite(directory+"api_unique.txt", "%s", strings.Join(rawApi, "\n"))
 		for _, raw := range rawApi {
 			fullPaths = append(fullPaths, RootPath+raw)
 		}
-		FileWrite(directory+"api_unique_full.txt", "==== Try: dirbrute --url-file %s\n", directory+"api_unique_full.txt")
-		FileWrite(directory+"api_unique_full.txt", "%s\n", strings.Join(fullPaths, "\n"))
+		FileWrite(directory+"api_endpoints.txt", "==== Try: dirbrute --url-file %s\n", directory+"api_endpoints.txt")
+		FileWrite(directory+"api_endpoints.txt", "%s\n", strings.Join(fullPaths, "\n"))
 	}
 }
 
@@ -879,7 +877,11 @@ func runSpider(out *SpiderSummary, rootPath, origURL string, depth int, db *sql.
 		out.Err = err
 		return
 	}
-	directory := fmt.Sprintf("%s/%s/spider/", time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
+	outDir := viper.GetString("output-dir")
+	if outDir == "" {
+		outDir = "output"
+	}
+	directory := fmt.Sprintf("%s/%s/%s/spider/", outDir, time.Now().Format("2006-01-02"), host.Hostname()+"_"+host.Port())
 	apiCounter := 0
 	err = Spider(rootPath, origURL, depth, directory, myMap, sourceMapSeen, &apiCounter, db, &prefetchedPage{
 		body:        string(fres.Body),

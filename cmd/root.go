@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/fatih/color"
 	"github.com/godspeedcurry/godscan/utils"
 	"github.com/google/go-github/v57/github"
 	"github.com/spf13/cobra"
@@ -34,15 +35,17 @@ func checkForUpdate(currentVersion string) {
 }
 
 func bannerText() string {
-	return `
+	banner := `
 ██████╗   ██████╗ ██████╗ ███████╗ ██████╗ █████╗ ███╗   ██╗
 ██╔════╝ ██╔═══██╗██╔══██╗██╔════╝██╔════╝██╔══██╗████╗  ██║
 ██║  ███╗██║   ██║██║  ██║███████╗██║     ███████║██╔██╗ ██║
 ██║   ██║██║   ██║██║  ██║╚════██║██║     ██╔══██║██║╚██╗██║
 ╚██████╔╝╚██████╔╝██████╔╝███████║╚██████╗██║  ██║██║ ╚████║
- ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝															
-godscan version: ` + version + `
-`
+ ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝`
+
+	// Create a gradient-like effect or at least a nice color
+	c := color.New(color.FgCyan, color.Bold)
+	return c.Sprint(banner) + fmt.Sprintf("\n%s version: %s\n", color.New(color.FgHiWhite).Sprint("godscan"), color.New(color.FgGreen).Sprint(version))
 }
 
 func maybeCheckForUpdate() {
@@ -76,6 +79,14 @@ var rootCmd = &cobra.Command{
 	Use:   "godscan",
 	Short: bannerText() + "Let's fight against the world.",
 	Long:  `godscan - web recon, API extraction, weakpass generator, port fingerprint.`,
+	Example: `  # Spider a website
+  godscan spider -u https://example.com
+
+  # Scan ports
+  godscan port -i 192.168.1.1/24
+
+  # Generate weak passwords
+  godscan weakpass -k "corp"`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		maybeCheckForUpdate()
 	},

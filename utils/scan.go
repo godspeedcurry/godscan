@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"path/filepath"
 	"regexp"
 	"runtime"
 	"sort"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/cheggaaa/pb/v3"
 	regexp2 "github.com/dlclark/regexp2"
+	"github.com/fatih/color"
 
 	"github.com/spf13/viper"
 )
@@ -923,6 +923,11 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	ConfigInit()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	bar := pb.StartNew(len(addr))
+	bar.SetMaxWidth(90)
+	bar.Set("prefix", color.CyanString("service"))
+	bar.SetTemplateString(`{{string . "prefix"}} {{counters . }} {{bar . "|" "█" "█" "░" "|"}} {{percent . }} | {{etime . }}`)
+	bar.SetRefreshRate(200 * time.Millisecond)
+
 	// 初始化 VScan 实例，并加载默认 nmap-service-probes 文件解析 Probe 列表
 	v := VScan{}
 	v.Init()
@@ -940,11 +945,10 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 		worker := Worker{inTargetChan, outResultChan, &config}
 		worker.Start(&v, &wgWorkers)
 	}
-	ServiceInfoResults := []string{}
+
 	// 实时结果输出协程
 	wgOutput := sync.WaitGroup{}
 	wgOutput.Add(1)
-	var mu sync.Mutex
 
 	go func(wg *sync.WaitGroup) {
 		for {
@@ -955,13 +959,20 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 				if len(banner) > 128 {
 					banner = banner[:128]
 				}
-				bar.Increment()
+				// Format: Service://IP:Port
 				ServiceInfoResult := fmt.Sprintf("%s://%s:%d", result.Name, result.Target.IP, result.Target.Port)
-				mu.Lock()
-				ServiceInfoResults = append(ServiceInfoResults, ServiceInfoResult)
-				mu.Unlock()
+
+				// Clear the progress bar line before logging
+				fmt.Print("\r\033[K")
+
+				// Log success - this goes to console and persistent log file (result.log)
 				Success("%s", ServiceInfoResult)
-				Warning("%s", hex.Dump([]byte(banner)))
+
+				// Log details - banner info
+				if banner != "" {
+					Info("Banner for %s:\n%s", ServiceInfoResult, hex.Dump([]byte(banner)))
+				}
+				bar.Increment()
 			} else {
 				break
 			}
@@ -983,14 +994,5 @@ func ScanWithIpAndPort(addr []ProtocolInfo) {
 	close(outResultChan)
 	Debug("Output goroutine finished")
 	wgOutput.Wait()
-
-	sort.Strings(ServiceInfoResults)
-	outDir := viper.GetString("output-dir")
-	if outDir == "" {
-		outDir = "."
-	}
-	servicePath := filepath.Join(outDir, "service.txt")
-	Success("Log at %s", servicePath)
-	FileWrite(servicePath, "%s", strings.Join(ServiceInfoResults, "\n")+"\n")
-
+	bar.Finish()
 }

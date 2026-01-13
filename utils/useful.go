@@ -156,7 +156,9 @@ func UrlFormated(lines []string) []string {
 func FileReadLine(filename string) []string {
 	file, err := os.Open(filename)
 	if err != nil {
-		Debug("Skip reading file %s: %v", filename, err)
+		if !os.IsNotExist(err) {
+			Debug("Skip reading file %s: %v", filename, err)
+		}
 		return []string{}
 	}
 	defer file.Close()
